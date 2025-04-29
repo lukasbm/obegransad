@@ -1,9 +1,11 @@
 #include <Arduino.h>
 #include <WiFi.h>
+#include "weather.cpp"
 
 // TODO:!
 #define WIFI_SSID ""
 #define WIFI_PASSWORD ""
+
 
 void wifi_connect(void);
 
