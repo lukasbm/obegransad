@@ -1,7 +1,8 @@
 #include <Arduino.h>
 #include "led.cpp"
 #include "time.cpp"
-
+#include "config.cpp"
+#include "weather.cpp"
 class SceneSwitcher
 {
 private:
@@ -40,13 +41,34 @@ public:
 
 class WeatherScene : public Scene
 {
+private:
+    struct WeatherData weatherData;
+    int secondsSinceLastFetch = 0;
+
+    void drawWeatherData()
+    {
+        // TODO:
+    }
+
 public:
     void activate() override
     {
+        weatherData = fetchWeather(settings.weather_latitude, settings.weather_longitude);
     }
 
     void update() override
     {
+        if (fullSecond)
+        {
+            secondsSinceLastFetch++;
+            if (secondsSinceLastFetch >= settings.weather_update_interval)
+            {
+                weatherData = fetchWeather(settings.weather_latitude, settings.weather_longitude);
+                secondsSinceLastFetch = 0;
+            }
+
+            drawWeatherData();
+        }
     }
 };
 
@@ -54,7 +76,6 @@ class ClockScene : public Scene
 {
 private:
     long mil;
-    int brightness = 100;
     uint8_t sec;
     uint8_t minute;
     uint8_t hour;
@@ -78,7 +99,7 @@ public:
             p_printChar(9, 0, (hour % 10) + 48);
             p_printChar(2, 9, (minute / 10) + 48);
             p_printChar(9, 9, (minute % 10) + 48);
-            p_scan(); // refreshes display
+            panel_scan(); // refreshes display
 
             // JEDE MINUTE
             sec++;
@@ -92,7 +113,7 @@ public:
             Serial.printf("Current time: %s\n", getTimeString());
         }
 
-        // TASTE
+        // TODO: move somewhere else! BUTTON
         if (digitalRead(P_KEY) == 0)
         {
             brightness += 50;

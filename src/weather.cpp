@@ -57,7 +57,7 @@ struct WeatherData fetchWeather(float lat, float lon)
     return res;
 }
 
-void parseWeatherData(WeatherData& res, const JsonDocument& doc)
+static void parseWeatherData(WeatherData &res, const JsonDocument &doc)
 {
     JsonObject current = doc["current"];
     res.temperature = current["temperature_2m"];

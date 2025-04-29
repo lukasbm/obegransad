@@ -6,7 +6,7 @@
 #define WIFI_SSID ""
 #define WIFI_PASSWORD ""
 
-void sleep(uint64_t seconds)
+void enter_light_sleep(uint64_t seconds)
 {
     esp_sleep_enable_timer_wakeup(seconds * 1000000ULL);
     gpio_wakeup_enable(WAKEUP_PIN, GPIO_INTR_LOW_LEVEL);

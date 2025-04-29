@@ -21,11 +21,59 @@ struct Settings
 {
     float weather_latitude;
     float weather_longitude;
-    float weather_update_interval; // in minutes
+    float weather_update_interval; // in seconds
+
+    int brightness_day;
+    int brightness_night;
 
     std::vector<OffTime> off_time_everyday;
     std::vector<OffTime> off_time_weekdays;
     std::vector<OffTime> off_time_weekends;
+
+    JsonObject json() const
+    {
+        JsonObject obj;
+
+        // weather
+        JsonObject weather = obj.createNestedObject("weather");
+        weather["latitude"] = weather_latitude;
+        weather["longitude"] = weather_longitude;
+        weather["update_interval"] = weather_update_interval;
+
+        // clock
+        JsonObject clock = obj.createNestedObject("clock");
+        clock["brightness_day"] = brightness_day;
+        clock["brightness_night"] = brightness_night;
+        JsonObject off_times = clock.createNestedObject("off_times");
+        JsonArray off_time_weekdays_arr = clock.createNestedArray("off_time_weekdays");
+        for (const OffTime &off_time : off_time_weekdays)
+        {
+            JsonObject off_time_obj = off_time_weekdays_arr.createNestedObject();
+            off_time_obj["start_hour"] = off_time.start_hour;
+            off_time_obj["start_minute"] = off_time.start_minute;
+            off_time_obj["end_hour"] = off_time.end_hour;
+            off_time_obj["end_minute"] = off_time.end_minute;
+        }
+        JsonArray off_time_weekends_arr = clock.createNestedArray("off_time_weekends");
+        for (const OffTime &off_time : off_time_weekends)
+        {
+            JsonObject off_time_obj = off_time_weekends_arr.createNestedObject();
+            off_time_obj["start_hour"] = off_time.start_hour;
+            off_time_obj["start_minute"] = off_time.start_minute;
+            off_time_obj["end_hour"] = off_time.end_hour;
+            off_time_obj["end_minute"] = off_time.end_minute;
+        }
+        JsonArray off_time_everyday_arr = clock.createNestedArray("off_time_everyday");
+        for (const OffTime &off_time : off_time_everyday)
+        {
+            JsonObject off_time_obj = off_time_everyday_arr.createNestedObject();
+            off_time_obj["start_hour"] = off_time.start_hour;
+            off_time_obj["start_minute"] = off_time.start_minute;
+            off_time_obj["end_hour"] = off_time.end_hour;
+            off_time_obj["end_minute"] = off_time.end_minute;
+        }
+        return obj;
+    }
 };
 
 void parseOffTimes(std::vector<OffTime> &res, const JsonArray &doc)
@@ -53,20 +101,26 @@ void parseOffTimes(std::vector<OffTime> &res, const JsonArray &doc)
 
 bool parseSettings(Settings &res, const JsonDocument &doc)
 {
-    if (!doc.containsKey("weather_latitude") ||
-        !doc.containsKey("weather_longitude"))
+    // clock scene settings
+    if (!doc.containsKey("clock"))
         return false;
+    JsonObject clock = doc["clock"];
+    if (clock.containsKey("off_time_everyday"))
+        parseOffTimes(res.off_time_everyday, clock["off_time_everyday"]);
+    if (clock.containsKey("off_time_weekdays"))
+        parseOffTimes(res.off_time_weekdays, clock["off_time_weekdays"]);
+    if (clock.containsKey("off_time_weekends"))
+        parseOffTimes(res.off_time_weekends, clock["off_time_weekends"]);
+    res.brightness_day = clock["brightness_day"] | 100;
+    res.brightness_night = clock["brightness_night"] | 50;
 
-    if (doc.containsKey("off_time_everyday"))
-        parseOffTimes(res.off_time_everyday, doc["off_time_everyday"]);
-    if (doc.containsKey("off_time_weekdays"))
-        parseOffTimes(res.off_time_weekdays, doc["off_time_weekdays"]);
-    if (doc.containsKey("off_time_weekends"))
-        parseOffTimes(res.off_time_weekends, doc["off_time_weekends"]);
-
-    res.weather_latitude = doc["weather"]["latitude"];
-    res.weather_longitude = doc["weather"]["longitude"];
-    res.weather_update_interval = doc["weather_update_interval"] | 5; // default to 5 if not set
+    // weather settings
+    if (!doc.containsKey("weather"))
+        return false;
+    JsonObject weather = doc["weather"];
+    res.weather_latitude = weather["latitude"];
+    res.weather_longitude = weather["longitude"];
+    res.weather_update_interval = weather["update_interval"] | 300;
 
     return true;
 }
@@ -78,7 +132,7 @@ void replyConfig(AsyncWebServerRequest *request)
     request->send(200, "application/json", payload);
 }
 
-void receiveConfig(AsyncWebServerRequest *request)
+void handleNewConfig(AsyncWebServerRequest *request)
 {
     // get body
     if (!request->hasArg("plain"))
@@ -117,6 +171,6 @@ void receiveConfig(AsyncWebServerRequest *request)
 void setup_config_server(void)
 {
     server.on("/config", HTTP_GET, replyConfig);
-    server.on("/config", HTTP_POST, receiveConfig);
+    server.on("/config", HTTP_POST, handleNewConfig);
     server.begin();
 }

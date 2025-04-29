@@ -17,14 +17,14 @@
                     "to_minute": 59
                 }
             ],
-            "weekends": [
-            ]
+            "weekends": []
         },
         "brightness_day": 100,
         "brightness_night": 20
     },
     "weather": {
         "latitude": 49.4613909,
-        "longitude": 11.1540788
+        "longitude": 11.1540788,
+        "update_interval": 300
     }
 }

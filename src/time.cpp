@@ -1,7 +1,7 @@
 #include <time.h>
 #include <string.h>
+
 #define NTP_SERVER "pool.ntp.org"
-// TODO: take timezone from weather["timezone"]
 
 static time_t now;
 static struct tm timeinfo;
@@ -70,8 +70,7 @@ void set_clock_from_tm()
     hour = tm.tm_hour;
 }
 
-
-
-void setup_clock() {
+void setup_clock()
+{
     setTime();
 }
