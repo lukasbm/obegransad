@@ -56,5 +56,8 @@
         "thread": "cpp",
         "cinttypes": "cpp",
         "typeinfo": "cpp"
-    }
+    },
+    "cSpell.words": [
+        "Obengransad"
+    ]
 }

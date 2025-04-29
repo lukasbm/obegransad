@@ -114,7 +114,7 @@ void receiveConfig(AsyncWebServerRequest *request)
     request->send(200, "application/json", "{\"success\":\"Settings saved\"}");
 }
 
-void setup_server(void)
+void setup_config_server(void)
 {
     server.on("/config", HTTP_GET, replyConfig);
     server.on("/config", HTTP_POST, receiveConfig);

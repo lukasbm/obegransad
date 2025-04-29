@@ -1,39 +1,35 @@
 #include <Arduino.h>
-#include <WiFi.h>
 #include "weather.cpp"
+#include "device.cpp"
+#include "config.cpp"
+#include "led.cpp"
+#include "scene.cpp"
 
-// TODO:!
-#define WIFI_SSID ""
-#define WIFI_PASSWORD ""
+#define BUTTON_PIN GPIO_NUM_9 // button pin!
 
-
-void wifi_connect(void);
+SceneSwitcher sceneSwitcher;
 
 void setup()
 {
   Serial.begin(115200);
   wifi_connect();
-  esp_deep_sleep_start();
+  setup_config_server();
+  sceneSwitcher.nextScene(); // Start with the first scene
 }
 
 void loop()
 {
-}
 
-void wifi_connect(void)
-{
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  Serial.print("Connecting to ");
-  Serial.println(WIFI_SSID);
-
-  while (WiFi.status() != WL_CONNECTED)
+  // Check if the button is pressed
+  if (digitalRead(BUTTON_PIN) == LOW)
   {
-    delay(500);
-    Serial.print(".");
+    Serial.println("Button pressed!");
+    sceneSwitcher.nextScene();
   }
-  Serial.println("");
 
-  Serial.println("WiFi connected!");
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
+  // Update the current scene
+  sceneSwitcher.tick();
+  
+  delay(50);
+
 }
