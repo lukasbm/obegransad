@@ -3,6 +3,7 @@
 #include "time.cpp"
 #include "config.cpp"
 #include "weather.cpp"
+
 class SceneSwitcher
 {
 private:
@@ -41,10 +42,11 @@ class WeatherScene : public Scene
 private:
     struct WeatherData weatherData;
     int secondsSinceLastFetch = 0;
+    int lastSecond = -1;
 
     void drawWeatherData()
     {
-        // TODO:
+        // TODO: idk
     }
 
 public:
@@ -55,7 +57,9 @@ public:
 
     void update() override
     {
-        if (fullSecond)
+        int currSecond = time_second();
+
+        if (time_second() != lastSecond && secondsSinceLastFetch >= 65)
         {
             secondsSinceLastFetch++;
             if (secondsSinceLastFetch >= settings.weather_update_interval)
@@ -63,15 +67,18 @@ public:
                 weatherData = fetchWeather(settings.weather_latitude, settings.weather_longitude);
                 secondsSinceLastFetch = 0;
             }
-
             drawWeatherData();
         }
+
+        lastSecond = currSecond;
     }
 };
 
 class ClockScene : public Scene
 {
 private:
+    int lastMinute = -1;
+
     void print_time(uint8_t hour, uint8_t minute)
     {
         panel_clear();
@@ -86,33 +93,18 @@ public:
     void activate() override
     {
         panel_debugTest();
-        print_time(hour, minute);
+        print_time(time_hour(), time_minute());
     }
 
     void update() override
     {
-        // JEDE SEKUNDE
-        if (millis() > mil + 1000)
+        int currMinute = time_minute();
+
+        if (currMinute != lastMinute)
         {
-            mil = millis();
-            // PRINT THE TIME
-
-            panel_printChar(2, 0, (hour / 10) + 48);
-            panel_printChar(9, 0, (hour % 10) + 48);
-            panel_printChar(2, 9, (minute / 10) + 48);
-            panel_printChar(9, 9, (minute % 10) + 48);
-            panel_show(); // refreshes display
-
-            // JEDE MINUTE
-            sec++;
-            // every minute set the time
-            if (sec > 60)
-            {
-                sec = 0;
-                set_clock_from_tm();
-                set_ntp_time();
-            }
-            Serial.printf("Current time: %s\n", getTimeString());
+            print_time(time_hour(), currMinute);
         }
+
+        lastMinute = currMinute;
     }
 };

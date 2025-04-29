@@ -13,7 +13,7 @@ void enter_light_sleep(uint64_t seconds)
     esp_sleep_enable_gpio_wakeup();
 
     // turn of wifi
-    wifi_off();
+    // wifi_off();
 
     // enter sleep
     esp_err_t res = esp_light_sleep_start(); // returns ESP_OK on wakeup
@@ -27,8 +27,8 @@ void enter_light_sleep(uint64_t seconds)
     esp_sleep_wakeup_cause_t reason = esp_sleep_get_wakeup_cause();
     Serial.printf("Wakeup cause: %d\n", reason);
 
-    // restore wifi
-    wifi_connect();
+    // restore wifi (it should reconnect automatically though)
+    // wifi_connect();
 }
 
 void wifi_connect(void)
@@ -58,7 +58,7 @@ void wifi_connect(void)
 void wifi_off()
 {
     Serial.println("Disconnecting from WiFi...");
-    WiFi.disconnect();
+    // WiFi.disconnect();
     WiFi.mode(WIFI_OFF);
     Serial.println("WiFi disconnected!");
 }

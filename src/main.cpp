@@ -20,6 +20,8 @@ void setup()
 
   wifi_connect();
 
+  time_setup();
+
   setup_config_server();
 
   sceneSwitcher.nextScene(); // Start with the first scene
