@@ -9,18 +9,15 @@ private:
     Scene scenes[2] = {
         WeatherScene(),
         ClockScene()};
-    int currentSceneIndex = 0;
-
-    SceneSwitcher(void)
-    {
-        // start with first scene
-        scenes[0].activate();
-    }
+    int currentSceneIndex = -1; // -1 means no scene is active
 
 public:
     void nextScene()
     {
-        scenes[currentSceneIndex].deactivate();
+        if (currentSceneIndex != -1)
+        {
+            scenes[currentSceneIndex].deactivate();
+        }
         currentSceneIndex = (currentSceneIndex + 1) % 2;
         Serial.printf("Switching to scene %d\n", currentSceneIndex);
         scenes[currentSceneIndex].activate();
@@ -82,7 +79,7 @@ private:
         panel_printChar(9, 0, (hour % 10) + 48);
         panel_printChar(2, 9, (minute / 10) + 48);
         panel_printChar(9, 9, (minute % 10) + 48);
-        panel_scan(1, settings.brightness); // refreshes display
+        panel_show(1, settings.brightness); // refreshes display
     }
 
 public:
@@ -104,7 +101,7 @@ public:
             panel_printChar(9, 0, (hour % 10) + 48);
             panel_printChar(2, 9, (minute / 10) + 48);
             panel_printChar(9, 9, (minute % 10) + 48);
-            panel_scan(); // refreshes display
+            panel_show(); // refreshes display
 
             // JEDE MINUTE
             sec++;
@@ -113,19 +110,9 @@ public:
             {
                 sec = 0;
                 set_clock_from_tm();
-                set_clock();
+                set_ntp_time();
             }
             Serial.printf("Current time: %s\n", getTimeString());
-        }
-
-        // TODO: move somewhere else! BUTTON
-        if (digitalRead(P_KEY) == 0)
-        {
-            brightness += 50;
-            if (brightness > 200)
-                brightness = 0;
-            analogWrite(P_EN, brightness); // full brightness
-            delay(500);
         }
     }
 };

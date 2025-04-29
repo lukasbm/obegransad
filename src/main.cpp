@@ -16,11 +16,12 @@ void setup()
   panel_init();
   panel_debugTest();
 
+  // TODO: set up clock!
+
   wifi_connect();
 
   setup_config_server();
 
-  // start a scene
   sceneSwitcher.nextScene(); // Start with the first scene
 }
 

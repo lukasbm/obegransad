@@ -1,7 +1,10 @@
 #include <time.h>
 #include <string.h>
+#include <Arduino.h>
 
-#define NTP_SERVER "pool.ntp.org"
+#define MY_NTP_SERVER "pool.ntp.org"
+// german time zone
+#define MY_TZ "CET-1CEST,M3.5.0,M10.5.0/3"
 
 static time_t now;
 static struct tm timeinfo;
@@ -11,21 +14,6 @@ struct tm *getTime()
     time(&now);
     localtime_r(&now, &timeinfo);
     return &timeinfo;
-}
-
-void setTime()
-{
-    configTime(0, 0, NTP_SERVER);
-    Serial.println("Waiting for time sync...");
-    while (!getLocalTime(&timeinfo, 1000))
-    {
-        Serial.print(".");
-        delay(1000);
-    }
-    Serial.println("");
-    Serial.println("Time synced!");
-    Serial.print("Current time: ");
-    Serial.println(asctime(&timeinfo));
 }
 
 const char *getTimeString(void)
@@ -42,11 +30,10 @@ const char *getTimeString(void)
     return acTimeString;
 }
 
-void set_clock(void)
+void set_ntp_time(void)
 {
-
     // configTime(((MY_TIMEZ) * 3600), (DST_OFFSET * 3600), "pool.ntp.org", "time.nist.gov", "time.windows.com");
-    configTime(MY_TZ, MY_NTP_SERVER); // --> Here is the IMPORTANT ONE LINER needed in your sketch!
+    configTzTime(MY_TZ, MY_NTP_SERVER); // --> Here is the IMPORTANT ONE LINER needed in your sketch!
 
     Serial.print("Waiting for NTP time sync: ");
     time_t now = time(nullptr); // Secs since 01.01.1970 (when uninitialized starts with (8 * 3600 = 28800)
@@ -56,7 +43,7 @@ void set_clock(void)
         Serial.print(".");
         now = time(nullptr);
     }
-    Serial.println("");
+    Serial.println("Done!");
     Serial.printf("Current time: %s\n", getTimeString());
 }
 
@@ -72,12 +59,10 @@ void set_clock_from_tm()
 
 void setup_clock()
 {
-    setTime();
+    set_ntp_time();
 }
 
-
 // TODO: also check off times!!!
-
 
 // in main setup:
 /*
@@ -85,4 +70,3 @@ set_clock();
 set_clock_from_tm();
 print_time();
 */
-

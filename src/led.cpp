@@ -108,8 +108,8 @@ static const uint8_t System6x7[] PROGMEM = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
-// LUT For OBEGRÄNSAD
-int lut[16][16] = {
+// LUT For OBEGRÄNSAD (they are wired weirdly)
+static int lut[16][16] = {
     {23, 22, 21, 20, 19, 18, 17, 16, 7, 6, 5, 4, 3, 2, 1, 0},
     {24, 25, 26, 27, 28, 29, 30, 31, 8, 9, 10, 11, 12, 13, 14, 15},
     {39, 38, 37, 36, 35, 34, 33, 32, 55, 54, 53, 52, 51, 50, 49, 48},
@@ -147,7 +147,7 @@ void panel_clear()
 }
 
 // SCAN DISPLAY, output Bytes to Serial to display
-void panel_scan(uint8_t cmask, int brightness)
+void panel_show(uint8_t cmask, int brightness)
 {
     panel_setBrightness(255);
     delayMicroseconds(TT);
@@ -185,12 +185,12 @@ void panel_debugTest()
     for (int i = 0; i < 2; i++)
     {
         panel_fillGrid(0xff);
-        panel_scan(1, 100);
-        analogWrite(P_EN, 250);
+        panel_show(1, 100);
+        panel_setBrightness(250);
         delay(300);
         panel_fillGrid(0x00);
-        panel_scan(1, 100);
-        analogWrite(P_EN, 250);
+        panel_show(1, 100);
+        panel_setBrightness(250);
         delay(300);
     }
 }
