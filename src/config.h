@@ -13,7 +13,6 @@ struct OffTime
 
 struct Config
 {
-    // your settings
     uint16_t brightness_day;
     uint16_t brightness_night;
 
@@ -40,5 +39,4 @@ void replyConfig(AsyncWebServerRequest *request);
 void handleNewConfig(AsyncWebServerRequest *request);
 void setup_config_server();
 
-// global variable
-struct Config settings;
+extern Config settings;

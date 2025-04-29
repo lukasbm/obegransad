@@ -1,6 +1,7 @@
 #include "config.h"
 
 static AsyncWebServer server(80);
+Config settings;
 
 // define default config
 Config::Config()

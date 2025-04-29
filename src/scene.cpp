@@ -1,7 +1,7 @@
 #include <Arduino.h>
-#include "led.cpp"
+#include "led.h"
 #include "device.h"
-#include "config.cpp"
+#include "config.h"
 #include "weather.h"
 
 class Scene
