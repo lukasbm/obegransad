@@ -1,30 +1,24 @@
 {
-    "clock": {
-        "off_times": {
-            "everyday": [
-                {
-                    "from_hour": 0,
-                    "from_minute": 0,
-                    "to_hour": 6,
-                    "to_minute": 0
-                }
-            ],
-            "weekdays": [
-                {
-                    "from_hour": 22,
-                    "from_minute": 30,
-                    "to_hour": 23,
-                    "to_minute": 59
-                }
-            ],
-            "weekends": []
-        },
-        "brightness_day": 100,
-        "brightness_night": 20
-    },
-    "weather": {
-        "latitude": 49.4613909,
-        "longitude": 11.1540788,
-        "update_interval": 300
-    }
+    "brightness_day": 100,
+    "brightness_night": 20,
+    "off_time_everyday": [
+        {
+            "from_hour": 0,
+            "from_minute": 0,
+            "to_hour": 6,
+            "to_minute": 0
+        }
+    ],
+    "off_time_weekdays": [
+        {
+            "from_hour": 22,
+            "from_minute": 30,
+            "to_hour": 23,
+            "to_minute": 59
+        }
+    ],
+    "off_time_weekends": [],
+    "weather_latitude": 49.4613909,
+    "weather_longitude": 11.1540788,
+    "weather_update_interval": 300
 }

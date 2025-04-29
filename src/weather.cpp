@@ -1,24 +1,11 @@
-#include <HTTPClient.h>
-#include <ArduinoJson.h>
-
-// example url: https://api.open-meteo.com/v1/forecast?latitude=49.4542&longitude=11.0775&daily=uv_index_max,sunrise,sunset&hourly=uv_index&current=temperature_2m,rain,precipitation,showers,snowfall,wind_speed_10m&timezone=auto&forecast_days=1
-
-struct WeatherData
-{
-    float temperature;
-    float rain;
-    float precipitation;
-    float showers;
-    float snowfall;
-    float maxUvIndex;
-    float windSpeed;
-};
+#include "weather.h"
 
 struct WeatherData fetchWeather(float lat, float lon)
 {
     WeatherData res;
 
     // 1) Build request URL
+    // example url: https://api.open-meteo.com/v1/forecast?latitude=49.4542&longitude=11.0775&daily=uv_index_max,sunrise,sunset&hourly=uv_index&current=temperature_2m,rain,precipitation,showers,snowfall,wind_speed_10m&timezone=auto&forecast_days=1
     String url = String("https://api.open-meteo.com/v1/forecast") +
                  "?latitude=" + String(lat) +
                  "&longitude=" + String(lon) +

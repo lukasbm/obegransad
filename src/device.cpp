@@ -1,10 +1,4 @@
-#include <WiFi.h>
-#include <esp_sleep.h>
-
-#define WAKEUP_PIN GPIO_NUM_9 // button pin!
-
-#define WIFI_SSID ""
-#define WIFI_PASSWORD ""
+#include "device.h"
 
 void enter_light_sleep(uint64_t seconds)
 {

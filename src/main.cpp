@@ -1,8 +1,8 @@
 #include <Arduino.h>
-#include "weather.cpp"
-#include "device.cpp"
-#include "config.cpp"
-#include "led.cpp"
+#include "weather.h"
+#include "device.h"
+#include "config.h"
+#include "led.h"
 #include "scene.cpp"
 
 #define BUTTON_PIN GPIO_NUM_9 // button pin!
@@ -39,6 +39,8 @@ void loop()
 
   // Update the current scene
   sceneSwitcher.tick();
+
+  // TODO: check if time for off time!
 
   delay(50);
 }

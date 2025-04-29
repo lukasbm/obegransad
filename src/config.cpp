@@ -1,80 +1,7 @@
+#include "config.h"
+
 // Web config interface
 
-#include <ESPAsyncWebServer.h>
-#include <ArduinoJson.h>
-#include <ArduinoJson.h>
-
-struct OffTime
-{
-    int start_hour;
-    int start_minute;
-    int end_hour;
-    int end_minute;
-};
-
-struct Settings
-{
-    float weather_latitude;
-    float weather_longitude;
-    float weather_update_interval; // in seconds
-
-    int brightness_day;
-    int brightness_night;
-
-    std::vector<OffTime> off_time_everyday;
-    std::vector<OffTime> off_time_weekdays;
-    std::vector<OffTime> off_time_weekends;
-
-    JsonObject json() const
-    {
-        JsonObject obj;
-
-        // weather
-        JsonObject weather = obj.createNestedObject("weather");
-        weather["latitude"] = weather_latitude;
-        weather["longitude"] = weather_longitude;
-        weather["update_interval"] = weather_update_interval;
-
-        // clock
-        JsonObject clock = obj.createNestedObject("clock");
-        clock["brightness_day"] = brightness_day;
-        clock["brightness_night"] = brightness_night;
-        JsonObject off_times = clock.createNestedObject("off_times");
-        JsonArray off_time_weekdays_arr = clock.createNestedArray("off_time_weekdays");
-        for (const OffTime &off_time : off_time_weekdays)
-        {
-            JsonObject off_time_obj = off_time_weekdays_arr.createNestedObject();
-            off_time_obj["start_hour"] = off_time.start_hour;
-            off_time_obj["start_minute"] = off_time.start_minute;
-            off_time_obj["end_hour"] = off_time.end_hour;
-            off_time_obj["end_minute"] = off_time.end_minute;
-        }
-        JsonArray off_time_weekends_arr = clock.createNestedArray("off_time_weekends");
-        for (const OffTime &off_time : off_time_weekends)
-        {
-            JsonObject off_time_obj = off_time_weekends_arr.createNestedObject();
-            off_time_obj["start_hour"] = off_time.start_hour;
-            off_time_obj["start_minute"] = off_time.start_minute;
-            off_time_obj["end_hour"] = off_time.end_hour;
-            off_time_obj["end_minute"] = off_time.end_minute;
-        }
-        JsonArray off_time_everyday_arr = clock.createNestedArray("off_time_everyday");
-        for (const OffTime &off_time : off_time_everyday)
-        {
-            JsonObject off_time_obj = off_time_everyday_arr.createNestedObject();
-            off_time_obj["start_hour"] = off_time.start_hour;
-            off_time_obj["start_minute"] = off_time.start_minute;
-            off_time_obj["end_hour"] = off_time.end_hour;
-            off_time_obj["end_minute"] = off_time.end_minute;
-        }
-        return obj;
-    }
-};
-
-static AsyncWebServer server(80);
-struct Settings settings;
-JsonDocument settings_doc; // last sucessfully received settings (for reply)
-// this is fine as the post endpoint is the only source that modifies the settings
 
 void parseOffTimes(std::vector<OffTime> &res, const JsonArray &doc)
 {
@@ -99,7 +26,7 @@ void parseOffTimes(std::vector<OffTime> &res, const JsonArray &doc)
     }
 }
 
-bool parseSettings(Settings &res, const JsonDocument &doc)
+bool parseSettings(struct Settings &res, const JsonDocument &doc)
 {
     // clock scene settings
     if (!doc.containsKey("clock"))
@@ -129,7 +56,7 @@ void replyConfig(AsyncWebServerRequest *request)
 {
     String payload;
     serializeJson(settings_doc, payload);
-    request->send(200, "application/json", payload);
+    request->send(200, "application/to_json", payload);
 }
 
 void handleNewConfig(AsyncWebServerRequest *request)
@@ -147,7 +74,7 @@ void handleNewConfig(AsyncWebServerRequest *request)
     DeserializationError err = deserializeJson(doc, body);
     if (err)
     {
-        request->send(400, "application/json",
+        request->send(400, "application/to_json",
                       String("{\"error\":\"Invalid JSON: ") +
                           err.c_str() + "\"}");
 
@@ -158,14 +85,14 @@ void handleNewConfig(AsyncWebServerRequest *request)
     Settings parsed;
     if (!parseSettings(parsed, doc))
     {
-        request->send(400, "application/json",
+        request->send(400, "application/to_json",
                       "{\"error\":\"Invalid settings\"}");
         return;
     }
 
     // save
     settings = parsed;
-    request->send(200, "application/json", "{\"success\":\"Settings saved\"}");
+    request->send(200, "application/to_json", "{\"success\":\"Settings saved\"}");
 }
 
 void setup_config_server(void)
