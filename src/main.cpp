@@ -11,9 +11,16 @@ SceneSwitcher sceneSwitcher;
 
 void setup()
 {
-  Serial.begin(115200);
+  Serial.begin(74880); // native baud rate of ESP32
+
+  panel_init();
+  panel_debugTest();
+
   wifi_connect();
+
   setup_config_server();
+
+  // start a scene
   sceneSwitcher.nextScene(); // Start with the first scene
 }
 
@@ -29,7 +36,6 @@ void loop()
 
   // Update the current scene
   sceneSwitcher.tick();
-  
-  delay(50);
 
+  delay(50);
 }

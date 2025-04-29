@@ -75,16 +75,21 @@ public:
 class ClockScene : public Scene
 {
 private:
-    long mil;
-    uint8_t sec;
-    uint8_t minute;
-    uint8_t hour;
-    time_t now; // this is the epoch
-    tm tm;
+    void print_time(uint8_t hour, uint8_t minute)
+    {
+        panel_clear();
+        panel_printChar(2, 0, (hour / 10) + 48);
+        panel_printChar(9, 0, (hour % 10) + 48);
+        panel_printChar(2, 9, (minute / 10) + 48);
+        panel_printChar(9, 9, (minute % 10) + 48);
+        panel_scan(1, settings.brightness); // refreshes display
+    }
 
 public:
     void activate() override
     {
+        panel_debugTest();
+        print_time(hour, minute);
     }
 
     void update() override
@@ -95,10 +100,10 @@ public:
             mil = millis();
             // PRINT THE TIME
 
-            p_printChar(2, 0, (hour / 10) + 48);
-            p_printChar(9, 0, (hour % 10) + 48);
-            p_printChar(2, 9, (minute / 10) + 48);
-            p_printChar(9, 9, (minute % 10) + 48);
+            panel_printChar(2, 0, (hour / 10) + 48);
+            panel_printChar(9, 0, (hour % 10) + 48);
+            panel_printChar(2, 9, (minute / 10) + 48);
+            panel_printChar(9, 9, (minute % 10) + 48);
             panel_scan(); // refreshes display
 
             // JEDE MINUTE

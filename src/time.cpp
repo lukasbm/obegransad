@@ -74,3 +74,15 @@ void setup_clock()
 {
     setTime();
 }
+
+
+// TODO: also check off times!!!
+
+
+// in main setup:
+/*
+set_clock();
+set_clock_from_tm();
+print_time();
+*/
+

@@ -134,6 +134,7 @@ void panel_init()
     pinMode(P_CLA, OUTPUT);
     pinMode(P_CLK, OUTPUT);
     pinMode(P_DI, OUTPUT);
+    pinMode(P_EN, OUTPUT);
 }
 
 // Clear the Panel Buffer
@@ -148,7 +149,7 @@ void panel_clear()
 // SCAN DISPLAY, output Bytes to Serial to display
 void panel_scan(uint8_t cmask, int brightness)
 {
-    analogWrite(P_EN, 255);
+    panel_setBrightness(255);
     delayMicroseconds(TT);
 
     uint8_t w = 0;
@@ -161,7 +162,7 @@ void panel_scan(uint8_t cmask, int brightness)
     } // update 2024/01/01 speedup
     digitalWrite(P_CLA, HIGH);
     digitalWrite(P_CLA, LOW);
-    analogWrite(P_EN, brightness); // re enable brightness
+    panel_setBrightness(brightness); // re enable brightness
 }
 
 void panel_setPixel(int8_t x, int8_t y, uint8_t color)
@@ -179,8 +180,7 @@ void panel_fillGrid(uint8_t col)
             panel_setPixel(x, y, col);
 }
 
-// -----------------------------------------------------------
-void test_display()
+void panel_debugTest()
 {
     for (int i = 0; i < 2; i++)
     {
@@ -195,8 +195,7 @@ void test_display()
     }
 }
 
-// -----------------------------------------------------------
-void p_printChar(uint8_t xs, uint8_t ys, char ch)
+void panel_printChar(uint8_t xs, uint8_t ys, char ch)
 {
     uint8_t d;
 
@@ -236,4 +235,9 @@ void p_printChar(uint8_t xs, uint8_t ys, char ch)
         else
             panel_setPixel(x + xs, 6 + ys, 0);
     }
+}
+
+void panel_setBrightness(uint8_t brightness)
+{
+    analogWrite(P_EN, brightness);
 }

@@ -174,3 +174,5 @@ void setup_config_server(void)
     server.on("/config", HTTP_POST, handleNewConfig);
     server.begin();
 }
+
+// FIXME: i need a default settings object in case the user does not provide one
