@@ -46,7 +46,7 @@ struct WeatherData fetchWeather(float lat, float lon)
 
 static void parseWeatherData(WeatherData &res, const JsonDocument &doc)
 {
-    JsonObject current = doc["current"];
+    JsonObjectConst current = doc["current"].as<JsonObjectConst>();
     res.temperature = current["temperature_2m"];
     res.rain = current["rain"];
     res.precipitation = current["precipitation"];
@@ -54,6 +54,6 @@ static void parseWeatherData(WeatherData &res, const JsonDocument &doc)
     res.snowfall = current["snowfall"];
     res.windSpeed = current["wind_speed_10m"];
 
-    JsonObject daily = doc["daily"];
+    JsonObjectConst daily = doc["daily"].as<JsonObjectConst>();
     res.maxUvIndex = daily["uv_index_max"][0];
 }

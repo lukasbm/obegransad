@@ -16,8 +16,6 @@ void setup()
   panel_init();
   panel_debugTest();
 
-  // TODO: set up clock!
-
   wifi_connect();
 
   time_setup();

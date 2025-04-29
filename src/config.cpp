@@ -1,10 +1,8 @@
 #include "config.h"
 
 static AsyncWebServer server(80);
-struct Config settings;
-JsonDocument doc; // last sucessfully received settings (for reply)
-// this is fine as the post endpoint is the only source that modifies the settings
 
+// define default config
 Config::Config()
     : brightness_day(100),
       brightness_night(20),
@@ -29,26 +27,27 @@ bool Config::fromJson(const JsonObject &root)
     weather_update_interval = root["weather_update_interval"] | weather_update_interval;
 
     // helper lambda to read an array of OffTime
-    auto readOff = [&](const char *key, std::vector<OffTime> &vec)
+    auto replaceRead = [&](const char *key, std::vector<OffTime> &vec)
     {
-        vec.clear();
-        if (root.containsKey(key))
+        if (!root[key].is<JsonArray>())
         {
-            for (JsonObject item : root[key].as<JsonArray>())
-            {
-                OffTime ot;
-                ot.from_hour = item["from_hour"] | 0;
-                ot.from_minute = item["from_minute"] | 0;
-                ot.to_hour = item["to_hour"] | 0;
-                ot.to_minute = item["to_minute"] | 0;
-                vec.push_back(ot);
-            }
+            return;
+        }
+        vec.clear();
+        for (JsonObject item : root[key].as<JsonArray>())
+        {
+            OffTime ot;
+            ot.from_hour = item["from_hour"] | 0;
+            ot.from_minute = item["from_minute"] | 0;
+            ot.to_hour = item["to_hour"] | 0;
+            ot.to_minute = item["to_minute"] | 0;
+            vec.push_back(ot);
         }
     };
 
-    readOff("off_time_everyday", off_time_everyday);
-    readOff("off_time_weekdays", off_time_weekdays);
-    readOff("off_time_weekends", off_time_weekends);
+    replaceRead("off_time_everyday", off_time_everyday);
+    replaceRead("off_time_weekdays", off_time_weekdays);
+    replaceRead("off_time_weekends", off_time_weekends);
 
     return true;
 }
@@ -65,10 +64,10 @@ void Config::toJson(JsonObject &root) const
     // helper lambda to write an array
     auto writeOff = [&](const char *key, const std::vector<OffTime> &vec)
     {
-        JsonArray arr = root.createNestedArray(key);
+        JsonArray arr = root[key].to<JsonArray>();
         for (auto &ot : vec)
         {
-            JsonObject o = arr.createNestedObject();
+            JsonObject o = arr.add<JsonObject>();
             o["from_hour"] = ot.from_hour;
             o["from_minute"] = ot.from_minute;
             o["to_hour"] = ot.to_hour;
@@ -83,7 +82,7 @@ void Config::toJson(JsonObject &root) const
 
 void replyConfig(AsyncWebServerRequest *request)
 {
-    doc.clear();
+    JsonDocument doc;
     JsonObject root = doc.to<JsonObject>();
     settings.toJson(root);
     String payload;
@@ -102,7 +101,7 @@ void handleNewConfig(AsyncWebServerRequest *request)
     String body = request->arg("plain");
 
     // deserialize body
-    doc.clear();
+    JsonDocument doc;
     DeserializationError err = deserializeJson(doc, body);
     if (err)
     {
@@ -131,5 +130,3 @@ void setup_config_server(void)
     server.on("/config", HTTP_POST, handleNewConfig);
     server.begin();
 }
-
-// FIXME: i need a default settings object in case the user does not provide one

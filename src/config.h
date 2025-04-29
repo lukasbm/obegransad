@@ -39,3 +39,6 @@ void parseOffTimes(std::vector<OffTime> &res, const JsonArray &doc);
 void replyConfig(AsyncWebServerRequest *request);
 void handleNewConfig(AsyncWebServerRequest *request);
 void setup_config_server();
+
+// global variable
+struct Config settings;

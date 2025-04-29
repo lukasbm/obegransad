@@ -1,15 +1,15 @@
 #include <Arduino.h>
 #include "led.cpp"
-#include "time.cpp"
+#include "device.h"
 #include "config.cpp"
-#include "weather.cpp"
+#include "weather.h"
 
 class Scene
 {
 public:
-    virtual void activate();
-    virtual void deactivate();
-    virtual void update();
+    virtual void activate() {}
+    virtual void deactivate() {}
+    virtual void update() {}
 };
 
 class WeatherScene : public Scene
@@ -54,16 +54,19 @@ class ClockScene : public Scene
 private:
     int lastMinute = -1;
 
-    void print_time(uint8_t hour, uint8_t minute)
+    void drawTime(uint8_t hour, uint8_t minute)
     {
         panel_clear();
         panel_printChar(2, 0, (hour / 10) + 48);
         panel_printChar(9, 0, (hour % 10) + 48);
         panel_printChar(2, 9, (minute / 10) + 48);
         panel_printChar(9, 9, (minute % 10) + 48);
-        if (isNight()) {
+        if (isNight())
+        {
             panel_show(1, settings.brightness_night); // refreshes display
-        } else {
+        }
+        else
+        {
             panel_show(0, settings.brightness_day); // refreshes display
         }
     }
@@ -72,7 +75,7 @@ public:
     void activate() override
     {
         panel_debugTest();
-        print_time(time_hour(), time_minute());
+        drawTime(time_hour(), time_minute());
     }
 
     void update() override
@@ -81,7 +84,7 @@ public:
 
         if (currMinute != lastMinute)
         {
-            print_time(time_hour(), currMinute);
+            drawTime(time_hour(), currMinute);
         }
 
         lastMinute = currMinute;
