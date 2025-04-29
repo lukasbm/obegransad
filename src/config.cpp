@@ -4,11 +4,6 @@
 #include <ArduinoJson.h>
 #include <ArduinoJson.h>
 
-static AsyncWebServer server(80);
-Settings settings;
-JsonDocument settings_doc; // last sucessfully received settings (for reply)
-// this is fine as the post endpoint is the only source that modifies the settings
-
 struct OffTime
 {
     int start_hour;
@@ -75,6 +70,11 @@ struct Settings
         return obj;
     }
 };
+
+static AsyncWebServer server(80);
+struct Settings settings;
+JsonDocument settings_doc; // last sucessfully received settings (for reply)
+// this is fine as the post endpoint is the only source that modifies the settings
 
 void parseOffTimes(std::vector<OffTime> &res, const JsonArray &doc)
 {

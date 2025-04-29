@@ -4,31 +4,6 @@
 #include "config.cpp"
 #include "weather.cpp"
 
-class SceneSwitcher
-{
-private:
-    Scene scenes[2] = {
-        WeatherScene(),
-        ClockScene()};
-    int currentSceneIndex = -1; // -1 means no scene is active
-
-public:
-    void nextScene()
-    {
-        if (currentSceneIndex != -1)
-        {
-            scenes[currentSceneIndex].deactivate();
-        }
-        currentSceneIndex = (currentSceneIndex + 1) % 2;
-        Serial.printf("Switching to scene %d\n", currentSceneIndex);
-        scenes[currentSceneIndex].activate();
-    }
-    void tick()
-    {
-        scenes[currentSceneIndex].update();
-    }
-};
-
 class Scene
 {
 public:
@@ -86,7 +61,11 @@ private:
         panel_printChar(9, 0, (hour % 10) + 48);
         panel_printChar(2, 9, (minute / 10) + 48);
         panel_printChar(9, 9, (minute % 10) + 48);
-        panel_show(1, settings.brightness); // refreshes display
+        if (isNight()) {
+            panel_show(1, settings.brightness_night); // refreshes display
+        } else {
+            panel_show(0, settings.brightness_day); // refreshes display
+        }
     }
 
 public:
@@ -106,5 +85,30 @@ public:
         }
 
         lastMinute = currMinute;
+    }
+};
+
+class SceneSwitcher
+{
+private:
+    Scene scenes[2] = {
+        WeatherScene(),
+        ClockScene()};
+    int currentSceneIndex = -1; // -1 means no scene is active
+
+public:
+    void nextScene()
+    {
+        if (currentSceneIndex != -1)
+        {
+            scenes[currentSceneIndex].deactivate();
+        }
+        currentSceneIndex = (currentSceneIndex + 1) % 2;
+        Serial.printf("Switching to scene %d\n", currentSceneIndex);
+        scenes[currentSceneIndex].activate();
+    }
+    void tick()
+    {
+        scenes[currentSceneIndex].update();
     }
 };

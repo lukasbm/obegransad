@@ -1,3 +1,6 @@
+#include <stdint.h>
+#include <Arduino.h>
+
 #define P_EN D1
 #define P_DI D2
 #define P_CLK D3
@@ -128,6 +131,16 @@ static int lut[16][16] = {
     {232, 233, 234, 235, 236, 237, 238, 239, 248, 249, 250, 251, 252, 253, 254, 255}};
 
 static uint8_t panel_buf[16 * 16];
+
+// forward declarations
+// void panel_setBrightness(uint8_t brightness);
+// void panel_setPixel(int8_t x, int8_t y, uint8_t color);
+// void panel_show(uint8_t cmask, int brightness);
+// void panel_clear();
+// void panel_printChar(uint8_t xs, uint8_t ys, char ch);
+// void panel_init();
+// void panel_fillGrid(uint8_t col);
+// void panel_debugTest();
 
 void panel_init()
 {
