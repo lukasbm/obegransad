@@ -11,8 +11,8 @@ void setup()
 {
   Serial.begin(74880); // native baud rate of ESP32
 
-  // panel_init();
-  // panel_debugTest();
+  panel_init();
+  panel_debugTest();
 
   setup_device();
 

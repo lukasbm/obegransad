@@ -75,7 +75,7 @@ void panel_printChar(uint8_t xs, uint8_t ys, char ch)
 
         d = pgm_read_byte_near((ch - 32) * 6 + // Buchstabennummer (ASCII ) minus 32 da die ersten 32 Zeichen nicht im Font sind
                                x +             // jede Spalte
-                               System6x7);     // Adrress of Font
+                               System6x7);     // Adress of Font
 
         if ((d & 1) == 1)
             panel_setPixel(x + xs, 0 + ys, 0xFF);

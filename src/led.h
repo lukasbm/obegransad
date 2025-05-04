@@ -14,6 +14,7 @@
 static const uint8_t System6x7[] PROGMEM = {
     // Fixed width; char width table not used !!!!
     // FIRST 32 Characters omitted
+    // each row is 6 bytes
 
     // font data
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // (space)

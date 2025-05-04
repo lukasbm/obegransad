@@ -6,6 +6,7 @@ struct WeatherData fetchWeather(float lat, float lon)
 
     // 1) Build request URL
     // example url: https://api.open-meteo.com/v1/forecast?latitude=49.4542&longitude=11.0775&daily=uv_index_max,sunrise,sunset&hourly=uv_index&current=temperature_2m,rain,precipitation,showers,snowfall,wind_speed_10m&timezone=auto&forecast_days=1
+    // BETTER example url (with weather codes, needed for icons!): https://api.open-meteo.com/v1/forecast?latitude=49.4542&longitude=11.0775&daily=uv_index_max&hourly=temperature_2m&current=precipitation,rain,showers,snowfall,temperature_2m,weather_code,cloud_cover&timezone=auto
     String url = String("https://api.open-meteo.com/v1/forecast") +
                  "?latitude=" + String(lat) +
                  "&longitude=" + String(lon) +
