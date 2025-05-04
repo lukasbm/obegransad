@@ -5,40 +5,40 @@
 #include "led.h"
 #include "scene.cpp"
 
-#define BUTTON_PIN GPIO_NUM_9 // button pin!
-
-SceneSwitcher sceneSwitcher;
+// SceneSwitcher sceneSwitcher;
 
 void setup()
 {
   Serial.begin(74880); // native baud rate of ESP32
 
-  panel_init();
-  panel_debugTest();
+  // panel_init();
+  // panel_debugTest();
 
-  wifi_connect();
+  setup_device();
 
-  time_setup();
+  // wifi_connect();
 
-  setup_config_server();
+  // time_setup();
 
-  sceneSwitcher.nextScene(); // Start with the first scene
+  // setup_config_server();
+
+  // // Start with the first scene
+  // sceneSwitcher.nextScene();
 }
 
 void loop()
 {
+  // // Check if the button is pressed
+  // if (digitalRead(BUTTON_PIN) == LOW)
+  // {
+  //   Serial.println("Button pressed!");
+  //   sceneSwitcher.nextScene();
+  // }
 
-  // Check if the button is pressed
-  if (digitalRead(BUTTON_PIN) == LOW)
-  {
-    Serial.println("Button pressed!");
-    sceneSwitcher.nextScene();
-  }
+  // // Update the current scene
+  // sceneSwitcher.tick();
 
-  // Update the current scene
-  sceneSwitcher.tick();
+  // // TODO: check if time for off time!
 
-  // TODO: check if time for off time!
-
-  delay(50);
+  // delay(50);
 }

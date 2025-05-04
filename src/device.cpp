@@ -1,9 +1,39 @@
 #include "device.h"
 
+// FIXME: there is currently no way for the user to clear the stored credentials
+void setup_device()
+{
+    // setup button as input
+    pinMode(BUTTON_PIN, INPUT_PULLUP);
+
+    // if WiFi connection not in flash, start captive portal
+    WiFiManager wifiManager;
+    wifiManager.setConfigPortalTimeout(600); // 10 minutes
+
+// wipe stored credentials (stored in flash by esp library)
+#if DEBUG
+    wifiManager.setDebugOutput(true);
+    wifiManager.resetSettings();
+#endif
+
+    bool res = wifiManager.autoConnect("Obengransad");
+    if (!res)
+    {
+        Serial.println("Failed to connect to WiFi");
+        delay(3000);
+        // restart the ESP32
+        ESP.restart();
+    }
+
+    Serial.println("Connected to WiFi!");
+    Serial.print("IP Address: ");
+    Serial.println(WiFi.localIP());
+}
+
 void enter_light_sleep(uint64_t seconds)
 {
     esp_sleep_enable_timer_wakeup(seconds * 1000000ULL);
-    gpio_wakeup_enable(WAKEUP_PIN, GPIO_INTR_LOW_LEVEL);
+    gpio_wakeup_enable(static_cast<gpio_num_t>(BUTTON_PIN), GPIO_INTR_LOW_LEVEL);
     esp_sleep_enable_gpio_wakeup();
 
     // turn of wifi
@@ -33,9 +63,9 @@ void wifi_connect(void)
     // WiFi.setSleep(false);        // Disable WiFi sleep mode
     WiFi.setAutoReconnect(true); // Enable auto-reconnect
     WiFi.setHostname("ESP32-Obengransad-Clock");
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-    Serial.print("Connecting to ");
-    Serial.println(WIFI_SSID);
+    // WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    // Serial.print("Connecting to ");
+    // Serial.println(WIFI_SSID);
 
     while (WiFi.status() != WL_CONNECTED)
     {
@@ -55,69 +85,4 @@ void wifi_off()
     // WiFi.disconnect();
     WiFi.mode(WIFI_OFF);
     Serial.println("WiFi disconnected!");
-}
-
-static struct tm timeinfo;
-
-void time_setup()
-{
-    setenv("TZ", MY_TZ, 1); // set timezone
-    tzset();                // apply timezone
-}
-
-void time_syncNTP()
-{
-    configTime(0, 0, MY_NTP_SERVER); // set NTP server
-    if (!getLocalTime(&timeinfo, 2000))
-    {
-        Serial.println("Failed to obtain time");
-        return;
-    }
-    Serial.println("NTP time synchronized.");
-}
-
-static void time_fetch()
-{
-    getLocalTime(&timeinfo, 2000);
-}
-
-int time_hour()
-{
-    time_fetch();
-    return timeinfo.tm_hour;
-}
-
-int time_minute()
-{
-    time_fetch();
-    return timeinfo.tm_min;
-}
-
-int time_second()
-{
-    time_fetch();
-    return timeinfo.tm_sec;
-}
-
-bool isNight()
-{
-    time_fetch();
-    if (timeinfo.tm_hour >= 22 || timeinfo.tm_hour < 6)
-    {
-        return true; // night
-    }
-    return false; // day
-}
-
-const char *getTimeString()
-{
-    static char timeString[20];
-    snprintf(timeString, sizeof(timeString), "%02d:%02d:%02d", time_hour(), time_minute(), time_second());
-    return timeString;
-}
-
-struct tm time_full()
-{
-    time_fetch();
-    return timeinfo;
 }

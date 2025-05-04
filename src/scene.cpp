@@ -3,6 +3,7 @@
 #include "device.h"
 #include "config.h"
 #include "weather.h"
+#include "clock.h"
 
 class Scene
 {
