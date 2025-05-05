@@ -1,7 +1,15 @@
 #include "device.h"
 
+void wifi_clear_credentials(void)
+{
+    // clear stored credentials
+    WiFiManager wifiManager;
+    wifiManager.resetSettings();
+}
+
 // FIXME: there is currently no way for the user to clear the stored credentials
-void setup_device()
+// e.g. holding the button for 10 full seconds
+void setup_device(void)
 {
     // setup button as input
     pinMode(BUTTON_PIN, INPUT_PULLUP);
@@ -13,7 +21,6 @@ void setup_device()
 // wipe stored credentials (stored in flash by esp library)
 #if DEBUG
     wifiManager.setDebugOutput(true);
-    wifiManager.resetSettings();
 #endif
 
     bool res = wifiManager.autoConnect("Obengransad");
@@ -79,7 +86,7 @@ void wifi_connect(void)
     Serial.println(WiFi.localIP());
 }
 
-void wifi_off()
+void wifi_off(void)
 {
     Serial.println("Disconnecting from WiFi...");
     // WiFi.disconnect();
