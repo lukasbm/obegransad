@@ -33,9 +33,8 @@ static uint8_t panel_buf[16 * 16];  // grayscale graphics buffer
 
 // forward declarations
 void panel_setPixel(int8_t row, int8_t col, uint8_t brightness);
-void panel_show(int brightness);
+void panel_show();
 void panel_clear();
 void panel_printChar(uint8_t xs, uint8_t ys, char ch);
 void panel_init();
 void panel_fillGrid(uint8_t col);
-void panel_debugTest();

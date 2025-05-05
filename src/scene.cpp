@@ -13,6 +13,49 @@ public:
     virtual void update() {}
 };
 
+// A simple scene where a snake moves around the screen with a tail following
+// moves once a second
+// the tail becomes gradually dimmer (length 5)
+// this is great for testing the LEDs
+class SnakeScene : public Scene
+{
+private:
+    int x = 0;
+    int y = 0;
+    int tail[5][2] = {0};
+    int tailLength = 5;
+
+    void drawSnake()
+    {
+        panel_clear();
+        for (int i = 0; i < tailLength; i++)
+        {
+            panel_setPixel(tail[i][0], tail[i][1], 255 - (i * 50));
+        }
+        panel_setPixel(x, y, 255);
+        panel_show();
+    }
+
+public:
+    void update() override
+    {
+        // move the snake
+        x = (x + 1) % 16;
+        y = (y + 1) % 16;
+
+        // move the tail
+        for (int i = tailLength - 1; i > 0; i--)
+        {
+            tail[i][0] = tail[i - 1][0];
+            tail[i][1] = tail[i - 1][1];
+        }
+        tail[0][0] = x;
+        tail[0][1] = y;
+
+        drawSnake();
+    }
+};
+
 class WeatherScene : public Scene
 {
 private:
@@ -64,18 +107,17 @@ private:
         panel_printChar(9, 9, (minute % 10) + 48);
         if (isNight())
         {
-            panel_show(settings.brightness_night); // refreshes display
+            panel_show(); // refreshes display
         }
         else
         {
-            panel_show(settings.brightness_day); // refreshes display
+            panel_show(); // refreshes display
         }
     }
 
 public:
     void activate() override
     {
-        panel_debugTest();
         drawTime(time_hour(), time_minute());
     }
 
@@ -109,6 +151,7 @@ public:
         }
         currentSceneIndex = (currentSceneIndex + 1) % 2;
         Serial.printf("Switching to scene %d\n", currentSceneIndex);
+        panel_clear();
         scenes[currentSceneIndex].activate();
     }
     void tick()

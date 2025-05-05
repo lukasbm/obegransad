@@ -19,7 +19,7 @@ void panel_clear()
 }
 
 // SCAN DISPLAY, output Bytes to Serial to display
-void panel_show(int brightness)
+void panel_show()
 {
     uint8_t cmask = 1; // to force it to a binary image.
 
@@ -39,7 +39,7 @@ void panel_show(int brightness)
     panel_setBrightness(brightness); // re enable brightness
 }
 
-void panel_setPixel(int8_t x, int8_t y, uint8_t color)
+void panel_setPixel(uint8_t x, uint8_t y, uint8_t color)
 {
     if ((x < 16) && (y < 16))
     {
@@ -54,21 +54,6 @@ void panel_fillGrid(uint8_t col)
             panel_setPixel(x, y, col);
 }
 
-void panel_debugTest()
-{
-    for (int i = 0; i < 2; i++)
-    {
-        panel_fillGrid(0xff);
-        panel_show(1, 100);
-        panel_setBrightness(250);
-        delay(300);
-        panel_fillGrid(0x00);
-        panel_show(1, 100);
-        panel_setBrightness(250);
-        delay(300);
-    }
-}
-
 void panel_printChar(uint8_t xs, uint8_t ys, char ch)
 {
     uint8_t d;
@@ -78,7 +63,7 @@ void panel_printChar(uint8_t xs, uint8_t ys, char ch)
 
         d = pgm_read_byte_near((ch - 32) * 6 + // Buchstabennummer (ASCII ) minus 32 da die ersten 32 Zeichen nicht im Font sind
                                x +             // jede Spalte
-                               BoldGlyphs6x7);     // Adress of Font
+                               BoldGlyphs6x7); // Adress of Font
 
         if ((d & 1) == 1)
             panel_setPixel(x + xs, 0 + ys, 0xFF);
