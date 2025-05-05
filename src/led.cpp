@@ -1,4 +1,5 @@
 #include "led.h"
+#include "font.h"
 
 void panel_init()
 {
@@ -18,8 +19,10 @@ void panel_clear()
 }
 
 // SCAN DISPLAY, output Bytes to Serial to display
-void panel_show(uint8_t cmask, int brightness)
+void panel_show(int brightness)
 {
+    uint8_t cmask = 1; // to force it to a binary image.
+
     panel_setBrightness(255);
     delayMicroseconds(TT);
 
@@ -75,7 +78,7 @@ void panel_printChar(uint8_t xs, uint8_t ys, char ch)
 
         d = pgm_read_byte_near((ch - 32) * 6 + // Buchstabennummer (ASCII ) minus 32 da die ersten 32 Zeichen nicht im Font sind
                                x +             // jede Spalte
-                               System6x7);     // Adress of Font
+                               BoldGlyphs6x7);     // Adress of Font
 
         if ((d & 1) == 1)
             panel_setPixel(x + xs, 0 + ys, 0xFF);

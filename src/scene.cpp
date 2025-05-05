@@ -64,11 +64,11 @@ private:
         panel_printChar(9, 9, (minute % 10) + 48);
         if (isNight())
         {
-            panel_show(1, settings.brightness_night); // refreshes display
+            panel_show(settings.brightness_night); // refreshes display
         }
         else
         {
-            panel_show(0, settings.brightness_day); // refreshes display
+            panel_show(settings.brightness_day); // refreshes display
         }
     }
 

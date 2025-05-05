@@ -9,11 +9,12 @@
 SceneSwitcher sceneSwitcher;
 
 OneButton button;
-static void buttonSetup();
-static void buttonSingleClick();
-static void buttonLongPressStart();
-static void buttonLongPressStop();
-static int buttonLongPressTimer = 0;
+void buttonSetup();
+void buttonSingleClick();
+// TODO: maybe add double click to enter sleep?
+void buttonLongPressStart();
+void buttonLongPressStop();
+int buttonLongPressTimer = 0;
 
 void setup()
 {
@@ -47,7 +48,7 @@ void loop()
   delay(50); // 20FPS at most
 }
 
-static void buttonSetup()
+void buttonSetup()
 {
   button.setup(
       BUTTON_PIN,   // Input pin for the button
@@ -58,17 +59,20 @@ static void buttonSetup()
   button.attachLongPressStart(buttonLongPressStart);
   button.attachLongPressStop(buttonLongPressStop);
 }
-static void buttonSingleClick()
+
+void buttonSingleClick()
 {
   Serial.println("Button - Single click -> next scene");
   sceneSwitcher.nextScene();
 }
-static void buttonLongPressStart()
+
+void buttonLongPressStart()
 {
   Serial.println("Button - Long press start");
   buttonLongPressTimer = millis();
 }
-static void buttonLongPressStop()
+
+void buttonLongPressStop()
 {
   Serial.println("Button - Long press stop");
   int duration = millis() - buttonLongPressTimer;
