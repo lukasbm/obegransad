@@ -4,12 +4,22 @@
 #include "config.h"
 #include "led.h"
 #include "scene.cpp"
+#include <OneButton.h>
 
-// SceneSwitcher sceneSwitcher;
+SceneSwitcher sceneSwitcher;
+
+OneButton button;
+static void buttonSetup();
+static void buttonSingleClick();
+static void buttonLongPressStart();
+static void buttonLongPressStop();
+static int buttonLongPressTimer = 0;
 
 void setup()
 {
   Serial.begin(74880); // native baud rate of ESP32
+
+  buttonSetup();
 
   panel_init();
   panel_debugTest();
@@ -22,23 +32,50 @@ void setup()
 
   // setup_config_server();
 
-  // // Start with the first scene
-  // sceneSwitcher.nextScene();
+  // Start with the first scene
+  sceneSwitcher.nextScene();
 }
 
 void loop()
 {
-  // // Check if the button is pressed
-  // if (digitalRead(BUTTON_PIN) == LOW)
-  // {
-  //   Serial.println("Button pressed!");
-  //   sceneSwitcher.nextScene();
-  // }
+  // Update the button
+  button.tick();
 
-  // // Update the current scene
-  // sceneSwitcher.tick();
+  // Update the current scene
+  sceneSwitcher.tick();
 
-  // // TODO: check if time for off time!
+  delay(50); // 20FPS at most
+}
 
-  // delay(50);
+static void buttonSetup()
+{
+  button.setup(
+      BUTTON_PIN,   // Input pin for the button
+      INPUT_PULLUP, // INPUT and enable the internal pull-up resistor
+      true          // Active low button (pressed = LOW)
+  );
+  button.attachClick(buttonSingleClick);
+  button.attachLongPressStart(buttonLongPressStart);
+  button.attachLongPressStop(buttonLongPressStop);
+}
+static void buttonSingleClick()
+{
+  Serial.println("Button - Single click -> next scene");
+  sceneSwitcher.nextScene();
+}
+static void buttonLongPressStart()
+{
+  Serial.println("Button - Long press start");
+  buttonLongPressTimer = millis();
+}
+static void buttonLongPressStop()
+{
+  Serial.println("Button - Long press stop");
+  int duration = millis() - buttonLongPressTimer;
+  Serial.printf("Button long press duration: %d ms\n", duration);
+  if (duration > 10000)
+  {
+    Serial.println("Button long press -> reset WiFi credentials");
+    wifi_clear_credentials();
+  }
 }

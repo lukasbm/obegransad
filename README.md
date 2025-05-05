@@ -49,3 +49,8 @@ Graphics are drawn as bitmaps (e.g. using Pixelorama, Piskel, LibreSprite or [Ti
 The screen will open a captive portal to request the WiFi credentials.
 Just connect to the `Obegransad` wifi device with your phone.
 If the portal does not open automatically, enter the IP `192.168.4.1` in your browser.
+
+### Config
+
+Look at `example_config.json` for possible configs.
+The time zones are used as described here: <https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv>

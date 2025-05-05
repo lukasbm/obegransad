@@ -7,8 +7,6 @@ void wifi_clear_credentials(void)
     wifiManager.resetSettings();
 }
 
-// FIXME: there is currently no way for the user to clear the stored credentials
-// e.g. holding the button for 10 full seconds
 void setup_device(void)
 {
     // setup button as input

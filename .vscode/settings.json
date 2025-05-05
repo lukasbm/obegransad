@@ -55,7 +55,8 @@
         "streambuf": "cpp",
         "thread": "cpp",
         "cinttypes": "cpp",
-        "typeinfo": "cpp"
+        "typeinfo": "cpp",
+        "esp32-hal.h": "c"
     },
     "cSpell.words": [
         "Obengransad"
