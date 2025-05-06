@@ -23,9 +23,8 @@ void setup()
   buttonSetup();
 
   panel_init();
-  panel_debugTest();
 
-  setup_device();
+  // setup_device();
 
   // wifi_connect();
 

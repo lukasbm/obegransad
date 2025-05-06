@@ -13,6 +13,22 @@ public:
     virtual void update() {}
 };
 
+class BrightnessScene : public Scene
+{
+    void activate() override
+    {
+        panel_clear();
+        for (int i = 0; i < 16; i++)
+        {
+            for (int j = 0; j < 16; j++)
+            {
+                panel_setPixel(i, j, i * 16 + j);
+            }
+        }
+        panel_show();
+    }
+};
+
 // A simple scene where a snake moves around the screen with a tail following
 // moves once a second
 // the tail becomes gradually dimmer (length 5)
@@ -20,39 +36,48 @@ public:
 class SnakeScene : public Scene
 {
 private:
-    int x = 0;
-    int y = 0;
-    int tail[5][2] = {0};
-    int tailLength = 5;
+    int lastUpdateTime = 0;
 
     void drawSnake()
     {
         panel_clear();
-        for (int i = 0; i < tailLength; i++)
-        {
-            panel_setPixel(tail[i][0], tail[i][1], 255 - (i * 50));
-        }
-        panel_setPixel(x, y, 255);
         panel_show();
+    }
+
+    // pos is one of the 60 corner pixels. returns the x and y coordinates.
+    // pos 0 is top left, moving clockwise
+    void ring_coord(uint8_t pos, uint8_t &x, uint8_t &y)
+    {
+        if (pos < 16)
+        {
+            x = pos;
+            y = 0;
+        }
+        else if (pos < 32)
+        {
+            x = 15;
+            y = pos - 16;
+        }
+        else if (pos < 48)
+        {
+            x = 47 - pos;
+            y = 15;
+        }
+        else
+        {
+            x = 0;
+            y = 63 - pos;
+        }
     }
 
 public:
     void update() override
     {
-        // move the snake
-        x = (x + 1) % 16;
-        y = (y + 1) % 16;
-
-        // move the tail
-        for (int i = tailLength - 1; i > 0; i--)
+        if (millis() > lastUpdateTime + 1000)
         {
-            tail[i][0] = tail[i - 1][0];
-            tail[i][1] = tail[i - 1][1];
+            drawSnake();
+            lastUpdateTime = millis();
         }
-        tail[0][0] = x;
-        tail[0][1] = y;
-
-        drawSnake();
     }
 };
 
@@ -137,9 +162,11 @@ public:
 class SceneSwitcher
 {
 private:
-    Scene scenes[2] = {
-        WeatherScene(),
-        ClockScene()};
+    Scene scenes[1] = {
+        BrightnessScene(),
+        // WeatherScene(),
+        // ClockScene()
+    };
     int currentSceneIndex = -1; // -1 means no scene is active
 
 public:
@@ -149,11 +176,12 @@ public:
         {
             scenes[currentSceneIndex].deactivate();
         }
-        currentSceneIndex = (currentSceneIndex + 1) % 2;
+        currentSceneIndex = (currentSceneIndex + 1) % 1; // FIXME: needs to be dynamic!!!!
         Serial.printf("Switching to scene %d\n", currentSceneIndex);
         panel_clear();
         scenes[currentSceneIndex].activate();
     }
+    
     void tick()
     {
         scenes[currentSceneIndex].update();
