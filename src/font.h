@@ -2,7 +2,7 @@
 
 #include <Arduino.h>
 
-static const uint8_t BoldGlyphs6x7[] PROGMEM = {
+static const uint8_t BoldGlyphs6x7[] = {
     // Fixed width; char width table not used !!!!
     // FIRST 32 Characters omitted
     // each row is 6 bytes
@@ -104,3 +104,7 @@ static const uint8_t BoldGlyphs6x7[] PROGMEM = {
     0x3d, 0x7d, 0x60, 0x60, 0x7d, 0x3d,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+static const uint8_t LightGlyphs4x6[] = {
+
+};

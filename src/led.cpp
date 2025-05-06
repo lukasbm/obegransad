@@ -60,10 +60,7 @@ void panel_printChar(uint8_t xs, uint8_t ys, char ch)
 
     for (uint8_t x = 0; x < 6; x++)
     {
-
-        d = pgm_read_byte_near((ch - 32) * 6 + // Buchstabennummer (ASCII ) minus 32 da die ersten 32 Zeichen nicht im Font sind
-                               x +             // jede Spalte
-                               BoldGlyphs6x7); // Adress of Font
+        d = BoldGlyphs6x7[(ch - 32) * 6 + x]; // Buchstabennummer (ASCII ) minus 32 da die ersten 32 Zeichen nicht im Font sind jede Spalte
 
         if ((d & 1) == 1)
             panel_setPixel(x + xs, 0 + ys, 0xFF);
