@@ -25,7 +25,6 @@ class BrightnessScene : public Scene
                 panel_setPixel(i, j, i * 16 + j);
             }
         }
-        panel_show();
     }
 };
 
@@ -178,7 +177,9 @@ public:
         }
         currentSceneIndex = (currentSceneIndex + 1) % 1; // FIXME: needs to be dynamic!!!!
         Serial.printf("Switching to scene %d\n", currentSceneIndex);
+        // clear and switch
         panel_clear();
+        panel_show();
         scenes[currentSceneIndex].activate();
     }
     

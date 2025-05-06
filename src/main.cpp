@@ -44,7 +44,8 @@ void loop()
   // Update the current scene
   sceneSwitcher.tick();
 
-  delay(50); // 20FPS at most
+  // refresh the display
+  panel_show();
 }
 
 void buttonSetup()

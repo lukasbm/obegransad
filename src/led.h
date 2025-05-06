@@ -2,13 +2,33 @@
 
 #include <Arduino.h>
 
+// I dont know which microcontroller the OBEGRÄNSAD uses,
+// but it might be one of the classics:
+// MBI5024/5034, STP16, TPIC6B595
+
+/*
+DI	Serial data in	1 bit at a time, no concept of “brightness”
+CLK	Shift‑register clock	Just marches data along
+CLA	Latch / strobe	Copies the 256 bits into the output on/off latches
+EN	Output‑enable / blank	Global: either all LED outputs drive, or none do
+*/
 #define P_EN D1
 #define P_DI D2
 #define P_CLK D3
 #define P_CLA D4
 
-// Waiting Time for Shift Cycle, can go downto 1
-#define TT 5
+/*
+The panel works as follows:
+1. Shift the data for one bit-plane
+2. Latch it with CLA.
+3. Turn on EN for a slice of time. EN therefore acts as a PWM signal that drives the brightness.
+4. Blank (EN = low) before the next bit-plane is shifted in.
+The entire display can be seen as a large shift register.
+*/
+
+// timing: BASE_US × (2^8 − 1)  ==  full frame duration
+// 40 µs gives ≈ 78 Hz refresh; 20 µs → 156 Hz, etc.
+#define BASE_TIME 160 // 19.5 Hz
 
 // LUT For OBEGRÄNSAD (they are wired weirdly)
 static int lut[16][16] = {
@@ -29,12 +49,15 @@ static int lut[16][16] = {
     {231, 230, 229, 228, 227, 226, 225, 224, 247, 246, 245, 244, 243, 242, 241, 240},
     {232, 233, 234, 235, 236, 237, 238, 239, 248, 249, 250, 251, 252, 253, 254, 255}};
 
-static uint8_t panel_buf[16 * 16];  // grayscale graphics buffer
+static uint8_t panel_buf[16 * 16]; // grayscale graphics buffer
 
 // forward declarations
 void panel_setPixel(int8_t row, int8_t col, uint8_t brightness);
 void panel_show();
-void panel_clear();
 void panel_printChar(uint8_t xs, uint8_t ys, char ch);
 void panel_init();
-void panel_fillGrid(uint8_t col);
+void panel_fill(uint8_t col);
+inline void panel_clear()
+{
+    panel_fill(0);
+}
