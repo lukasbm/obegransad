@@ -43,6 +43,7 @@ void setup()
 void loop()
 {
   Serial.println("Looping...");
+
   // Update the button
   button.tick();
 
@@ -51,8 +52,8 @@ void loop()
 
   // refresh the display
   // FIXME: I think this should happen at fixed intervals, interrupt driven. Timing is very important here.
-  // if the scene switcher is slow, this causes flickering  
-  panel_show();  
+  // if the scene switcher is slow, this causes flickering
+  panel_show();
 }
 
 void buttonSetup()

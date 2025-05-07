@@ -7,12 +7,6 @@ void panel_init()
     pinMode(P_CLK, OUTPUT);
     pinMode(P_DI, OUTPUT);
     pinMode(P_EN, OUTPUT);
-
-    /* LEDC PWM on the EN/OE pin */
-    ledcSetup(EN_CH, EN_FREQ, EN_RES);
-    ledcAttachPin(P_EN, EN_CH);
-
-    ledcWrite(EN_CH, MIN_BRIGHTNESS); // keep blank during init
 }
 
 inline void shift_and_latch(uint8_t bit)
@@ -45,17 +39,18 @@ void panel_setPixel(int8_t row, int8_t col, uint8_t brightness)
 
 void panel_show()
 {
-    uint32_t dur = BASE_TIME;
+    // FIXME: remove the next line
+    global_brightness = (global_brightness + 1) % 256;
+    Serial.println(global_brightness);
+
+    uint32_t slice = (BASE_TIME * global_brightness) / 255;
     for (uint8_t bit = 0; bit < 8; bit++)
     {
-        ledcWrite(EN_CH, MIN_BRIGHTNESS); // 1) blank panel while shifting
-        digitalWrite(P_LATCH, LOW);         //    keep LA/ LOW so outputs freeze
-        shiftPlane(bit);                  // 2) clock 256 bits of this plane
-        digitalWrite(P_LATCH, HIGH);        // 3) short HIGH pulse latches data
-        digitalWrite(P_LATCH, LOW);
-        ledcWrite(EN_CH, MAX_BRIGHTNESS); // 4) enable LEDs
-        delayMicroseconds(dur);           // 5) time slice proportional to bit
-        dur <<= 1;                        // the higher the bit, the longer the time slice
+        shift_and_latch(bit);     // clock + latch atomically
+        digitalWrite(P_EN, LOW);  // OE/ LOW  → LEDs ON
+        delayMicroseconds(slice); // hold slice
+        digitalWrite(P_EN, HIGH); // OE/ HIGH → LEDs OFF
+        slice <<= 1;              // next bit weight
     }
 }
 
