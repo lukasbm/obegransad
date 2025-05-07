@@ -25,11 +25,14 @@ inline void shiftPlane(uint8_t bit)
         digitalWrite(P_CLK, HIGH);
         digitalWrite(P_CLK, LOW);
     }
-    // latch outputs
-    digitalWrite(P_CLA, HIGH);
-    // IMPORTANT: leave P_LATCH high, many driver ICs
-    // keep outputs enabled only while LE is HIGH
-    // digitalWrite(P_CLA, LOW);
+}
+
+void panel_setPixel(int8_t row, int8_t col, uint8_t brightness)
+{
+    if ((row < 16) && (row < 16))
+    {
+        panel_buf[lut[row][col]] = brightness;
+    }
 }
 
 void panel_show()
@@ -37,21 +40,14 @@ void panel_show()
     uint32_t dur = BASE_TIME;
     for (uint8_t bit = 0; bit < 8; bit++)
     {
-        ledcWrite(EN_CH, MIN_BRIGHTNESS); // 1) BLANK the panel
-        shiftPlane(bit);                  // 2) clock 256 bits (LA/ kept LOW)
-        digitalWrite(P_CLA, HIGH);        // 3) copy SR->latch (≈ 50 ns)
-        digitalWrite(P_CLA, LOW);         //    …and freeze it again
-        ledcWrite(EN_CH, MAX_BRIGHTNESS); // 4) show this bit‑plane
-        delayMicroseconds(dur);           // 5) keep it for weighted time
+        ledcWrite(EN_CH, MIN_BRIGHTNESS); // 1) blank panel while shifting
+        digitalWrite(P_CLA, LOW);         //    keep LA/ LOW so outputs freeze
+        shiftPlane(bit);                  // 2) clock 256 bits of this plane
+        digitalWrite(P_CLA, HIGH);        // 3) short HIGH pulse latches data
+        digitalWrite(P_CLA, LOW);
+        ledcWrite(EN_CH, MAX_BRIGHTNESS); // 4) enable LEDs
+        delayMicroseconds(dur);           // 5) time slice proportional to bit
         dur <<= 1;                        // the higher the bit, the longer the time slice
-    }
-}
-
-void panel_setPixel(uint8_t x, uint8_t y, uint8_t color)
-{
-    if ((x < 16) && (y < 16))
-    {
-        panel_buf[lut[y][x]] = color;
     }
 }
 
@@ -62,4 +58,19 @@ void panel_fill(uint8_t col)
     {
         panel_buf[i] = col;
     }
+}
+
+void panel_print(void)
+{
+    Serial.println("Panel buffer:");
+    for (int i = 0; i < 256; i++)
+    {
+        if (i % 16 == 0)
+        {
+            Serial.println();
+        }
+        Serial.print(panel_buf[i], HEX);
+        Serial.print(" ");
+    }
+    Serial.println();
 }

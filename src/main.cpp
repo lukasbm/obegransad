@@ -1,10 +1,11 @@
 #include <Arduino.h>
+#include <OneButton.h>
+
 #include "weather.h"
 #include "device.h"
 #include "config.h"
 #include "led.h"
 #include "scene.cpp"
-#include <OneButton.h>
 
 SceneSwitcher sceneSwitcher;
 
@@ -32,14 +33,16 @@ void setup()
 
   // setup_config_server();
 
+  delay(100);
+  Serial.println("Setup done!");
+
   // Start with the first scene
   sceneSwitcher.nextScene();
-
-  Serial.println("Setup done");
 }
 
 void loop()
 {
+  Serial.println("Looping...");
   // Update the button
   button.tick();
 
