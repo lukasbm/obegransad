@@ -12,10 +12,18 @@ CLK	Shift‑register clock	Just marches data along
 CLA	Latch / strobe	Copies the 256 bits into the output on/off latches
 EN	Output‑enable / blank	Global: either all LED outputs drive, or none do
 */
-#define P_EN D1
-#define P_DI D2
-#define P_CLK D3
-#define P_CLA D4
+#define P_EN D4
+#define P_DI D3
+#define P_CLK D2
+#define P_CLA D1
+
+#define EN_CH 0       // LEDC channel 0
+#define EN_FREQ 20000 // 20 kHz
+#define EN_RES 10     // ESP32 has 10‑bit PWM
+
+// FIXME: swap?
+#define MAX_BRIGHTNESS 0
+#define MIN_BRIGHTNESS 1023 // blank
 
 /*
 The panel works as follows:
@@ -50,14 +58,19 @@ static int lut[16][16] = {
     {232, 233, 234, 235, 236, 237, 238, 239, 248, 249, 250, 251, 252, 253, 254, 255}};
 
 static uint8_t panel_buf[16 * 16]; // grayscale graphics buffer
+static uint8_t gbright = 0;        // global brightness (0-255)
 
 // forward declarations
 void panel_setPixel(int8_t row, int8_t col, uint8_t brightness);
 void panel_show();
-void panel_printChar(uint8_t xs, uint8_t ys, char ch);
 void panel_init();
 void panel_fill(uint8_t col);
 inline void panel_clear()
 {
     panel_fill(0);
+}
+inline void panel_setBrightness(uint8_t bright)
+{
+    gbright = bright;
+    // ledcWrite(EN_CH, gbright);
 }

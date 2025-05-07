@@ -125,17 +125,13 @@ private:
     void drawTime(uint8_t hour, uint8_t minute)
     {
         panel_clear();
-        panel_printChar(2, 0, (hour / 10) + 48);
-        panel_printChar(9, 0, (hour % 10) + 48);
-        panel_printChar(2, 9, (minute / 10) + 48);
-        panel_printChar(9, 9, (minute % 10) + 48);
+        // panel_printChar(2, 0, (hour / 10) + 48);
+        // panel_printChar(9, 0, (hour % 10) + 48);
+        // panel_printChar(2, 9, (minute / 10) + 48);
+        // panel_printChar(9, 9, (minute % 10) + 48);
         if (isNight())
         {
-            panel_show(); // refreshes display
-        }
-        else
-        {
-            panel_show(); // refreshes display
+            // TODO: update total brightness
         }
     }
 
