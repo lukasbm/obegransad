@@ -40,10 +40,10 @@ void panel_setPixel(int8_t row, int8_t col, uint8_t brightness)
 void panel_show()
 {
     // FIXME: remove the next line
-    global_brightness = (global_brightness + 1) % 256;
-    Serial.println(global_brightness);
+    gBright = (gBright + 1) % 256;
+    Serial.println(gBright);
 
-    uint32_t slice = (BASE_TIME * global_brightness) / 255;
+    uint32_t slice = (BASE_TIME * gBright) / 255;
     for (uint8_t bit = 0; bit < 8; bit++)
     {
         shift_and_latch(bit);     // clock + latch atomically
