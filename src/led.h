@@ -26,7 +26,7 @@ The panel works as follows:
 The entire display can be seen as a large shift register.
 */
 
-// timing: BASE_US × (2^8 − 1)  ==  full frame duration
+// timing: BASE_US × (2^8 − 1) == full frame duration
 // 40 µs gives ≈ 78 Hz refresh; 20 µs → 156 Hz, etc.
 #define BASE_TIME 160 // 19.5 Hz
 

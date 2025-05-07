@@ -23,7 +23,7 @@ void panel_show_bitPlane(uint8_t bit, uint16_t dur_us)
         digitalWrite(P_CLK, HIGH);
         digitalWrite(P_CLK, LOW);
     }
-    
+
     // latch the 256 bits
     digitalWrite(P_CLA, HIGH);
     digitalWrite(P_CLA, LOW);

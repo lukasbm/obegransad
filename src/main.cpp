@@ -18,7 +18,7 @@ int buttonLongPressTimer = 0;
 
 void setup()
 {
-  Serial.begin(74880); // native baud rate of ESP32
+  Serial.begin(115200);
 
   buttonSetup();
 
@@ -34,6 +34,8 @@ void setup()
 
   // Start with the first scene
   sceneSwitcher.nextScene();
+
+  Serial.println("Setup done");
 }
 
 void loop()
