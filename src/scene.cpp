@@ -18,6 +18,7 @@ class BrightnessScene : public Scene
     void activate() override
     {
         panel_clear();
+        // build a gradient for testing
         for (int i = 0; i < 16; i++)
         {
             for (int j = 0; j < 16; j++)
@@ -178,7 +179,7 @@ public:
         panel_show();
         scenes[currentSceneIndex].activate();
     }
-    
+
     void tick()
     {
         scenes[currentSceneIndex].update();

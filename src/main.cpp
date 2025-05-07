@@ -47,7 +47,9 @@ void loop()
   sceneSwitcher.tick();
 
   // refresh the display
-  panel_show();
+  // FIXME: I think this should happen at fixed intervals, interrupt driven. Timing is very important here.
+  // if the scene switcher is slow, this causes flickering  
+  panel_show();  
 }
 
 void buttonSetup()

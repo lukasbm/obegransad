@@ -21,7 +21,6 @@ EN	Output‑enable / blank	Global: either all LED outputs drive, or none do
 #define EN_FREQ 20000 // 20 kHz
 #define EN_RES 10     // ESP32 has 10‑bit PWM
 
-// FIXME: swap?
 #define MAX_BRIGHTNESS 0
 #define MIN_BRIGHTNESS 1023 // blank
 

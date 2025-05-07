@@ -37,10 +37,12 @@ void panel_show()
     uint32_t dur = BASE_TIME;
     for (uint8_t bit = 0; bit < 8; bit++)
     {
-        ledcWrite(EN_CH, MIN_BRIGHTNESS); // blank
-        shiftPlane(bit);                  // shift one bit-plane
-        ledcWrite(EN_CH, MAX_BRIGHTNESS); // show  // FIXME: use gbright instead of MAX_BRIGHTNESS
-        delayMicroseconds(dur);           // wait for the slice time
+        ledcWrite(EN_CH, MIN_BRIGHTNESS); // 1) BLANK the panel
+        shiftPlane(bit);                  // 2) clock 256 bits (LA/ kept LOW)
+        digitalWrite(P_CLA, HIGH);        // 3) copy SR->latch (≈ 50 ns)
+        digitalWrite(P_CLA, LOW);         //    …and freeze it again
+        ledcWrite(EN_CH, MAX_BRIGHTNESS); // 4) show this bit‑plane
+        delayMicroseconds(dur);           // 5) keep it for weighted time
         dur <<= 1;                        // the higher the bit, the longer the time slice
     }
 }
