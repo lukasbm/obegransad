@@ -15,17 +15,20 @@ public:
 
 class BrightnessScene : public Scene
 {
+public:
     void activate() override
     {
         panel_clear();
         // build a gradient for testing
-        for (int i = 0; i < 16; i++)
+        for (uint8_t i = 0; i < 16; i++)
         {
-            for (int j = 0; j < 16; j++)
+            for (uint8_t j = 0; j < 16; j++)
             {
-                panel_setPixel(i, j, i * 16 + j);
+                panel_setPixel(i, j, static_cast<uint8_t>(i * 16 + j));
             }
         }
+        Serial.println("Brightness scene activated");
+        panel_print();
     }
 };
 

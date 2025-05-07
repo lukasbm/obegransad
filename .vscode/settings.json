@@ -59,6 +59,7 @@
         "esp32-hal.h": "c"
     },
     "cSpell.words": [
+        "ledc",
         "Obengransad"
     ]
 }

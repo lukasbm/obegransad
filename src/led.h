@@ -17,12 +17,12 @@ EN	Output‑enable / blank	Global: either all LED outputs drive, or none do
 #define P_CLK D2
 #define P_CLA D1
 
-#define EN_CH 0       // LEDC channel 0
+#define EN_CH 0       // LEDC channel for EN
 #define EN_FREQ 20000 // 20 kHz
 #define EN_RES 10     // ESP32 has 10‑bit PWM
 
 #define MAX_BRIGHTNESS 0
-#define MIN_BRIGHTNESS 1023 // blank
+#define MIN_BRIGHTNESS 1023
 
 /*
 The panel works as follows:
@@ -34,8 +34,8 @@ The entire display can be seen as a large shift register.
 */
 
 // timing: BASE_US × (2^8 − 1) == full frame duration
-// 40 µs gives ≈ 78 Hz refresh; 20 µs → 156 Hz, etc.
-#define BASE_TIME 160 // 19.5 Hz
+// 8 is the color depth (2^8 = 256 grayscale values)
+#define BASE_TIME 800 // 204 ms
 
 // LUT For OBEGRÄNSAD (they are wired weirdly)
 static int lut[16][16] = {
@@ -61,13 +61,21 @@ static uint8_t gbright = 0;        // global brightness (0-255)
 
 // forward declarations
 void panel_setPixel(int8_t row, int8_t col, uint8_t brightness);
+
 void panel_show();
+
+// prints the buffer to the serial monitor
+void panel_print(void);
+
 void panel_init();
+
 void panel_fill(uint8_t col);
+
 inline void panel_clear()
 {
     panel_fill(0);
 }
+
 inline void panel_setBrightness(uint8_t bright)
 {
     gbright = bright;
