@@ -7,6 +7,8 @@
 #include "led.h"
 #include "scene.cpp"
 
+// FIXME: i think this is the problem
+// Scene Is never initialized
 SceneSwitcher sceneSwitcher;
 
 OneButton button;
@@ -21,7 +23,7 @@ void setup()
 {
   Serial.begin(115200);
 
-  buttonSetup();
+  // buttonSetup();
 
   panel_init();
 
@@ -33,7 +35,6 @@ void setup()
 
   // setup_config_server();
 
-  delay(100);
   Serial.println("Setup done!");
 
   // Start with the first scene
@@ -45,14 +46,12 @@ void loop()
   Serial.println("Looping...");
 
   // Update the button
-  button.tick();
+  // button.tick();
 
   // Update the current scene
-  sceneSwitcher.tick();
+  // sceneSwitcher.tick();
 
   // refresh the display
-  // FIXME: I think this should happen at fixed intervals, interrupt driven. Timing is very important here.
-  // if the scene switcher is slow, this causes flickering
   panel_show();
 }
 

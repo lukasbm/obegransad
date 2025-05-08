@@ -6,14 +6,14 @@ void panel_init()
     pinMode(P_LATCH, OUTPUT);
     pinMode(P_CLK, OUTPUT);
     pinMode(P_DI, OUTPUT);
-    pinMode(P_EN, OUTPUT);
+    pinMode(P_OE, OUTPUT);
 }
 
 inline void shift_and_latch(uint8_t bit)
 {
     noInterrupts();
     digitalWrite(P_LATCH, LOW); // freeze outputs
-    digitalWrite(P_EN, HIGH);   // OE/ HIGH  (panel dark)
+    digitalWrite(P_OE, HIGH);   // OE/ HIGH  (panel dark)
 
     uint16_t i = 0;
     for (; i < 256; i++)
@@ -39,7 +39,6 @@ void panel_setPixel(int8_t row, int8_t col, uint8_t brightness)
 
 void panel_show()
 {
-    // FIXME: remove the next line
     gBright = (gBright + 1) % 256;
     Serial.println(gBright);
 
@@ -47,9 +46,9 @@ void panel_show()
     for (uint8_t bit = 0; bit < 8; bit++)
     {
         shift_and_latch(bit);     // clock + latch atomically
-        digitalWrite(P_EN, LOW);  // OE/ LOW  → LEDs ON
+        digitalWrite(P_OE, LOW);  // OE/ LOW  → LEDs ON
         delayMicroseconds(slice); // hold slice
-        digitalWrite(P_EN, HIGH); // OE/ HIGH → LEDs OFF
+        digitalWrite(P_OE, HIGH); // OE/ HIGH → LEDs OFF
         slice <<= 1;              // next bit weight
     }
 }

@@ -24,7 +24,7 @@ public:
         {
             for (uint8_t j = 0; j < 16; j++)
             {
-                panel_setPixel(i, j, static_cast<uint8_t>(i * 16 + j));
+                panel_setPixel(i, j, i * 16 + j);
             }
         }
         Serial.println("Brightness scene activated");
@@ -44,7 +44,6 @@ private:
     void drawSnake()
     {
         panel_clear();
-        panel_show();
     }
 
     // pos is one of the 60 corner pixels. returns the x and y coordinates.
@@ -179,7 +178,6 @@ public:
         Serial.printf("Switching to scene %d\n", currentSceneIndex);
         // clear and switch
         panel_clear();
-        panel_show();
         scenes[currentSceneIndex].activate();
     }
 
