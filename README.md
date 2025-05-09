@@ -40,7 +40,7 @@ The ESP32 has an RTC:
 
 ### Graphics
 
-Graphics are drawn as bitmaps (e.g. using Pixelorama, Piskel, LibreSprite or [Tilesetter](https://www.tilesetter.org/)) and the converted to C++ arrays using an online tool called [img2cpp](https://hurricanejoef.github.io/image2cpp/).
+Graphics are drawn as bitmaps (e.g. using Pixelorama, Piskel, **LibreSprite** or [Tilesetter](https://www.tilesetter.org/)) and the converted to C++ arrays using an online tool called [img2cpp](https://hurricanejoef.github.io/image2cpp/).
 
 ## Usage
 

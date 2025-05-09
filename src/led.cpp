@@ -1,117 +1,77 @@
 #include "led.h"
 #include "font.h"
 
+uint8_t gBright = BRIGHTNESS_4; // global brightness (0-255)
+
 void panel_init()
 {
-    pinMode(P_CLA, OUTPUT);
+    pinMode(P_LATCH, OUTPUT);
     pinMode(P_CLK, OUTPUT);
     pinMode(P_DI, OUTPUT);
-    pinMode(P_EN, OUTPUT);
+    pinMode(P_OE, OUTPUT);
+}
+
+inline void shift_and_latch(uint8_t bit)
+{
+    noInterrupts();
+    digitalWrite(P_LATCH, LOW); // freeze outputs
+    digitalWrite(P_OE, HIGH);   // OE/ HIGH  (panel dark)
+
+    uint16_t i = 0;
+    for (; i < 256; i++)
+    {
+        digitalWrite(P_DI, (panel_buf[i] >> bit) & 1);
+        digitalWrite(P_CLK, HIGH);
+        digitalWrite(P_CLK, LOW);
+    }
+
+    digitalWrite(P_LATCH, HIGH); // transfer SR -> outputs
+    delayMicroseconds(1);        // ≥ 20 ns is enough
+    digitalWrite(P_LATCH, LOW);  // freeze outputs again
+    interrupts();
+}
+
+void panel_setPixel(int8_t row, int8_t col, uint8_t brightness)
+{
+    if ((row < 16) && (row < 16))
+    {
+        panel_buf[lut[row][col]] = brightness;
+    }
+}
+
+void panel_show()
+{
+    uint32_t slice = (BASE_TIME * gBright) / 255;
+    for (uint8_t bit = 0; bit < 8; bit++)
+    {
+        shift_and_latch(bit);     // clock + latch atomically
+        digitalWrite(P_OE, LOW);  // OE/ LOW  → LEDs ON
+        delayMicroseconds(slice); // hold slice
+        digitalWrite(P_OE, HIGH); // OE/ HIGH → LEDs OFF
+        slice <<= 1;              // next bit weight
+    }
 }
 
 // Clear the Panel Buffer
-void panel_clear()
+void panel_fill(uint8_t col)
 {
     for (int i = 0; i < 256; i++)
     {
-        panel_buf[i] = 0;
+        panel_buf[i] = col;
     }
 }
 
-// SCAN DISPLAY, output Bytes to Serial to display
-void panel_show(int brightness)
+void panel_print(void)
 {
-    uint8_t cmask = 1; // to force it to a binary image.
-
-    panel_setBrightness(255);
-    delayMicroseconds(TT);
-
-    uint8_t w = 0;
-    for (int i = 256; i > 0; i--)
+    Serial.println("Panel buffer:");
+    for (int i = 0; i < 256; i++)
     {
-        digitalWrite(P_DI, cmask & panel_buf[w++]);
-        digitalWrite(P_CLK, HIGH);
-        digitalWrite(P_CLK, LOW);
-
-    } // update 2024/01/01 speedup
-    digitalWrite(P_CLA, HIGH);
-    digitalWrite(P_CLA, LOW);
-    panel_setBrightness(brightness); // re enable brightness
-}
-
-void panel_setPixel(int8_t x, int8_t y, uint8_t color)
-{
-    if ((x < 16) && (y < 16))
-    {
-        panel_buf[lut[y][x]] = color;
+        if (i % 16 == 0)
+        {
+            Serial.println();
+        }
+        Serial.print(panel_buf[i], HEX);
+        Serial.print(" ");
     }
-}
-
-void panel_fillGrid(uint8_t col)
-{
-    for (uint8_t x = 0; x < 16; x++)
-        for (uint8_t y = 0; y < 16; y++)
-            panel_setPixel(x, y, col);
-}
-
-void panel_debugTest()
-{
-    for (int i = 0; i < 2; i++)
-    {
-        panel_fillGrid(0xff);
-        panel_show(1, 100);
-        panel_setBrightness(250);
-        delay(300);
-        panel_fillGrid(0x00);
-        panel_show(1, 100);
-        panel_setBrightness(250);
-        delay(300);
-    }
-}
-
-void panel_printChar(uint8_t xs, uint8_t ys, char ch)
-{
-    uint8_t d;
-
-    for (uint8_t x = 0; x < 6; x++)
-    {
-
-        d = pgm_read_byte_near((ch - 32) * 6 + // Buchstabennummer (ASCII ) minus 32 da die ersten 32 Zeichen nicht im Font sind
-                               x +             // jede Spalte
-                               BoldGlyphs6x7);     // Adress of Font
-
-        if ((d & 1) == 1)
-            panel_setPixel(x + xs, 0 + ys, 0xFF);
-        else
-            panel_setPixel(x + xs, 0 + ys, 0);
-        if ((d & 2) == 2)
-            panel_setPixel(x + xs, 1 + ys, 0xFF);
-        else
-            panel_setPixel(x + xs, 1 + ys, 0);
-        if ((d & 4) == 4)
-            panel_setPixel(x + xs, 2 + ys, 0xFF);
-        else
-            panel_setPixel(x + xs, 2 + ys, 0);
-        if ((d & 8) == 8)
-            panel_setPixel(x + xs, 3 + ys, 0xFF);
-        else
-            panel_setPixel(x + xs, 3 + ys, 0);
-        if ((d & 16) == 16)
-            panel_setPixel(x + xs, 4 + ys, 0xFF);
-        else
-            panel_setPixel(x + xs, 4 + ys, 0);
-        if ((d & 32) == 32)
-            panel_setPixel(x + xs, 5 + ys, 0xFF);
-        else
-            panel_setPixel(x + xs, 5 + ys, 0);
-        if ((d & 64) == 64)
-            panel_setPixel(x + xs, 6 + ys, 0xFF);
-        else
-            panel_setPixel(x + xs, 6 + ys, 0);
-    }
-}
-
-void panel_setBrightness(uint8_t brightness)
-{
-    analogWrite(P_EN, brightness);
+    Serial.println();
 }

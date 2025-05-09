@@ -1,31 +1,30 @@
 #include <Arduino.h>
+#include <OneButton.h>
+
 #include "weather.h"
 #include "device.h"
 #include "config.h"
 #include "led.h"
 #include "scene.cpp"
-#include <OneButton.h>
 
 SceneSwitcher sceneSwitcher;
 
 OneButton button;
 void buttonSetup();
 void buttonSingleClick();
-// TODO: maybe add double click to enter sleep?
 void buttonLongPressStart();
 void buttonLongPressStop();
 int buttonLongPressTimer = 0;
 
 void setup()
 {
-  Serial.begin(74880); // native baud rate of ESP32
+  Serial.begin(115200);
 
   buttonSetup();
 
   panel_init();
-  panel_debugTest();
 
-  setup_device();
+  // setup_device();
 
   // wifi_connect();
 
@@ -33,19 +32,27 @@ void setup()
 
   // setup_config_server();
 
+  Serial.println("Setup done!");
+
   // Start with the first scene
   sceneSwitcher.nextScene();
 }
 
 void loop()
 {
+  // Serial.println("Looping...");
+  // gBright = (gBright + 1) % 256;
+  // Serial.println(gBright);
+  // TODO: update brightness at night!
+
   // Update the button
   button.tick();
 
   // Update the current scene
   sceneSwitcher.tick();
 
-  delay(50); // 20FPS at most
+  // refresh the display
+  panel_show();
 }
 
 void buttonSetup()

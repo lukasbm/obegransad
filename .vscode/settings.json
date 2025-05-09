@@ -56,9 +56,11 @@
         "thread": "cpp",
         "cinttypes": "cpp",
         "typeinfo": "cpp",
-        "esp32-hal.h": "c"
+        "esp32-hal.h": "c",
+        "variant": "cpp"
     },
     "cSpell.words": [
+        "ledc",
         "Obengransad"
     ]
 }
