@@ -12,7 +12,6 @@ SceneSwitcher sceneSwitcher;
 OneButton button;
 void buttonSetup();
 void buttonSingleClick();
-// TODO: maybe add double click to enter sleep? (or empty scene)
 void buttonLongPressStart();
 void buttonLongPressStop();
 int buttonLongPressTimer = 0;
@@ -71,7 +70,7 @@ void buttonSetup()
 void buttonSingleClick()
 {
   Serial.println("Button - Single click -> next scene");
-  // sceneSwitcher.nextScene();
+  sceneSwitcher.nextScene();
 }
 
 void buttonLongPressStart()
