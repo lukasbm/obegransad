@@ -7,8 +7,6 @@
 #include "led.h"
 #include "scene.cpp"
 
-// FIXME: i think this is the problem
-// Scene Is never initialized
 SceneSwitcher sceneSwitcher;
 
 SnakeScene snakeScene;
@@ -16,7 +14,7 @@ SnakeScene snakeScene;
 OneButton button;
 void buttonSetup();
 void buttonSingleClick();
-// TODO: maybe add double click to enter sleep?
+// TODO: maybe add double click to enter sleep? (or empty scene)
 void buttonLongPressStart();
 void buttonLongPressStop();
 int buttonLongPressTimer = 0;
@@ -49,6 +47,7 @@ void loop()
   // Serial.println("Looping...");
   // gBright = (gBright + 1) % 256;
   // Serial.println(gBright);
+  // TODO: update brightness at night!
 
   snakeScene.update();
 

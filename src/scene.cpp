@@ -5,12 +5,25 @@
 #include "weather.h"
 #include "clock.h"
 
+// avoid calling panel_clear in the scene.
+// It is called in the SceneManager/Switcher.
+// This way we can combine multiple scenes!
 class Scene
 {
 public:
     virtual void activate() {}
     virtual void deactivate() {}
     virtual void update() {}
+};
+
+class EmptyScene : public Scene
+{
+public:
+    void activate() override
+    {
+        panel_clear();
+        Serial.println("Empty scene activated");
+    }
 };
 
 class BrightnessScene : public Scene
@@ -42,22 +55,21 @@ private:
 
         Serial.printf("Snake head: %d\n", headPos);
 
-        panel_clear();
         // head
         ring_coord((headPos + 60) % 60, x, y);
-        panel_setPixel(x, y, BRIGHTNESS_4);
+        panel_setPixel(y, x, BRIGHTNESS_4);
 
         ring_coord((headPos - 1 + 60) % 60, x, y);
-        panel_setPixel(x, y, BRIGHTNESS_3);
+        panel_setPixel(y, x, BRIGHTNESS_3);
 
         ring_coord((headPos - 2 + 60) % 60, x, y);
-        panel_setPixel(x, y, BRIGHTNESS_2);
+        panel_setPixel(y, x, BRIGHTNESS_2);
 
         ring_coord((headPos - 3 + 60) % 60, x, y);
-        panel_setPixel(x, y, BRIGHTNESS_1);
+        panel_setPixel(y, x, BRIGHTNESS_1);
     }
 
-    // pos is one of the 60 corner pixels. returns the x and y coordinates.
+    // pos is one of the 60 corner pixels. writes the x and y coordinates.
     // pos 0 is top left, moving clockwise
     void ring_coord(uint8_t pos, uint8_t &x, uint8_t &y)
     {
@@ -69,7 +81,7 @@ private:
         else if (pos < 32)
         {
             x = 15;
-            y = pos - 16;
+            y = pos - 15;
         }
         else if (pos < 48)
         {
@@ -139,15 +151,10 @@ private:
 
     void drawTime(uint8_t hour, uint8_t minute)
     {
-        panel_clear();
         // panel_printChar(2, 0, (hour / 10) + 48);
         // panel_printChar(9, 0, (hour % 10) + 48);
         // panel_printChar(2, 9, (minute / 10) + 48);
         // panel_printChar(9, 9, (minute % 10) + 48);
-        if (isNight())
-        {
-            // TODO: update total brightness
-        }
     }
 
 public:
@@ -172,12 +179,6 @@ public:
 class SceneSwitcher
 {
 private:
-    Scene scenes[1] = {
-        BrightnessScene(),
-        // WeatherScene(),
-        // ClockScene()
-    };
-    int currentSceneIndex = -1; // -1 means no scene is active
 
 public:
     void nextScene()
@@ -195,6 +196,7 @@ public:
 
     void tick()
     {
+        panel_clear();
         scenes[currentSceneIndex].update();
     }
 };
