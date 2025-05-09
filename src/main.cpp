@@ -11,6 +11,8 @@
 // Scene Is never initialized
 SceneSwitcher sceneSwitcher;
 
+SnakeScene snakeScene;
+
 OneButton button;
 void buttonSetup();
 void buttonSingleClick();
@@ -26,9 +28,7 @@ void setup()
   // buttonSetup();
 
   panel_init();
-  for (uint8_t y = 0; y < 16; y++)
-    for (uint8_t x = 0; x < 16; x++)
-      panel_setPixel(y, x, y * 16 + x);
+  snakeScene.activate();
 
   // setup_device();
 
@@ -41,12 +41,16 @@ void setup()
   Serial.println("Setup done!");
 
   // Start with the first scene
-  // sceneSwitcher.nextScene();
+  sceneSwitcher.nextScene();
 }
 
 void loop()
 {
-  Serial.println("Looping...");
+  // Serial.println("Looping...");
+  // gBright = (gBright + 1) % 256;
+  // Serial.println(gBright);
+
+  snakeScene.update();
 
   // Update the button
   // button.tick();

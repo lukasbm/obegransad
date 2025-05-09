@@ -1,6 +1,8 @@
 #include "led.h"
 #include "font.h"
 
+uint8_t gBright = BRIGHTNESS_4; // global brightness (0-255)
+
 void panel_init()
 {
     pinMode(P_LATCH, OUTPUT);
@@ -39,9 +41,6 @@ void panel_setPixel(int8_t row, int8_t col, uint8_t brightness)
 
 void panel_show()
 {
-    gBright = (gBright + 1) % 256;
-    Serial.println(gBright);
-
     uint32_t slice = (BASE_TIME * gBright) / 255;
     for (uint8_t bit = 0; bit < 8; bit++)
     {

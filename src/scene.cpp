@@ -18,15 +18,9 @@ class BrightnessScene : public Scene
 public:
     void activate() override
     {
-        panel_clear();
-        // build a gradient for testing
-        for (uint8_t i = 0; i < 16; i++)
-        {
-            for (uint8_t j = 0; j < 16; j++)
-            {
-                panel_setPixel(i, j, i * 16 + j);
-            }
-        }
+        for (uint8_t y = 0; y < 16; y++)
+            for (uint8_t x = 0; x < 16; x++)
+                panel_setPixel(y, x, y * 16 + x);
         Serial.println("Brightness scene activated");
         panel_print();
     }
@@ -34,16 +28,33 @@ public:
 
 // A simple scene where a snake moves around the screen with a tail following
 // moves once a second
-// the tail becomes gradually dimmer (length 5)
+// the tail becomes gradually dimmer (length 4)
 // this is great for testing the LEDs
 class SnakeScene : public Scene
 {
 private:
-    int lastUpdateTime = 0;
+    unsigned long lastUpdateTime = 0;
+    short headPos = 0;
 
     void drawSnake()
     {
+        uint8_t x, y;
+
+        Serial.printf("Snake head: %d\n", headPos);
+
         panel_clear();
+        // head
+        ring_coord((headPos + 60) % 60, x, y);
+        panel_setPixel(x, y, BRIGHTNESS_4);
+
+        ring_coord((headPos - 1 + 60) % 60, x, y);
+        panel_setPixel(x, y, BRIGHTNESS_3);
+
+        ring_coord((headPos - 2 + 60) % 60, x, y);
+        panel_setPixel(x, y, BRIGHTNESS_2);
+
+        ring_coord((headPos - 3 + 60) % 60, x, y);
+        panel_setPixel(x, y, BRIGHTNESS_1);
     }
 
     // pos is one of the 60 corner pixels. returns the x and y coordinates.
@@ -78,6 +89,7 @@ public:
         if (millis() > lastUpdateTime + 1000)
         {
             drawSnake();
+            headPos++;
             lastUpdateTime = millis();
         }
     }
