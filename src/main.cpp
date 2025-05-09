@@ -26,6 +26,9 @@ void setup()
   // buttonSetup();
 
   panel_init();
+  for (uint8_t y = 0; y < 16; y++)
+    for (uint8_t x = 0; x < 16; x++)
+      panel_setPixel(y, x, y * 16 + x);
 
   // setup_device();
 
@@ -38,7 +41,7 @@ void setup()
   Serial.println("Setup done!");
 
   // Start with the first scene
-  sceneSwitcher.nextScene();
+  // sceneSwitcher.nextScene();
 }
 
 void loop()
