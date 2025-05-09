@@ -1,3 +1,4 @@
+#include <variant>
 #include <Arduino.h>
 #include "led.h"
 #include "device.h"
@@ -31,6 +32,7 @@ class BrightnessScene : public Scene
 public:
     void activate() override
     {
+        Serial.println("Brightness scene activated");
         for (uint8_t y = 0; y < 16; y++)
             for (uint8_t x = 0; x < 16; x++)
                 panel_setPixel(y, x, y * 16 + x);
@@ -96,12 +98,16 @@ private:
     }
 
 public:
+    void activate() override
+    {
+        Serial.println("Snake Scene activated");
+    }
     void update() override
     {
         if (millis() > lastUpdateTime + 1000)
         {
             drawSnake();
-            headPos++;
+            headPos = (headPos + 1) % 60;
             lastUpdateTime = millis();
         }
     }
@@ -122,6 +128,7 @@ private:
 public:
     void activate() override
     {
+        Serial.println("Weather scene activated");
         weatherData = fetchWeather(settings.weather_latitude, settings.weather_longitude);
     }
 
@@ -160,6 +167,7 @@ private:
 public:
     void activate() override
     {
+        Serial.println("Clock scene activated");
         drawTime(time_hour(), time_minute());
     }
 
@@ -178,25 +186,53 @@ public:
 
 class SceneSwitcher
 {
-private:
-
 public:
+    SceneSwitcher()
+    {
+        // populate the pointer array
+        scenes = {&emptyScene, &snakeScene, &clockScene, &weatherScene};
+        currIdx = 0; // empty
+        panel_clear();
+        scenes[currIdx]->activate();
+    }
+
+    ~SceneSwitcher()
+    {
+        scenes[currIdx]->deactivate();
+    }
+
     void nextScene()
     {
-        if (currentSceneIndex != -1)
-        {
-            scenes[currentSceneIndex].deactivate();
-        }
-        currentSceneIndex = (currentSceneIndex + 1) % 1; // FIXME: needs to be dynamic!!!!
-        Serial.printf("Switching to scene %d\n", currentSceneIndex);
-        // clear and switch
+        scenes[currIdx]->deactivate();
+        currIdx = (currIdx + 1) % numScenes;
         panel_clear();
-        scenes[currentSceneIndex].activate();
+        scenes[currIdx]->activate();
+    }
+
+    void prevScene()
+    {
+        scenes[currIdx]->deactivate();
+        currIdx = (currIdx + numScenes - 1) % numScenes;
+        panel_clear();
+        scenes[currIdx]->activate();
     }
 
     void tick()
     {
         panel_clear();
-        scenes[currentSceneIndex].update();
+        scenes[currIdx]->update();
     }
+
+private:
+    // all scenes live here, in RAM
+    EmptyScene emptyScene;
+    SnakeScene snakeScene;
+    WeatherScene weatherScene;
+    ClockScene clockScene;
+
+    static constexpr uint8_t numScenes = 4;
+
+    // pointers for polymorphic dispatch
+    std::array<Scene *, numScenes> scenes{};
+    uint8_t currIdx;
 };

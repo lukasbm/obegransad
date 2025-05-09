@@ -23,7 +23,7 @@ void setup()
 {
   Serial.begin(115200);
 
-  // buttonSetup();
+  buttonSetup();
 
   panel_init();
   snakeScene.activate();
@@ -39,7 +39,7 @@ void setup()
   Serial.println("Setup done!");
 
   // Start with the first scene
-  sceneSwitcher.nextScene();
+  // sceneSwitcher.nextScene();
 }
 
 void loop()
@@ -76,7 +76,7 @@ void buttonSetup()
 void buttonSingleClick()
 {
   Serial.println("Button - Single click -> next scene");
-  sceneSwitcher.nextScene();
+  // sceneSwitcher.nextScene();
 }
 
 void buttonLongPressStart()
