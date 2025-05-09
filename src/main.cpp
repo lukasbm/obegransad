@@ -9,8 +9,6 @@
 
 SceneSwitcher sceneSwitcher;
 
-SnakeScene snakeScene;
-
 OneButton button;
 void buttonSetup();
 void buttonSingleClick();
@@ -26,7 +24,6 @@ void setup()
   buttonSetup();
 
   panel_init();
-  snakeScene.activate();
 
   // setup_device();
 
@@ -39,7 +36,7 @@ void setup()
   Serial.println("Setup done!");
 
   // Start with the first scene
-  // sceneSwitcher.nextScene();
+  sceneSwitcher.nextScene();
 }
 
 void loop()
@@ -49,13 +46,11 @@ void loop()
   // Serial.println(gBright);
   // TODO: update brightness at night!
 
-  snakeScene.update();
-
   // Update the button
-  // button.tick();
+  button.tick();
 
   // Update the current scene
-  // sceneSwitcher.tick();
+  sceneSwitcher.tick();
 
   // refresh the display
   panel_show();

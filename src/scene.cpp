@@ -106,6 +106,7 @@ public:
     {
         if (millis() > lastUpdateTime + 1000)
         {
+            panel_clear();
             drawSnake();
             headPos = (headPos + 1) % 60;
             lastUpdateTime = millis();
@@ -187,12 +188,9 @@ public:
 class SceneSwitcher
 {
 public:
-    SceneSwitcher()
+    SceneSwitcher() : scenes{&emptyScene, &snakeScene, &weatherScene, &clockScene}, currIdx(0)
     {
-        // populate the pointer array
-        scenes = {&emptyScene, &snakeScene, &clockScene, &weatherScene};
-        currIdx = 0; // empty
-        panel_clear();
+        Serial.println("SceneSwitcher initialized");
         scenes[currIdx]->activate();
     }
 
@@ -219,7 +217,6 @@ public:
 
     void tick()
     {
-        panel_clear();
         scenes[currIdx]->update();
     }
 
@@ -229,10 +226,9 @@ private:
     SnakeScene snakeScene;
     WeatherScene weatherScene;
     ClockScene clockScene;
-
     static constexpr uint8_t numScenes = 4;
 
     // pointers for polymorphic dispatch
-    std::array<Scene *, numScenes> scenes{};
+    const std::array<Scene *, numScenes> scenes;
     uint8_t currIdx;
 };
