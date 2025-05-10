@@ -55,6 +55,9 @@ void loop()
   panel_show();
 }
 
+
+///// button stuff
+
 void buttonSetup()
 {
   button.setup(

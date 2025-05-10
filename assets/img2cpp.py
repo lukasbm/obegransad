@@ -168,7 +168,7 @@ def parse_sprite_sheet(input_file: str, spriteWidth: int, spriteHeight: int, col
             print(packed)
             print("===")
     else:
-        print(f"// sprite size: {spriteWidth}x{spriteHeight}")
+        print(f"// sprite size: {spriteWidth}x{spriteHeight} ({imgWidth}x{imgHeight} total)")
         print(cpp_dataArray2D(packedArrays))
 
     # add the atlas class

@@ -5,10 +5,8 @@
 #include "config.h"
 #include "weather.h"
 #include "clock.h"
+#include "sprites/small_test.h"
 
-// avoid calling panel_clear in the scene.
-// It is called in the SceneManager/Switcher.
-// This way we can combine multiple scenes!
 class Scene
 {
 public:
@@ -38,6 +36,17 @@ public:
                 panel_setPixel(y, x, y * 16 + x);
         Serial.println("Brightness scene activated");
         panel_print();
+    }
+};
+
+class SpriteTestScene : public Scene
+{
+public:
+    void activate() override
+    {
+        Serial.println("Sprite test scene activated");
+        panel_clear();
+        panel_drawSprite(2, 2, reinterpret_cast<const uint8_t *>(smallSprite), 4, 8);
     }
 };
 
@@ -188,7 +197,7 @@ public:
 class SceneSwitcher
 {
 public:
-    SceneSwitcher() : scenes{&emptyScene, &snakeScene, &weatherScene, &clockScene}, currIdx(0)
+    SceneSwitcher() : scenes{&emptyScene, &spriteTestScene, &snakeScene, &weatherScene, &clockScene}, currIdx(0)
     {
         Serial.println("SceneSwitcher initialized");
         scenes[currIdx]->activate();
@@ -223,10 +232,11 @@ public:
 private:
     // all scenes live here, in RAM
     EmptyScene emptyScene;
+    SpriteTestScene spriteTestScene;
     SnakeScene snakeScene;
     WeatherScene weatherScene;
     ClockScene clockScene;
-    static constexpr uint8_t numScenes = 4;
+    static constexpr uint8_t numScenes = 5;
 
     // pointers for polymorphic dispatch
     const std::array<Scene *, numScenes> scenes;
