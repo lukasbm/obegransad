@@ -88,4 +88,4 @@ static const Brightness colorMap[4] = {
     BRIGHTNESS_4};
 
 // draws a sprite starting at the top left corner (tlX, tlY)
-void drawSprite(uint8_t tlX, uint8_t tlY, const uint8_t *data, uint8_t width, uint8_t height, uint8_t brightness);
+void panel_drawSprite(uint8_t tlX, uint8_t tlY, const uint8_t *data, uint8_t width, uint8_t height);

@@ -60,7 +60,7 @@ void panel_fill(uint8_t col)
     }
 }
 
-void drawSprite(uint8_t tlX, uint8_t tlY, const uint8_t *data, uint8_t width, uint8_t height, uint8_t brightness)
+void panel_drawSprite(uint8_t tlX, uint8_t tlY, const uint8_t *data, uint8_t width, uint8_t height)
 {
     uint8_t *p = const_cast<uint8_t *>(data);
     uint8_t i = 0;

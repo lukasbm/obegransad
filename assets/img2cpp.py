@@ -134,6 +134,8 @@ def load_image(input_file: str) -> np.ndarray:
 # for a single sprite
 def parse_single_sprite(input_file: str, color_depth: int = 2) -> None:
     arr = load_image(input_file)
+    imgHeight = arr.shape[0]
+    imgWidth = arr.shape[1]
 
     if not DEBUG:
         print(front_matter)
@@ -144,6 +146,7 @@ def parse_single_sprite(input_file: str, color_depth: int = 2) -> None:
 
     # print the packed array
     if not DEBUG:
+        print(f"// img size: {imgWidth}x{imgHeight}")
         print(cpp_dataArray1D(packed))
 
 
@@ -165,6 +168,7 @@ def parse_sprite_sheet(input_file: str, spriteWidth: int, spriteHeight: int, col
             print(packed)
             print("===")
     else:
+        print(f"// sprite size: {spriteWidth}x{spriteHeight}")
         print(cpp_dataArray2D(packedArrays))
 
     # add the atlas class
