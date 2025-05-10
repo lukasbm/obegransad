@@ -24,9 +24,7 @@ void setup()
 
   panel_init();
 
-  // setup_device();
-
-  // wifi_connect();
+  setup_device();
 
   // time_setup();
 

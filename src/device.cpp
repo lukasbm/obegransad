@@ -16,7 +16,6 @@ void setup_device(void)
     WiFiManager wifiManager;
     wifiManager.setConfigPortalTimeout(600); // 10 minutes
 
-// wipe stored credentials (stored in flash by esp library)
 #if DEBUG
     wifiManager.setDebugOutput(true);
 #endif
@@ -68,9 +67,6 @@ void wifi_connect(void)
     // WiFi.setSleep(false);        // Disable WiFi sleep mode
     WiFi.setAutoReconnect(true); // Enable auto-reconnect
     WiFi.setHostname("ESP32-Obengransad-Clock");
-    // WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-    // Serial.print("Connecting to ");
-    // Serial.println(WIFI_SSID);
 
     while (WiFi.status() != WL_CONNECTED)
     {
