@@ -28,37 +28,34 @@ def cpp_dataArray1D(packedArray: np.ndarray) -> str:
     hexSprite = np.array2string(packedArray, separator=", ", formatter={'int': lambda x: f"0x{x:02x}"})
     # fix formatting
     hexSpritePost = "\t" + hexSprite.replace("[", "{").replace("]", "}")
-    return f"static const uint8_t {data_array_name}[{len(packedArray)}] = {hexSpritePost};\n"
+    return f"constexpr uint8_t {data_array_name}[{len(packedArray)}] = {hexSpritePost};\n"
 
 
 def cpp_dataArray2D(packedArrays: list[np.ndarray]) -> str:
     assert len(packedArrays) > 0, "packedArrays is empty"
     spriteLen = len(packedArrays[0])
     atlasLen  = len(packedArrays)
-    res = f"static const uint8_t {data_array_name}[{atlasLen}][{spriteLen}] = {{\n"
+    res = f"constexpr uint8_t {data_array_name}[{atlasLen}*{spriteLen}] = {{\n"
     for packed in packedArrays:
         # convert to hex
         hexSprite = np.array2string(packed, separator=", ", formatter={'int': lambda x: f"0x{x:02x}"})
         # fix formatting
-        hexSpritePost = "\t" + hexSprite.replace("[", "{").replace("]", "}")
-        res += f"\t{hexSpritePost},\n"
+        hexSpritePost = "\t" + hexSprite.replace("[", "").replace("]", "")
+        res += f"\t{hexSpritePost}, //\n"
     res += "};\n"
     return res
 
 
-def cpp_textureAtlasClass(width: int, height: int, spriteWidth: int, spriteHeight: int) -> str:
-    numSprites = (width * height) // (spriteWidth * spriteHeight)
-    return f"TextureAtlas atlas({width}, {height}, (const uint8_t **){data_array_name}, {spriteWidth}, {spriteHeight}, {numSprites});"
+def cpp_textureAtlasClass(spriteWidth: int, spriteHeight: int, numSprites:int) -> str:
+    return f"constexpr TextureAtlas atlas({data_array_name}, {spriteWidth}, {spriteHeight}, {numSprites});"
 
 
-def cpp_spriteSheetClass(width: int, height: int, spriteWidth: int, spriteHeight: int) -> str:
-    numSprites = (width * height) // (spriteWidth * spriteHeight)
-    return f"SpriteSheet atlas({width}, {height}, (const uint8_t **){data_array_name}, {spriteWidth}, {spriteHeight}, {numSprites});"
+def cpp_spriteSheetClass(spriteWidth: int, spriteHeight: int, numSprites:int) -> str:
+    return f"constexpr SpriteSheet atlas({data_array_name}, {spriteWidth}, {spriteHeight}, {numSprites});"
 
 
-def cpp_fontClass(width: int, height: int, spriteWidth: int, spriteHeight: int, ascii_offset: int) -> str:
-    numSprites = (width * height) // (spriteWidth * spriteHeight)
-    return f"FontSheet atlas({width}, {height}, (const uint8_t **){data_array_name}, {spriteWidth}, {spriteHeight}, {numSprites}, {ascii_offset});"
+def cpp_fontClass(spriteWidth: int, spriteHeight: int, numSprites:int, ascii_offset: int) -> str:
+    return f"constexpr FontSheet atlas({data_array_name}, {spriteWidth}, {spriteHeight}, {numSprites}, {ascii_offset});"
 
 
 #############################
@@ -171,12 +168,14 @@ def parse_sprite_sheet(input_file: str, spriteWidth: int, spriteHeight: int, col
         print(f"// sprite size: {spriteWidth}x{spriteHeight} ({imgWidth}x{imgHeight} total)")
         print(cpp_dataArray2D(packedArrays))
 
+    numSprites = len(packedArrays)
+
     # add the atlas class
     if not DEBUG:
         print("// keep only ONE of the following:")
-        print(cpp_textureAtlasClass(imgWidth, imgHeight, spriteWidth, spriteHeight))
-        print(cpp_spriteSheetClass(imgWidth, imgHeight, spriteWidth, spriteHeight))
-        print(cpp_fontClass(imgWidth, imgHeight, spriteWidth, spriteHeight, 32))
+        print(cpp_textureAtlasClass(spriteWidth, spriteHeight, numSprites))
+        print(cpp_spriteSheetClass(spriteWidth, spriteHeight, numSprites))
+        print(cpp_fontClass(spriteWidth, spriteHeight, numSprites, 32))
 
 
 if __name__ == "__main__":
