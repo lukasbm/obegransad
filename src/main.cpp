@@ -26,9 +26,9 @@ void setup()
 
   setup_device();
 
-  // time_setup();
+  time_setup();
 
-  // setup_config_server();
+  setup_config_server();
 
   Serial.println("Setup done!");
 
@@ -38,10 +38,17 @@ void setup()
 
 void loop()
 {
-  // Serial.println("Looping...");
-  // gBright = (gBright + 1) % 256;
-  // Serial.println(gBright);
-  // TODO: update brightness at night!
+  static unsigned long lastChecks = millis();
+  if (millis() - lastChecks > 10000) // check every 10 seconds
+  {
+    lastChecks = millis();
+    // check if night and adjust brightness
+    // gBright = (gBright + 1) % 256;
+    // Serial.println(gBright);
+    // TODO: update brightness at night!
+
+    // TODO: also check if it is time to shut off!
+  }
 
   // Update the button
   button.tick();

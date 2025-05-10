@@ -3,36 +3,37 @@
 #include <ArduinoJson.h>
 
 // from: https://open-meteo.com/en/docs#weather_variable_documentation
-enum WeatherCode
+// The weather panel is split in two parts. The left is the general view of the sky and the right side gives precipitation data
+enum WeatherCode : uint8_t
 {
-    CLEAR = 0,
-    PARTLY_CLOUDY = 1,
-    CLOUDY = 2,
-    OVERCAST = 3,
-    FOG = 45,
-    RIME_FOG = 48,
-    LIGHT_DRIZZLE = 51,
-    MODERATE_DRIZZLE = 53,
-    HEAVY_DRIZZLE = 55,
-    LIGHT_FREEZING_DRIZZLE = 56,
-    DENSE_FREEZING_DRIZZLE = 57,
-    SLIGHT_RAIN = 61,
-    MODERATE_RAIN = 63,
-    HEAVY_RAIN = 65,
-    LIGHT_FREEZING_RAIN = 66,
-    HEAVY_FREEZING_RAIN = 67,
-    SLIGHT_SNOW_FALL = 71,
-    MODERATE_SNOW_FALL = 73,
-    HEAVY_SNOW_FALL = 75,
-    SNOW_GRAINS = 77,
-    SLIGHT_RAIN_SHOWER = 80,
-    MODERATE_RAIN_SHOWER = 81,
-    VIOLENT_RAIN_SHOWER = 82,
-    SLIGHT_SNOW_SHOWER = 85,
-    HEAVY_SNOW_SHOWER = 86,
-    SLIGHT_OR_MODERATE_THUNDERSTORM = 95,
-    THUNDERSTORM_WITH_LIGHT_HAIL = 96,
-    THUNDERSTORM_WITH_HEAVY_HAIL = 99,
+    CLEAR = 0,                            // full: clear sky
+    PARTLY_CLOUDY = 1,                    // left: cloud sprite
+    CLOUDY = 2,                           // left: cloud sprite
+    OVERCAST = 3,                         // left: cloud sprite
+    FOG = 45,                             // left: cloud sprite
+    RIME_FOG = 48,                        // left: cloud sprite
+    LIGHT_DRIZZLE = 51,                   // right: raining
+    MODERATE_DRIZZLE = 53,                // right: raining
+    HEAVY_DRIZZLE = 55,                   // right: raining
+    LIGHT_FREEZING_DRIZZLE = 56,          // right: raining
+    DENSE_FREEZING_DRIZZLE = 57,          // right: raining
+    SLIGHT_RAIN = 61,                     // right: raining
+    MODERATE_RAIN = 63,                   // right: raining
+    HEAVY_RAIN = 65,                      // right: raining
+    LIGHT_FREEZING_RAIN = 66,             // right: raining
+    HEAVY_FREEZING_RAIN = 67,             // right: raining
+    SLIGHT_SNOW_FALL = 71,                // right: snowing
+    MODERATE_SNOW_FALL = 73,              // right: snowing
+    HEAVY_SNOW_FALL = 75,                 // right: snowing
+    SNOW_GRAINS = 77,                     // right: snowing
+    SLIGHT_RAIN_SHOWER = 80,              // right: raining
+    MODERATE_RAIN_SHOWER = 81,            // right: raining
+    VIOLENT_RAIN_SHOWER = 82,             // right: raining
+    SLIGHT_SNOW_SHOWER = 85,              // right: snowing
+    HEAVY_SNOW_SHOWER = 86,               // right: snowing
+    SLIGHT_OR_MODERATE_THUNDERSTORM = 95, // right: lightning bolts
+    THUNDERSTORM_WITH_LIGHT_HAIL = 96,    // right: lightning bolts
+    THUNDERSTORM_WITH_HEAVY_HAIL = 99,    // right: lightning bolts
 };
 
 struct WeatherData
