@@ -63,10 +63,10 @@ private:
     void drawNextSprite()
     {
         panel_clear();
-        auto sprite = smallSheet.nextFrame();
+        auto sprite = asset_smallTestSheet.getByIndex(0);
         if (sprite != nullptr)
         {
-            panel_drawSprite(2, 2, sprite, smallSheet.spriteWidth, smallSheet.spriteHeight);
+            panel_drawSprite(2, 2, sprite, asset_smallTestSheet.spriteWidth, asset_smallTestSheet.spriteHeight);
         }
         else
         {
