@@ -1,6 +1,5 @@
 #pragma once
 
-#include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
 
 struct OffTime
@@ -13,21 +12,17 @@ struct OffTime
 
 struct Config
 {
-    uint16_t brightness_day;
-    uint16_t brightness_night;
-
+    uint8_t brightness_day;
+    uint8_t brightness_night;
     std::vector<OffTime> off_time_everyday;
     std::vector<OffTime> off_time_weekdays;
     std::vector<OffTime> off_time_weekends;
-
     double weather_latitude;
     double weather_longitude;
-    uint32_t weather_update_interval;
+    char *timezone;
 
     Config();
-
     bool fromJson(const JsonObject &root);
-
     void toJson(JsonObject &root) const;
 };
 

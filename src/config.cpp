@@ -1,7 +1,7 @@
+#include <ESPAsyncWebServer.h>
 #include "config.h"
 
 static AsyncWebServer server(80);
-Config settings;
 
 // define default config
 Config::Config()
@@ -9,14 +9,16 @@ Config::Config()
       brightness_night(20),
       weather_latitude(49.4613909),
       weather_longitude(11.1540788),
-      weather_update_interval(300)
+      timezone("CET-1CEST,M3.5.0,M10.5.0/3")
 {
     // default off-times
-    off_time_everyday.push_back({0, 0, 6, 0});
-    off_time_weekdays.push_back({22, 30, 23, 59});
+    off_time_everyday.push_back({0, 0, 6, 0});     // everyday 0:00-6:00
+    off_time_weekdays.push_back({22, 30, 23, 59}); // weekdays 22:30-23:59
     // weekends left empty
     off_time_weekends.clear();
 }
+
+Config settings;
 
 bool Config::fromJson(const JsonObject &root)
 {
@@ -25,7 +27,7 @@ bool Config::fromJson(const JsonObject &root)
     brightness_night = root["brightness_night"] | brightness_night;
     weather_latitude = root["weather_latitude"] | weather_latitude;
     weather_longitude = root["weather_longitude"] | weather_longitude;
-    weather_update_interval = root["weather_update_interval"] | weather_update_interval;
+    timezone = root["timezone"] | timezone;
 
     // helper lambda to read an array of OffTime
     auto replaceRead = [&](const char *key, std::vector<OffTime> &vec)
@@ -60,7 +62,7 @@ void Config::toJson(JsonObject &root) const
     root["brightness_night"] = brightness_night;
     root["weather_latitude"] = weather_latitude;
     root["weather_longitude"] = weather_longitude;
-    root["weather_update_interval"] = weather_update_interval;
+    root["timezone"] = timezone;
 
     // helper lambda to write an array
     auto writeOff = [&](const char *key, const std::vector<OffTime> &vec)
@@ -107,9 +109,7 @@ void handleNewConfig(AsyncWebServerRequest *request)
     if (err)
     {
         request->send(400, "application/to_json",
-                      String("{\"error\":\"Invalid JSON: ") +
-                          err.c_str() + "\"}");
-
+                      String("{\"error\":\"Invalid JSON: ") + err.c_str() + "\"}");
         return;
     }
 
