@@ -1,3 +1,5 @@
+#include <HTTPClient.h>
+
 #include "weather.h"
 
 struct WeatherData fetchWeather(float lat, float lon)
@@ -5,13 +7,15 @@ struct WeatherData fetchWeather(float lat, float lon)
     WeatherData res;
 
     // 1) Build request URL
-    // example url: https://api.open-meteo.com/v1/forecast?latitude=49.4542&longitude=11.0775&daily=uv_index_max,sunrise,sunset&hourly=uv_index&current=temperature_2m,rain,precipitation,showers,snowfall,wind_speed_10m&timezone=auto&forecast_days=1
-    // BETTER example url (with weather codes, needed for icons!): https://api.open-meteo.com/v1/forecast?latitude=49.4542&longitude=11.0775&daily=uv_index_max&hourly=temperature_2m&current=precipitation,rain,showers,snowfall,temperature_2m,weather_code,cloud_cover&timezone=auto
+    // BETTER example url (with weather codes, needed for icons!): https://api.open-meteo.com/v1/forecast?latitude=49.4542&longitude=11.0775&daily=uv_index_max&hourly=temperature_2m&current=precipitation,rain,showers,snowfall,temperature_2m,weather_code,cloud_cover&timezone=auto&forecast_days=1
     String url = String("https://api.open-meteo.com/v1/forecast") +
                  "?latitude=" + String(lat) +
                  "&longitude=" + String(lon) +
-                 "&daily=uv_index_max,sunrise,sunset" +
-                 "&hourly=uv_index&current=temperature_2m,rain,precipitation,showers,snowfall,wind_speed_10m&timezone=auto&forecast_days=1";
+                 "&daily=uv_index_max" +
+                 //  "&hourly=uv_index,temperature_2m" +
+                 "&current=temperature_2m,rain,precipitation,showers,snowfall,weather_code,cloud_cover" +
+                 "&timezone=auto" +
+                 "&forecast_days=1";
 
     HTTPClient http;
     http.begin(url); // HTTPS by default
@@ -47,14 +51,14 @@ struct WeatherData fetchWeather(float lat, float lon)
 
 static void parseWeatherData(WeatherData &res, const JsonDocument &doc)
 {
-    JsonObjectConst current = doc["current"].as<JsonObjectConst>();
-    res.temperature = current["temperature_2m"];
-    res.rain = current["rain"];
+    JsonObjectConst current = doc["current"];
     res.precipitation = current["precipitation"];
+    res.rain = current["rain"];
     res.showers = current["showers"];
     res.snowfall = current["snowfall"];
-    res.windSpeed = current["wind_speed_10m"];
+    res.temperature = current["temperature_2m"];
+    res.weatherCode = (WeatherCode)current["weather_code"];
 
-    JsonObjectConst daily = doc["daily"].as<JsonObjectConst>();
+    JsonObjectConst daily = doc["daily"];
     res.maxUvIndex = daily["uv_index_max"][0];
 }

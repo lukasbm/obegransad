@@ -1,21 +1,6 @@
 #pragma once
 
-#include <HTTPClient.h>
 #include <ArduinoJson.h>
-
-struct WeatherData
-{
-    float temperature;
-    float rain;
-    float precipitation;
-    float showers;
-    float snowfall;
-    float maxUvIndex;
-    float windSpeed;
-};
-
-struct WeatherData fetchWeather(float lat, float lon);
-static void parseWeatherData(WeatherData &res, const JsonDocument &doc);
 
 // from: https://open-meteo.com/en/docs#weather_variable_documentation
 enum WeatherCode
@@ -49,3 +34,17 @@ enum WeatherCode
     THUNDERSTORM_WITH_LIGHT_HAIL = 96,
     THUNDERSTORM_WITH_HEAVY_HAIL = 99,
 };
+
+struct WeatherData
+{
+    float precipitation;
+    float rain;
+    float showers;
+    float snowfall;
+    float temperature;
+    WeatherCode weatherCode;
+    float maxUvIndex;
+};
+
+struct WeatherData fetchWeather(float lat, float lon);
+static void parseWeatherData(WeatherData &res, const JsonDocument &doc);
