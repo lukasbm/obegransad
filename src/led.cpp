@@ -61,6 +61,29 @@ void panel_fill(uint8_t col)
     }
 }
 
+Brightness twoBitColorToBrightness(uint8_t color)
+{
+    switch (color)
+    {
+    case 0:
+        return BRIGHTNESS_OFF;
+    case 1:
+        return BRIGHTNESS_1;
+    case 2:
+        return BRIGHTNESS_2;
+    case 3:
+        return BRIGHTNESS_4;
+    default:
+        return BRIGHTNESS_OFF;
+    }
+}
+
+
+void drawSprite(uint8_t x, uint8_t y, const uint8_t *data, uint8_t width, uint8_t height, uint8_t brightness)
+{
+    // TODO: use twoBitColorToBrightness
+}
+
 void panel_print(void)
 {
     Serial.println("Panel buffer:");

@@ -14,7 +14,7 @@ DEBUG = os.getenv("DEBUG", False)
 front_matter = """#pragma once
 
 #include <Arduino.h>
-#include "font.h"
+#include "sprites.h"
 
 """
 
