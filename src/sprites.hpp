@@ -7,43 +7,42 @@
 // for many static sprites
 struct TextureAtlas
 {
-    const uint8_t width;
-    const uint8_t height;
-    const uint8_t **data;
+    const uint8_t *data;
     const uint8_t spriteWidth;
     const uint8_t spriteHeight;
-    const uint8_t spriteCount;
+    const size_t spriteBytes;
+    const size_t spriteCount;
 
-    TextureAtlas(const uint8_t w, const uint8_t h, const uint8_t **d, const uint8_t sw, const uint8_t sh, const uint8_t sc)
-        : width(w), height(h), data(d), spriteWidth(sw), spriteHeight(sh), spriteCount(sc) {}
+    constexpr TextureAtlas(const uint8_t *d, const uint8_t sw, const uint8_t sh, const size_t sc)
+        : data(d), spriteWidth(sw), spriteHeight(sh), spriteBytes((sh * sw) / 4), spriteCount(sc) {}
 
-    unsigned short getByIndex(unsigned short index, const uint8_t *out)
+    unsigned short getByIndex(unsigned short index, const uint8_t *&out)
     {
         if (index >= spriteCount)
         {
             return 0;
         }
-        out = data[index];
-        return spriteWidth * spriteHeight;
+        out = &data[index * spriteBytes];
+        return spriteBytes;
     }
 };
 
 // for fonts (ASCII subset)
 struct FontSheet : TextureAtlas
 {
-    FontSheet(const uint8_t w, const uint8_t h, const uint8_t **d, const uint8_t sw, const uint8_t sh, const uint8_t sc, char ast)
-        : TextureAtlas(w, h, d, sw, sh, sc), asciiStart(ast) {}
+    constexpr FontSheet(const uint8_t *d, const uint8_t sw, const uint8_t sh, const uint8_t sc, const char ast)
+        : TextureAtlas(d, sw, sh, sc), asciiStart(ast) {}
 
-    unsigned short getGlyph(const char c, const uint8_t *out)
+    unsigned short getGlyph(const char c, const uint8_t *&out) const
     {
-        if (c < 32 || c > 126)
+        if (c < asciiStart || c > asciiStart + spriteCount)
         {
             out = nullptr;
             return 0;
         }
-        unsigned short index = c - 32;
-        out = data[index];
-        return spriteWidth * spriteHeight;
+        unsigned short index = c - asciiStart;
+        out = &data[index * spriteBytes];
+        return spriteBytes;
     }
 
 private:
@@ -53,17 +52,18 @@ private:
 // for animations
 struct SpriteSheet : TextureAtlas
 {
-    SpriteSheet(const uint8_t w, const uint8_t h, const uint8_t **d, const uint8_t sw, const uint8_t sh, const uint8_t sc)
-        : TextureAtlas(w, h, d, sw, sh, sc) {}
+    constexpr SpriteSheet(const uint8_t *d, const uint8_t sw, const uint8_t sh, const uint8_t sc)
+        : TextureAtlas(d, sw, sh, sc) {}
 
-    unsigned short nextFrame(const uint8_t *out)
+    unsigned short nextFrame(const uint8_t *&out)
     {
-        out = data[currFrame];
+        out = &data[currFrame * spriteBytes];
         currFrame++;
         if (currFrame >= spriteCount)
         {
             currFrame = 0;
         }
+        return spriteBytes;
     }
 
     void startOver()

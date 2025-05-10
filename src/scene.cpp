@@ -5,7 +5,7 @@
 #include "config.h"
 #include "weather.h"
 #include "clock.h"
-#include "sprites/small_test.h"
+#include "sprites/small_test.hpp"
 
 class Scene
 {
