@@ -5,7 +5,7 @@
 
 
 // sprite size: 4x6 (4x390 total)
-constexpr uint8_t spriteData[65*6] = {
+constexpr uint8_t asset_thinGlyphs[65*6] = {
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //
 		0x34, 0x34, 0x34, 0x34, 0x00, 0x34, //
 		0x33, 0x33, 0x00, 0x00, 0x00, 0x00, //
@@ -73,7 +73,4 @@ constexpr uint8_t spriteData[65*6] = {
 		0x3c, 0x00, 0x00, 0x00, 0x00, 0x00, //
 };
 
-// keep only ONE of the following:
-constexpr TextureAtlas atlas(spriteData, 4, 6, 65);
-constexpr SpriteSheet atlas(spriteData, 4, 6, 65);
-constexpr FontSheet atlas(spriteData, 4, 6, 65, 32);
+constexpr FontSheet asset_thinGlyphSheet(asset_thinGlyphs, 4, 6, 65, 32);
