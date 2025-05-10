@@ -9,4 +9,4 @@ constexpr uint8_t smallSprite[] = {
     0xf0, 0xf0, 0xff, 0xff, //
 };
 
-constexpr TextureAtlas smallAtlas(smallSprite, 4, 4, 2);
+constexpr SpriteSheet smallSheet(smallSprite, 4, 4, 2);

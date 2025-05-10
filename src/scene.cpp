@@ -46,8 +46,32 @@ public:
     {
         Serial.println("Sprite test scene activated");
         panel_clear();
-        auto sprite = smallAtlas.getByIndex(0);
-        panel_drawSprite(2, 2, sprite, smallAtlas.spriteWidth, smallAtlas.spriteHeight);
+        drawNextSprite();
+    }
+    void update()
+    {
+        static unsigned short timeSinceLastUpdate = millis();
+
+        if (millis() - timeSinceLastUpdate > 1000)
+        {
+            timeSinceLastUpdate = millis();
+            drawNextSprite();
+        }
+    }
+
+private:
+    void drawNextSprite()
+    {
+        panel_clear();
+        auto sprite = smallSheet.nextFrame();
+        if (sprite != nullptr)
+        {
+            panel_drawSprite(2, 2, sprite, smallSheet.spriteWidth, smallSheet.spriteHeight);
+        }
+        else
+        {
+            Serial.println("SpriteTestScene: sprite is null");
+        }
     }
 };
 

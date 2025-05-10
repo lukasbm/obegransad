@@ -39,7 +39,7 @@ struct FontSheet : TextureAtlas
             return nullptr;
         }
         unsigned short index = c - asciiStart;
-        return &data[index * spriteBytes];
+        return getByIndex(index);
     }
 
 private:
@@ -60,10 +60,6 @@ struct SpriteSheet : TextureAtlas
         {
             currFrame = 0;
         }
-        else
-        {
-            currFrame++;
-        }
-        return &data[currFrame * spriteBytes];
+        return getByIndex(currFrame++);
     }
 };
