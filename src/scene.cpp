@@ -46,7 +46,8 @@ public:
     {
         Serial.println("Sprite test scene activated");
         panel_clear();
-        panel_drawSprite(2, 2, reinterpret_cast<const uint8_t *>(smallSprite), 4, 8);
+        auto sprite = smallAtlas.getByIndex(0);
+        panel_drawSprite(2, 2, sprite, smallAtlas.spriteWidth, smallAtlas.spriteHeight);
     }
 };
 
