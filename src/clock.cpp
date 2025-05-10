@@ -1,66 +1,43 @@
 #include "clock.h"
-
-static struct tm timeinfo;
+#include "config.h"
 
 void time_setup()
 {
-    // setenv("TZ", MY_TZ, 1); // set timezone
-    tzset();                // apply timezone
+    time_syncNTP();
 }
 
 void time_syncNTP()
 {
-    // configTime(0, 0, MY_NTP_SERVER); // set NTP server
-    if (!getLocalTime(&timeinfo, 2000))
+    configTzTime(settings.timezone, MY_NTP_SERVER);
+    struct tm temp;
+    if (!getLocalTime(&temp, 2000))
     {
         Serial.println("Failed to obtain time");
         return;
     }
-    Serial.println("NTP time synchronized.");
 }
 
-static void time_fetch()
+bool isNight(struct tm time)
 {
-    getLocalTime(&timeinfo, 2000);
-}
-
-int time_hour()
-{
-    time_fetch();
-    return timeinfo.tm_hour;
-}
-
-int time_minute()
-{
-    time_fetch();
-    return timeinfo.tm_min;
-}
-
-int time_second()
-{
-    time_fetch();
-    return timeinfo.tm_sec;
-}
-
-bool isNight()
-{
-    time_fetch();
-    if (timeinfo.tm_hour >= 22 || timeinfo.tm_hour < 6)
+    if (time.tm_hour >= 22 || time.tm_hour < 6)
     {
         return true; // night
     }
     return false; // day
 }
 
-const char *getTimeString()
+struct tm time_fetch()
 {
-    static char timeString[20];
-    snprintf(timeString, sizeof(timeString), "%02d:%02d:%02d", time_hour(), time_minute(), time_second());
-    return timeString;
-}
-
-struct tm time_full()
-{
-    time_fetch();
+    static time_t lastFetch = 0;
+    static time_t now = 0;
+    time(&now);                          // get the current time
+    if (difftime(now, lastFetch) > 3600) // if more than an hour has passed
+    {
+        time_syncNTP();
+        lastFetch = now; // update the last fetch time
+    }
+    // fetch the time again.
+    struct tm timeinfo;
+    getLocalTime(&timeinfo, 2000);
     return timeinfo;
 }
