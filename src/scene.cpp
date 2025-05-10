@@ -123,7 +123,7 @@ private:
 
     void drawWeatherData()
     {
-        // TODO: idk
+        // TODO: need sprites first!
     }
 
 public:

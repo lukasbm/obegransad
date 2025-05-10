@@ -4,7 +4,7 @@
 
 // NOTE: sprite are always stacked on top of each other (y-axis)
 
-// for static sprites
+// for many static sprites
 struct TextureAtlas
 {
     const uint8_t width;

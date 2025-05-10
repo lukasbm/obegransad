@@ -18,7 +18,6 @@ struct WeatherData fetchWeather(float lat, float lon);
 static void parseWeatherData(WeatherData &res, const JsonDocument &doc);
 
 // from: https://open-meteo.com/en/docs#weather_variable_documentation
-// TODO: draw a symbol for each weather code
 enum WeatherCode
 {
     CLEAR = 0,

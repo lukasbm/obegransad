@@ -1,5 +1,4 @@
 #include "led.h"
-#include "font.h"
 
 uint8_t gBright = BRIGHTNESS_4; // global brightness (0-255)
 
@@ -61,27 +60,27 @@ void panel_fill(uint8_t col)
     }
 }
 
-Brightness twoBitColorToBrightness(uint8_t color)
+void drawSprite(uint8_t tlX, uint8_t tlY, const uint8_t *data, uint8_t width, uint8_t height, uint8_t brightness)
 {
-    switch (color)
+    uint8_t *p = const_cast<uint8_t *>(data);
+    uint8_t i = 0;
+    for (uint8_t y = 0; y < height; y++)
     {
-    case 0:
-        return BRIGHTNESS_OFF;
-    case 1:
-        return BRIGHTNESS_1;
-    case 2:
-        return BRIGHTNESS_2;
-    case 3:
-        return BRIGHTNESS_4;
-    default:
-        return BRIGHTNESS_OFF;
+        for (uint8_t x = 0; x < width; x++)
+        {
+            // move to next byte
+            if (i >= 4)
+            {
+                p++;
+                i = 0;
+            }
+            // get the pixel value (2 bits per pixel) - they are big endian.
+            uint8_t pixel = (*p >> (6 - i * 2)) & mask;
+            // draw it
+            panel_setPixel(tlY + y, tlX + x, colorMap[pixel]);
+            i++;
+        }
     }
-}
-
-
-void drawSprite(uint8_t x, uint8_t y, const uint8_t *data, uint8_t width, uint8_t height, uint8_t brightness)
-{
-    // TODO: use twoBitColorToBrightness
 }
 
 void panel_print(void)

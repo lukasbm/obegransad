@@ -78,4 +78,14 @@ inline void panel_clear()
     panel_fill(0);
 }
 
-void drawSprite(uint8_t x, uint8_t y, const uint8_t *data, uint8_t width, uint8_t height, uint8_t brightness);
+// we have a 2 bit color depth
+static const uint8_t mask = 0b11;
+
+static const Brightness colorMap[4] = {
+    BRIGHTNESS_OFF,
+    BRIGHTNESS_1,
+    BRIGHTNESS_2,
+    BRIGHTNESS_4};
+
+// draws a sprite starting at the top left corner (tlX, tlY)
+void drawSprite(uint8_t tlX, uint8_t tlY, const uint8_t *data, uint8_t width, uint8_t height, uint8_t brightness);

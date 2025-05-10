@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
-#include "sprites.h"
+#include "sprites.hpp"
 
 static const uint8_t spriteData[2][4] = {
     {0xf0, 0xf0, 0x0f, 0x0f}, // 4x4
