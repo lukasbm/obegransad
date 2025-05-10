@@ -28,23 +28,34 @@ struct TextureAtlas
     }
 };
 
+// for fonts (ASCII subset)
 struct FontSheet : TextureAtlas
 {
+    FontSheet(const uint8_t w, const uint8_t h, const uint8_t **d, const uint8_t sw, const uint8_t sh, const uint8_t sc, char ast)
+        : TextureAtlas(w, h, d, sw, sh, sc), asciiStart(ast) {}
+
     unsigned short getGlyph(const char c, const uint8_t *out)
     {
         if (c < 32 || c > 126)
         {
+            out = nullptr;
             return 0;
         }
         unsigned short index = c - 32;
         out = data[index];
         return spriteWidth * spriteHeight;
     }
+
+private:
+    const char asciiStart;
 };
 
 // for animations
 struct SpriteSheet : TextureAtlas
 {
+    SpriteSheet(const uint8_t w, const uint8_t h, const uint8_t **d, const uint8_t sw, const uint8_t sh, const uint8_t sc)
+        : TextureAtlas(w, h, d, sw, sh, sc) {}
+
     unsigned short nextFrame(const uint8_t *out)
     {
         out = data[currFrame];
