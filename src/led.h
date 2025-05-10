@@ -7,15 +7,6 @@
 // MBI5024/5034, STP16, TPIC6B595
 
 /*
-The panel works as follows:
-1. Shift the data for one bit-plane
-2. Latch it with CLA.
-3. Turn on EN for a slice of time. EN therefore acts as a PWM signal that drives the brightness.
-4. Blank (EN = low) before the next bit-plane is shifted in.
-The entire display can be seen as a large shift register.
-*/
-
-/*
 DI	Serial data in	1 bit at a time, no concept of “brightness”
 CLK	Shift‑register clock	Just marches data along
 CLA	Latch / strobe	Copies the 256 bits into the output on/off latches

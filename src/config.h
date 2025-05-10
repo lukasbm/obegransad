@@ -24,13 +24,10 @@ struct Config
     double weather_longitude;
     uint32_t weather_update_interval;
 
-    // 1) default ctor: builds your “fallback” config
     Config();
 
-    // 2) read JSON into *this* (preserving defaults when keys missing)
     bool fromJson(const JsonObject &root);
 
-    // 3) write *this* into a JsonObject
     void toJson(JsonObject &root) const;
 };
 

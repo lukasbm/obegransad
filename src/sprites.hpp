@@ -52,21 +52,18 @@ struct SpriteSheet : TextureAtlas
     constexpr SpriteSheet(const uint8_t *d, const uint8_t sw, const uint8_t sh, const uint8_t sc)
         : TextureAtlas(d, sw, sh, sc) {}
 
-    const uint8_t *nextFrame()
+    const uint8_t *nextFrame() const
     {
+        static unsigned short currFrame = 0;
+
         if (currFrame >= spriteCount)
         {
             currFrame = 0;
         }
-        currFrame++;
+        else
+        {
+            currFrame++;
+        }
         return &data[currFrame * spriteBytes];
     }
-
-    void startOver()
-    {
-        currFrame = 0;
-    }
-
-private:
-    unsigned short currFrame = 0;
 };
