@@ -253,7 +253,7 @@ public:
     {
         Serial.println("Clock scene activated");
         struct tm time = time_fetch();
-        drawTime(time.tm_hour, time.tm_hour);
+        drawTime(time.tm_hour, time.tm_min);
     }
 
     void update() override
@@ -263,7 +263,7 @@ public:
         struct tm time = time_fetch();
         if (time.tm_min != lastMinute)
         {
-            drawTime(time.tm_hour, time.tm_hour);
+            drawTime(time.tm_hour, time.tm_min);
             lastMinute = time.tm_min;
         }
     }
