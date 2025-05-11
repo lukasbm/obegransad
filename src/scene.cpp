@@ -49,34 +49,19 @@ class SpriteTestScene : public Scene
 public:
     void activate() override
     {
+        uint8_t const *sprite;
+
         Serial.println("Sprite test scene activated");
         panel_clear();
-        drawNextSprite();
-    }
-    void update()
-    {
-        static unsigned short timeSinceLastUpdate = millis();
 
-        if (millis() - timeSinceLastUpdate > 1000)
-        {
-            timeSinceLastUpdate = millis();
-            drawNextSprite();
-        }
-    }
-
-private:
-    void drawNextSprite()
-    {
-        panel_clear();
-        auto sprite = sheet_test.getByIndex(0);
-        if (sprite != nullptr)
-        {
-            panel_drawSprite(2, 2, sprite, sheet_test.spriteWidth, sheet_test.spriteHeight);
-        }
-        else
-        {
-            Serial.println("SpriteTestScene: sprite is null");
-        }
+        sprite = font_bold.getGlyph('1');
+        panel_drawSprite(0, 0, sprite, font_bold.spriteWidth, font_bold.spriteHeight);
+        sprite = font_bold.getGlyph('9');
+        panel_drawSprite(0, 8, sprite, font_bold.spriteWidth, font_bold.spriteHeight);
+        sprite = font_bold.getGlyph('A');
+        panel_drawSprite(9, 0, sprite, font_bold.spriteWidth, font_bold.spriteHeight);
+        sprite = font_bold.getGlyph('Y');
+        panel_drawSprite(9, 8, sprite, font_bold.spriteWidth, font_bold.spriteHeight);
     }
 };
 

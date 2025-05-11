@@ -12,7 +12,7 @@ struct SingleSprite
     const size_t bytes;
 
     constexpr SingleSprite(const uint8_t *d, const uint8_t w, const uint8_t h)
-        : data(d), width(w), height(h), bytes(sizeof(d)) {} // bytes((h * w) / 4) {}
+        : data(d), width(w), height(h), bytes(sizeof(d)) {}
 };
 
 // for many static sprites
@@ -24,8 +24,8 @@ struct TextureAtlas
     const size_t spriteBytes;
     const size_t spriteCount;
 
-    constexpr TextureAtlas(const uint8_t *d, const uint8_t sw, const uint8_t sh, const size_t sc)
-        : data(d), spriteWidth(sw), spriteHeight(sh), spriteBytes((sh * sw) / 4), spriteCount(sc) {}
+    constexpr TextureAtlas(const uint8_t *data, const uint8_t spriteWidth, const uint8_t spriteHeight, const size_t spriteCount, const size_t spriteBytes)
+        : data(data), spriteWidth(spriteWidth), spriteHeight(spriteHeight), spriteBytes(spriteBytes), spriteCount(spriteCount) {}
 
     const uint8_t *getByIndex(unsigned short index) const
     {
@@ -40,8 +40,8 @@ struct TextureAtlas
 // for fonts (ASCII subset)
 struct FontSheet : TextureAtlas
 {
-    constexpr FontSheet(const uint8_t *d, const uint8_t sw, const uint8_t sh, const uint8_t sc, const char ast)
-        : TextureAtlas(d, sw, sh, sc), asciiStart(ast) {}
+    constexpr FontSheet(const uint8_t *data, const uint8_t spriteWidth, const uint8_t spriteHeight, const uint8_t spriteCount, const size_t spriteBytes, const char asciiStart)
+        : TextureAtlas(data, spriteWidth, spriteHeight, spriteCount, spriteBytes), asciiStart(asciiStart) {}
 
     const uint8_t *getGlyph(const char c) const
     {
@@ -60,8 +60,8 @@ private:
 // for animations
 struct SpriteSheet : TextureAtlas
 {
-    constexpr SpriteSheet(const uint8_t *d, const uint8_t sw, const uint8_t sh, const uint8_t sc)
-        : TextureAtlas(d, sw, sh, sc) {}
+    constexpr SpriteSheet(const uint8_t *data, const uint8_t spriteWidth, const uint8_t spriteHeight, const uint8_t spriteCount, const uint8_t spriteBytes)
+        : TextureAtlas(data, spriteWidth, spriteHeight, spriteCount, spriteBytes) {}
 
     const uint8_t *nextFrame() const
     {
