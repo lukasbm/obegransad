@@ -55,6 +55,13 @@ extern uint8_t gBright;            // global brightness (0-255)
 // forward declarations
 void panel_setPixel(int8_t row, int8_t col, uint8_t brightness);
 
+// leaves the panel on (but no PWM)
+// call this once before doing a long blocking task, this keeps the panel on.
+// after wards just call panel_show() to refresh the panel
+void panel_hold();
+
+// refreshes the panel (with PWM)
+// needed for animations and individual pixel brightness
 void panel_show();
 
 // prints the buffer to the serial monitor

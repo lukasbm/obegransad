@@ -12,7 +12,7 @@ void panel_init()
 
 inline void shift_and_latch(uint8_t bit)
 {
-    noInterrupts();
+    noInterrupts();             // interrupts will throw off the timing
     digitalWrite(P_LATCH, LOW); // freeze outputs
     digitalWrite(P_OE, HIGH);   // OE/ HIGH  (panel dark)
 
@@ -27,7 +27,7 @@ inline void shift_and_latch(uint8_t bit)
     digitalWrite(P_LATCH, HIGH); // transfer SR -> outputs
     delayMicroseconds(1);        // ≥ 20 ns is enough
     digitalWrite(P_LATCH, LOW);  // freeze outputs again
-    interrupts();
+    interrupts();                // re-enable interrupts
 }
 
 void panel_setPixel(int8_t row, int8_t col, uint8_t brightness)
@@ -49,6 +49,11 @@ void panel_show()
         digitalWrite(P_OE, HIGH); // OE/ HIGH → LEDs OFF
         slice <<= 1;              // next bit weight
     }
+}
+
+void panel_hold()
+{
+    digitalWrite(P_OE, LOW); // OE/ LOW  → LEDs ON
 }
 
 // Clear the Panel Buffer
