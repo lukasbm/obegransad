@@ -5,9 +5,11 @@ IKEA obegränsad hack
 ## TODO
 
 - [X] Brightness does not do anything.
-- [ ] Errors, e.g. with WiFi are not handled gracefully.
-- [ ] NTP is synced very infrequently!
-- [ ] Would be nice if i didn't have to way on the weatherData. This would mean caching and refreshing it outside the scene, e.g. the Weather module or a new Data Access module that also takes care of other things. Alternatively the "conduct_checks" loop could update the weather data
+- [ ] Would be nice if i didn't have to wait on the weatherData. This would mean caching and refreshing it outside the scene, e.g. the Weather module or a new Data Access module that also takes care of other things. Alternatively the "conduct_checks" loop could update the weather data
+- [ ] Redesign the weather scene. Instead it should show the max temperature in bold (on the top), the min temperature (bottom left) and maybe an icon in the bottom right.
+    Alternatively have two weather scenes. One with the numbers and one with the icons.
+- [ ] Add more animations/screensaver style scenes.
+- [ ] Refactor scenes into one file each!
 
 ## Hardware
 
