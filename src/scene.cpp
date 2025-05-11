@@ -272,7 +272,7 @@ public:
 class SceneSwitcher
 {
 public:
-    SceneSwitcher() : scenes{&emptyScene, &spriteTestScene, &snakeScene, &weatherScene, &clockScene}, currIdx(0)
+    SceneSwitcher() : scenes{&emptyScene, &snakeScene, &weatherScene, &clockScene}, currIdx(0)
     {
         Serial.println("SceneSwitcher initialized");
         scenes[currIdx]->activate();
@@ -307,11 +307,11 @@ public:
 private:
     // all scenes live here, in RAM
     EmptyScene emptyScene;
-    SpriteTestScene spriteTestScene;
+    // SpriteTestScene spriteTestScene;
     SnakeScene snakeScene;
     WeatherScene weatherScene;
     ClockScene clockScene;
-    static constexpr uint8_t numScenes = 5;
+    static constexpr uint8_t numScenes = 4;
 
     // pointers for polymorphic dispatch
     const std::array<Scene *, numScenes> scenes;

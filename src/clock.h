@@ -14,3 +14,17 @@ bool shouldTurnOff(struct tm time);
 
 // gets local time and updates if needed
 struct tm time_fetch();
+
+enum MoonPhase : uint8_t
+{
+    NEW,
+    WAXING_CRESCENT,
+    FIRST_QUARTER,
+    WAXING_GIBBOUS,
+    FULL,
+    WANING_GIBBOUS,
+    LAST_QUARTER,
+    WANING_CRESCENT,
+};
+
+MoonPhase calculateMoonPhase(struct tm time);

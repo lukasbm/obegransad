@@ -73,3 +73,9 @@ struct tm time_fetch()
     getLocalTime(&timeinfo, 2000);
     return timeinfo;
 }
+
+// https://fcds.cs.put.poznan.pl/MyWeb/Praca/Ubiquitous/LunarPhases.pdf
+MoonPhase getMoonPhase(struct tm time)
+{
+    return FULL;
+}
