@@ -8,7 +8,7 @@ void time_setup()
 
 void time_syncNTP()
 {
-    configTzTime(settings.timezone, MY_NTP_SERVER);
+    configTzTime(settings.timezone.c_str(), MY_NTP_SERVER);
     struct tm temp;
     if (!getLocalTime(&temp, 2000))
     {

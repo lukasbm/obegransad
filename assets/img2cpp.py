@@ -25,7 +25,7 @@ front_matter = """#pragma once
 
 def cpp_dataArray1D(packedArray: np.ndarray) -> str:
     # convert to hex
-    hexSprite = np.array2string(packedArray, separator=", ", formatter={'int': lambda x: f"0x{x:02x}"})
+    hexSprite = np.array2string(packedArray, separator=", ", max_line_width=200, formatter={'int': lambda x: f"0x{x:02x}"})
     # fix formatting
     hexSpritePost = "\t" + hexSprite.replace("[", "{").replace("]", "}")
     return f"constexpr uint8_t {data_array_name}[{len(packedArray)}] = {hexSpritePost};\n"
@@ -38,7 +38,7 @@ def cpp_dataArray2D(packedArrays: list[np.ndarray]) -> str:
     res = f"constexpr uint8_t {data_array_name}[{atlasLen}*{spriteLen}] = {{\n"
     for packed in packedArrays:
         # convert to hex
-        hexSprite = np.array2string(packed, separator=", ", formatter={'int': lambda x: f"0x{x:02x}"})
+        hexSprite = np.array2string(packed, separator=", ", max_line_width=200, formatter={'int': lambda x: f"0x{x:02x}"})
         # fix formatting
         hexSpritePost = "\t" + hexSprite.replace("[", "").replace("]", "")
         res += f"\t{hexSpritePost}, //\n"

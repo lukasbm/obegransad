@@ -1,4 +1,3 @@
-#include <ESPAsyncWebServer.h>
 #include "config.h"
 
 static AsyncWebServer server(80);
