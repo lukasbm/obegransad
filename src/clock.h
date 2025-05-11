@@ -8,8 +8,9 @@ void time_setup();
 
 void time_syncNTP();
 
-// get time
 bool isNight(struct tm time);
+
+bool shouldTurnOff(struct tm time);
 
 // gets local time and updates if needed
 struct tm time_fetch();

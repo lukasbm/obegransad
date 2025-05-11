@@ -4,8 +4,8 @@ static AsyncWebServer server(80);
 
 // define default config
 Config::Config()
-    : brightness_day(100),
-      brightness_night(20),
+    : brightness_day(200),
+      brightness_night(30),
       weather_latitude(49.4613909),
       weather_longitude(11.1540788),
       timezone("CET-1CEST,M3.5.0,M10.5.0/3")

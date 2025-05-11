@@ -6,6 +6,8 @@
 #include "config.h"
 #include "led.h"
 #include "scene.cpp"
+#include "sprites/wifi.hpp"
+#include "clock.h"
 
 SceneSwitcher sceneSwitcher;
 
@@ -16,6 +18,8 @@ void buttonLongPressStart();
 void buttonLongPressStop();
 int buttonLongPressTimer = 0;
 
+static void conduct_checks();
+
 void setup()
 {
   Serial.begin(115200);
@@ -24,16 +28,41 @@ void setup()
 
   panel_init();
 
+  // display the wifi logo while connecting
+  panel_clear();
+  panel_drawSprite(3, 5, sprite_wifi.data, sprite_wifi.width, sprite_wifi.height);
+  panel_show();
+  panel_hold();
+
+  // mostly wifi setup in here
   setup_device();
 
+  // NTP sync
   time_setup();
 
+  // accept new configs
   setup_config_server();
 
   Serial.println("Setup done!");
 
+  conduct_checks();
+
   // Start with the first scene
   sceneSwitcher.nextScene();
+}
+
+static void conduct_checks()
+{
+  Serial.println("Conducting checks...");
+  struct tm time = time_fetch();
+  // adjust brightness
+  gBright = isNight(time) ? settings.brightness_night : settings.brightness_day;
+
+  // also check if it is time to shut off!
+  // if (shouldTurnOff(time))
+  // {
+  //   enter_light_sleep() // TODO: make it also return the sleep duration
+  // }
 }
 
 void loop()
@@ -41,13 +70,8 @@ void loop()
   static unsigned long lastChecks = millis();
   if (millis() - lastChecks > 10000) // check every 10 seconds
   {
+    conduct_checks();
     lastChecks = millis();
-    // check if night and adjust brightness
-    // gBright = (gBright + 1) % 256;
-    // Serial.println(gBright);
-    // TODO: update brightness at night!
-
-    // TODO: also check if it is time to shut off!
   }
 
   // Update the button
@@ -59,7 +83,6 @@ void loop()
   // refresh the display
   panel_show();
 }
-
 
 ///// button stuff
 
