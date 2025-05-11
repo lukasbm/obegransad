@@ -4,6 +4,17 @@
 
 // NOTE: sprite are always stacked on top of each other (y-axis)
 
+struct SingleSprite
+{
+    const uint8_t *data;
+    const uint8_t width;
+    const uint8_t height;
+    const size_t bytes;
+
+    constexpr SingleSprite(const uint8_t *d, const uint8_t w, const uint8_t h)
+        : data(d), width(w), height(h), bytes(sizeof(d)) {} // bytes((h * w) / 4) {}
+};
+
 // for many static sprites
 struct TextureAtlas
 {
