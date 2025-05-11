@@ -166,25 +166,32 @@ private:
 
         ////////////////// temperature at the bottom (bottom 6 pixels)
 
-        // first digit
+        // minus sign
         if (weatherData.temperature < 0)
         {
-            sprite = asset_boldGlyphSheet.getGlyph(45); // minus sign
-            panel_drawSprite(0, 9, sprite, asset_boldGlyphSheet.spriteWidth, asset_boldGlyphSheet.spriteHeight);
+            sprite = asset_thinGlyphSheet.getGlyph(45); // minus sign
+            panel_drawSprite(0, 9, sprite, asset_thinGlyphSheet.spriteWidth, asset_thinGlyphSheet.spriteHeight);
         }
-        // first digit
-        sprite = asset_boldGlyphSheet.getGlyph(weatherData.temperature / 10 + 48); // temperature/10 is 0-2
-        panel_drawSprite(4, 9, sprite, asset_boldGlyphSheet.spriteWidth, asset_boldGlyphSheet.spriteHeight);
 
+        int temperature = (int)abs(weatherData.temperature);
+        // first digit
+        sprite = asset_thinGlyphSheet.getGlyph(temperature / 10 + 48); // temperature/10 is 0-2
+        panel_drawSprite(4, 9, sprite, asset_thinGlyphSheet.spriteWidth, asset_thinGlyphSheet.spriteHeight);
         // second digit
-        sprite = asset_boldGlyphSheet.getGlyph(weatherData.temperature / 10 + 48); // temperature/10 is 0,1 or 2
-        panel_drawSprite(9, 9, sprite, asset_boldGlyphSheet.spriteWidth, asset_boldGlyphSheet.spriteHeight);
+        sprite = asset_thinGlyphSheet.getGlyph(temperature % 10 + 48);
+        panel_drawSprite(9, 9, sprite, asset_thinGlyphSheet.spriteWidth, asset_thinGlyphSheet.spriteHeight);
 
         // degree symbol
-        panel_setPixel(14, 9, BRIGHTNESS_4);
-        panel_setPixel(15, 9, BRIGHTNESS_4);
-        panel_setPixel(14, 10, BRIGHTNESS_4);
-        panel_setPixel(15, 10, BRIGHTNESS_4);
+        panel_setPixel(9, 14, BRIGHTNESS_4);
+        panel_setPixel(9, 15, BRIGHTNESS_4);
+        panel_setPixel(10, 14, BRIGHTNESS_4);
+        panel_setPixel(10, 15, BRIGHTNESS_4);
+
+        // draw separator
+        for (int i = 0; i < 16; i++)
+        {
+            panel_setPixel(8, i, BRIGHTNESS_4);
+        }
 
         ///////////////// TODO: symbols at top (top 9 pixels)
 
@@ -194,7 +201,7 @@ private:
 
         // rain
         sprite = asset_RainSheet.nextFrame();
-        panel_drawSprite(0, 9, sprite, 7, 8);
+        panel_drawSprite(9, 0, sprite, 7, 8);
     }
 
 public:
@@ -203,6 +210,7 @@ public:
         Serial.println("Weather scene activated");
         // initial data
         weatherData = fetchWeather(settings.weather_latitude, settings.weather_longitude);
+        weatherData.print();
         drawWeatherData();
     }
 
@@ -217,10 +225,11 @@ public:
         if (now - lastFetch > weatherUpdateInterval * 1000)
         {
             weatherData = fetchWeather(settings.weather_latitude, settings.weather_longitude);
+            weatherData.print();
             lastFetch = now;
         }
         // have to draw all the time (every second) because of animations
-        if (now - lastDraw > 1000)
+        if (now - lastDraw > 200)
         {
             lastDraw = now;
             drawWeatherData();

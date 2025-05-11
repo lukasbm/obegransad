@@ -45,6 +45,12 @@ struct WeatherData
     float temperature;
     WeatherCode weatherCode;
     float maxUvIndex;
+
+    void print() const
+    {
+        Serial.printf("WeatherData: precipitation: %.2f, rain: %.2f, showers: %.2f, snowfall: %.2f, temperature: %.2f, weatherCode: %d\n",
+                      precipitation, rain, showers, snowfall, temperature, weatherCode);
+    }
 };
 
 struct WeatherData fetchWeather(float lat, float lon);
