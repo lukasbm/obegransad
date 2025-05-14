@@ -5,11 +5,33 @@
 #include "device.h"
 #include "config.h"
 #include "led.h"
-#include "scene.cpp"
 #include "sprites/wifi.hpp"
 #include "clock.h"
+#include "scenes/switcher.cpp"
+#include "scenes/scene_brightness.cpp"
+#include "scenes/scene_clock.cpp"
+#include "scenes/scene_empty.cpp"
+#include "scenes/scene_snake.cpp"
+#include "scenes/scene_test.cpp"
+#include "scenes/scene_weather.cpp"
 
-SceneSwitcher sceneSwitcher;
+// all scenes live here, in RAM
+EmptyScene emptyScene;
+// SpriteTestScene spriteTestScene;
+SnakeScene snakeScene;
+WeatherScene weatherScene;
+ClockScene clockScene;
+
+// switcher
+constexpr size_t NUM_SCENES = 4; // number of scenes
+SceneSwitcher<NUM_SCENES> sceneSwitcher(
+    std::array<Scene *, NUM_SCENES>{
+        &emptyScene,
+        // &spriteTestScene,
+        &snakeScene,
+        &weatherScene,
+        &clockScene,
+    });
 
 OneButton button;
 void buttonSetup();
