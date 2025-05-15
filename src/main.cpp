@@ -7,13 +7,13 @@
 #include "led.h"
 #include "sprites/wifi.hpp"
 #include "clock.h"
-#include "scenes/switcher.cpp"
-#include "scenes/scene_brightness.cpp"
-#include "scenes/scene_clock.cpp"
-#include "scenes/scene_empty.cpp"
-#include "scenes/scene_snake.cpp"
-#include "scenes/scene_test.cpp"
-#include "scenes/scene_weather.cpp"
+#include "scenes/switcher.hpp"
+#include "scenes/scene_brightness.hpp"
+#include "scenes/scene_clock.hpp"
+#include "scenes/scene_empty.hpp"
+#include "scenes/scene_snake.hpp"
+#include "scenes/scene_test.hpp"
+#include "scenes/scene_weather.hpp"
 
 // all scenes live here, in RAM
 EmptyScene emptyScene;

@@ -20,4 +20,5 @@ constexpr uint8_t data_rain[13 * 14] = {
 	0x4c, 0x01, 0x10, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0c, 0x00, //
 };
 
+// TODO: make it a class that just wraps SpriteSheet in the constructor!!!
 constexpr SpriteSheet animation_rain(data_rain, 7, 8, 13, 14);
