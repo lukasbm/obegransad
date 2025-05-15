@@ -46,6 +46,7 @@ def cpp_dataArray2D(packedArrays: list[np.ndarray]) -> str:
     return res
 
 
+# TODO: add byte size per sprite!
 def cpp_textureAtlasClass(spriteWidth: int, spriteHeight: int, numSprites:int) -> str:
     return f"constexpr TextureAtlas atlas({data_array_name}, {spriteWidth}, {spriteHeight}, {numSprites});"
 
