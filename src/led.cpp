@@ -8,13 +8,18 @@ void panel_init()
     pinMode(P_CLK, OUTPUT);
     pinMode(P_DI, OUTPUT);
     pinMode(P_OE, OUTPUT);
+
+    digitalWrite(P_LATCH, LOW); // outputs frozen
+    digitalWrite(P_OE, HIGH);   // panel blank
+    digitalWrite(P_CLK, LOW);   // idle state
+    digitalWrite(P_DI, LOW);    // idle state
 }
 
 inline void shift_and_latch(uint8_t bit)
 {
     noInterrupts();             // interrupts will throw off the timing
     digitalWrite(P_LATCH, LOW); // freeze outputs
-    digitalWrite(P_OE, HIGH);   // OE/ HIGH  (panel dark)
+    digitalWrite(P_OE, HIGH);   // OE/ HIGH (panel dark / blank)
 
     uint16_t i = 0;
     for (; i < 256; i++)
@@ -32,16 +37,18 @@ inline void shift_and_latch(uint8_t bit)
 
 void panel_setPixel(int8_t row, int8_t col, uint8_t brightness)
 {
-    if ((row < 16) && (row < 16))
+    if ((row < 16) && (col < 16))
     {
+        noInterrupts();
         panel_buf[lut[row][col]] = brightness;
+        interrupts();
     }
 }
 
 void panel_show()
 {
     uint32_t slice = (BASE_TIME * gBright) / 255;
-    for (uint8_t bit = 0; bit < 8; bit++)
+    for (uint8_t bit = 0; bit < 8; bit++) // color delineation is bad on 4 bit!
     {
         shift_and_latch(bit);     // clock + latch atomically
         digitalWrite(P_OE, LOW);  // OE/ LOW  → LEDs ON
@@ -59,10 +66,12 @@ void panel_hold()
 // Clear the Panel Buffer
 void panel_fill(uint8_t col)
 {
+    noInterrupts();
     for (int i = 0; i < 256; i++)
     {
         panel_buf[i] = col;
     }
+    interrupts();
 }
 
 void panel_drawSprite(uint8_t tlX, uint8_t tlY, const uint8_t *data, uint8_t width, uint8_t height)
