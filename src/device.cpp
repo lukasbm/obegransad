@@ -9,29 +9,36 @@ void wifi_clear_credentials(void)
 
 void setup_device(void)
 {
-    // setup button as input
-    pinMode(BUTTON_PIN, INPUT_PULLUP);
-
     // if WiFi connection not in flash, start captive portal
     WiFiManager wifiManager;
     wifiManager.setConfigPortalTimeout(600); // 10 minutes
-
 #if DEBUG
     wifiManager.setDebugOutput(true);
 #endif
 
-    bool res = wifiManager.autoConnect("Obengransad");
-    if (!res)
+    if (WebServer *s = wifiManager.server.get())
     {
-        Serial.println("Failed to connect to WiFi");
-        delay(3000);
-        // restart the ESP32
+        s->on("/generate_204", HTTP_ANY, [s]()
+              {
+      s->sendHeader("Location", "/");
+      s->send(302, "text/plain", ""); });
+        s->on("/hotspot-detect.html", HTTP_ANY, [s]()
+              { s->send(200, "text/html", "<!doctype html>"); });
+    }
+
+    if (!wifiManager.autoConnect("MyDevice-Setup"))
+    {
+        Serial.println("Portal timed out or aborted!");
         ESP.restart();
     }
 
     Serial.println("Connected to WiFi!");
     Serial.print("IP Address: ");
     Serial.println(WiFi.localIP());
+
+    delay(5000);                 // give phone time to finish
+    WiFi.softAPdisconnect(true); // drop the hotspot
+    WiFi.mode(WIFI_STA);
 }
 
 void enter_light_sleep(uint64_t seconds)

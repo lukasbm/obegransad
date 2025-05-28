@@ -11,6 +11,7 @@ IKEA obegränsad hack
 - [ ] Add more animations/screensaver style scenes.
 - [ ] Refactor scenes into one file each!
 - [ ] How to handle WiFi outages? Maybe need a general error screen that replaces weather and other wifi dependent stuff
+- [ ] also need to introduce error code in case some setup stuff goes wrong
 
 ## Hardware
 
