@@ -16,7 +16,7 @@
 #include "scenes/scene_weather.hpp"
 
 // all scenes live here, in RAM
-EmptyScene emptyScene;
+// EmptyScene emptyScene;
 // SpriteTestScene spriteTestScene;
 SnakeScene snakeScene;
 WeatherScene weatherScene;
@@ -26,7 +26,7 @@ ClockScene clockScene;
 constexpr size_t NUM_SCENES = 4; // number of scenes
 SceneSwitcher<NUM_SCENES> sceneSwitcher(
     std::array<Scene *, NUM_SCENES>{
-        &emptyScene,
+        // &emptyScene,
         // &spriteTestScene,
         &snakeScene,
         &weatherScene,

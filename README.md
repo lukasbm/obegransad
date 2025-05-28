@@ -10,6 +10,7 @@ IKEA obegränsad hack
     Alternatively have two weather scenes. One with the numbers and one with the icons.
 - [ ] Add more animations/screensaver style scenes.
 - [ ] Refactor scenes into one file each!
+- [ ] How to handle WiFi outages? Maybe need a general error screen that replaces weather and other wifi dependent stuff
 
 ## Hardware
 
