@@ -2,6 +2,7 @@
 converts an texture atlas or sprite sheet into a C++ array.
 output is given on stdout
 """
+import re
 from fire import Fire
 from PIL import Image
 import numpy as np
@@ -47,6 +48,7 @@ def SingleSprite(img_path: str, class_name: str, color_depth : int = 2):
     spriteHeight = img.shape[0]
     spriteWidth = img.shape[1]
     packed = convertSpriteToPacked(img, color_depth)
+    spriteBytes = len(packed)
 
     if not DEBUG:
         print(FRONT_MATTER)
@@ -60,8 +62,11 @@ def SingleSprite(img_path: str, class_name: str, color_depth : int = 2):
     if not DEBUG:
         print(f"struct {class_name} : SingleSprite")
         print("{")
-        print(f"    constexpr {class_name}() : SingleSprite(data, {spriteWidth}, {spriteHeight}) {{}}")
+        print(f"    constexpr {class_name}() : SingleSprite(data, {spriteWidth}, {spriteHeight}, {spriteBytes}) {{}}")
         print("};")
+        print()
+        print("// global instance as there is no instance state")
+        print(f"constexpr {class_name} {camel_to_snake(class_name)};")
 
 
 def TextureAtlas(img_path: str, class_name: str,  spriteWidth: int, spriteHeight: int, color_depth: int = 2):
@@ -91,6 +96,9 @@ def TextureAtlas(img_path: str, class_name: str,  spriteWidth: int, spriteHeight
         print("{")
         print(f"    constexpr {class_name}() : TextureAtlas(data, {spriteWidth}, {spriteHeight}, {spriteCount}, {spriteBytes}) {{}}")
         print("};")
+        print()
+        print("// global instance as there is no instance state")
+        print(f"constexpr {class_name} {camel_to_snake(class_name)};")
 
 
 def AnimationSheet(img_path: str, class_name: str, spriteWidth: int, spriteHeight: int, color_depth: int = 2):
@@ -149,10 +157,20 @@ def FontSheet(img_path: str, class_name: str, spriteWidth: int, spriteHeight: in
         print("{")
         print(f"    constexpr {class_name}() : FontSheet(data, {spriteWidth}, {spriteHeight}, {spriteCount}, {spriteBytes}, {ascii_offset}) {{}}")
         print("};")
+        print()
+        print("// global instance as there is no instance state")
+        print(f"constexpr {class_name} {camel_to_snake(class_name)};")
 
 #############################
 #==== Conversion functions
 ############################
+
+def camel_to_snake(s: str) -> str:
+    # Step 1: put a _ between a lowercase/digit and an uppercase run
+    s = re.sub(r'(.)([A-Z][a-z]+)', r'\1_\2', s)
+    # Step 2: handle the boundary between a lowercase/digit and a single capital
+    s = re.sub(r'([a-z0-9])([A-Z])', r'\1_\2', s)
+    return s.lower()
 
 def map_value(x : int, in_min=0, in_max=255, out_min=0, out_max=3) -> int:
     """
