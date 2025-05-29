@@ -23,20 +23,20 @@ private:
         panel_drawSprite(0, 0, sprite, animation_heart.spriteWidth, animation_heart.spriteHeight);
 
         // day first digit
-        sprite = font_thin.getGlyph((day / 10) + 48); // day/10 is 0,1 or 2
-        panel_drawSprite(0, 10, sprite, font_thin.spriteWidth, font_thin.spriteHeight);
+        sprite = thin_font.getGlyph((day / 10) + 48); // day/10 is 0,1 or 2
+        panel_drawSprite(0, 10, sprite, thin_font.spriteWidth, thin_font.spriteHeight);
 
         // day second digit
-        sprite = font_thin.getGlyph((day % 10) + 48); // day % 10 is 0-9
-        panel_drawSprite(4, 10, sprite, font_thin.spriteWidth, font_thin.spriteHeight);
+        sprite = thin_font.getGlyph((day % 10) + 48); // day % 10 is 0-9
+        panel_drawSprite(4, 10, sprite, thin_font.spriteWidth, thin_font.spriteHeight);
 
         // month first digit
-        sprite = font_thin.getGlyph((month / 10) + 48); // month/10 is 0-5
-        panel_drawSprite(8, 10, sprite, font_thin.spriteWidth, font_thin.spriteHeight);
+        sprite = thin_font.getGlyph((month / 10) + 48); // month/10 is 0-5
+        panel_drawSprite(8, 10, sprite, thin_font.spriteWidth, thin_font.spriteHeight);
 
         // month second digit
-        sprite = font_thin.getGlyph((month % 10) + 48); // month % 10 is 0-9
-        panel_drawSprite(12, 10, sprite, font_thin.spriteWidth, font_thin.spriteHeight);
+        sprite = thin_font.getGlyph((month % 10) + 48); // month % 10 is 0-9
+        panel_drawSprite(12, 10, sprite, thin_font.spriteWidth, thin_font.spriteHeight);
     }
 
 public:

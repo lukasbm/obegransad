@@ -52,7 +52,7 @@ void setup()
 
   // display the wifi logo while connecting
   panel_clear();
-  panel_drawSprite(3, 5, wifi_sprite.data, sprite_wifi.width, sprite_wifi.height);
+  panel_drawSprite(3, 5, wifi_sprite.data, wifi_sprite.width, wifi_sprite.height);
   panel_show();
   panel_hold();
 

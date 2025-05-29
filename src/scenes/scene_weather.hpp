@@ -11,6 +11,7 @@ class WeatherScene : public Scene
 {
 private:
     struct WeatherData weatherData;
+    struct RainAnimation animation_rain;
 
     void drawWeatherData()
     {
@@ -23,17 +24,17 @@ private:
         // minus sign
         if (weatherData.temperature < 0)
         {
-            sprite = font_thin.getGlyph(45); // minus sign
-            panel_drawSprite(0, 9, sprite, font_thin.spriteWidth, font_thin.spriteHeight);
+            sprite = thin_font.getGlyph(45); // minus sign
+            panel_drawSprite(0, 9, sprite, thin_font.spriteWidth, thin_font.spriteHeight);
         }
 
         int temperature = (int)abs(weatherData.temperature);
         // first digit
-        sprite = font_thin.getGlyph(temperature / 10 + 48); // temperature/10 is 0-2
-        panel_drawSprite(4, 9, sprite, font_thin.spriteWidth, font_thin.spriteHeight);
+        sprite = thin_font.getGlyph(temperature / 10 + 48); // temperature/10 is 0-2
+        panel_drawSprite(4, 9, sprite, thin_font.spriteWidth, thin_font.spriteHeight);
         // second digit
-        sprite = font_thin.getGlyph(temperature % 10 + 48);
-        panel_drawSprite(9, 9, sprite, font_thin.spriteWidth, font_thin.spriteHeight);
+        sprite = thin_font.getGlyph(temperature % 10 + 48);
+        panel_drawSprite(9, 9, sprite, thin_font.spriteWidth, thin_font.spriteHeight);
 
         // degree symbol
         panel_setPixel(9, 14, BRIGHTNESS_4);
@@ -50,8 +51,7 @@ private:
         ///////////////// TODO: symbols at top (top 9 pixels)
 
         // cloud
-        sprite = data_cloud;
-        panel_drawSprite(0, 0, sprite, 9, 5);
+        panel_drawSprite(0, 0, cloud_sprite.data, cloud_sprite.width, cloud_sprite.height);
 
         // rain
         sprite = animation_rain.nextFrame();
