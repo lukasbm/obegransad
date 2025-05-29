@@ -1,45 +1,59 @@
 #include "device.h"
+#include "led.h"
+#include "sprites/wifi.hpp"
 
 WiFiManager wifiManager;
-static const uint32_t RETRY_PERIOD_MS = 30000; // retry every 30 s
-static unsigned long lastTry = 0;
+
 static const char *PORTAL_NAME = "Obegransad";
 
 // handles the cases when connection is lost in AP/STA mode
+// the driver fires the event typically every 3-10 seconds when disconnected
 static void on_STA_disconnected(WiFiEvent_t event, WiFiEventInfo_t info)
 {
     static uint8_t failCount = 0;
 
     // print reason
-    Serial.printf("Wi-Fi lost, reason %d … reconnecting\n",
-                  info.wifi_sta_disconnected.reason);
+    Serial.printf("Driver Wi-Fi lost event (on_STA_disconnected), reason %d … reconnecting\n", info.wifi_sta_disconnected.reason);
 
     if (++failCount < 10)
     {
-        WiFi.reconnect(); // try to reconnect
+        Serial.printf("Reconnecting to Wi-Fi, attempt %d …\n", failCount);
+        WiFi.reconnect();
     }
     else
     {
-        // 10×30 s ≈ 5 min of attempts → launch portal again
+        Serial.println("Failed to reconnect, starting captive portal again…");
         failCount = 0;
-        // FIXME: but i need/want WiFi symbol on
-        wifiManager.startConfigPortal(PORTAL_NAME); // blocking portal
+        display_wifi_setup_prompt();                // show the wifi logo
+        wifiManager.startConfigPortal(PORTAL_NAME); // blocking until user fixes wifi.
     }
-
-    // quickest fix for most outages
-    WiFi.disconnect(false); // keep radio on
-    WiFi.reconnect();       // ↳ async, returns immediately
-    lastTry = millis();     // remember when we tried
 }
 
-// FIXME: when is this used?
+void display_wifi_setup_prompt(void)
+{
+    // display the wifi logo while connecting
+    panel_clear();
+    panel_drawSprite(3, 5, wifi_sprite.data, wifi_sprite.width, wifi_sprite.height);
+    panel_show();
+    panel_hold();
+}
+
+void display_device_error(DeviceError err)
+{
+    panel_clear();
+    // TODO: draw error icons!!!
+    panel_show();
+    panel_hold();
+}
+
 bool wifi_check(void)
 {
+    static unsigned long lastTry = 0;
+
     if (WiFi.status() != WL_CONNECTED)
     {
-        if (millis() - lastTry > RETRY_PERIOD_MS)
+        if (millis() - lastTry > 30000)
         {
-            Serial.println("Wi-Fi lost, trying to reconnect …");
             lastTry = millis();
             return WiFi.reconnect();
         }
@@ -62,6 +76,8 @@ void wifi_clear_credentials(void)
     wifiManager.resetSettings();
 }
 
+// add some endpoints to trick android and IOS into showing the captive portal
+// this is needed to make the captive portal appear on the device
 static void add_captive_portal_spoof(WebServer *s)
 {
     s->on(
@@ -85,10 +101,12 @@ DeviceError wifi_setup(void)
 {
     // if WiFi connection not in flash, start captive portal
     wifiManager.setConfigPortalTimeout(600); // 10 minutes
+
 #if DEBUG
     wifiManager.setDebugOutput(true);
 #endif
 
+    // make the captive portal actually appear on device
     if (WebServer *s = wifiManager.server.get())
     {
         add_captive_portal_spoof(s);
@@ -102,9 +120,9 @@ DeviceError wifi_setup(void)
 
     // register callback for connection loss
     WiFi.onEvent(on_STA_disconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
-    WiFi.setAutoReconnect(true);
+    WiFi.setAutoReconnect(true); // one automatic retry after disconnect
 
-    // clean up after succes
+    // clean up after success
     Serial.println("Connected to WiFi!");
     Serial.print("IP Address: ");
     Serial.println(WiFi.localIP());
@@ -115,7 +133,6 @@ DeviceError wifi_setup(void)
     return ERR_NONE;
 }
 
-// TODO: migrate to WiFi off?
 DeviceError enter_light_sleep(uint64_t seconds)
 {
     // flush serial output
@@ -161,6 +178,8 @@ DeviceError enter_light_sleep(uint64_t seconds)
         Serial.println(esp_err_to_name(res));
         return ERR_SLEEP;
     }
+
+    // zZZzzz ... blocks during sleep ...
 
     // examine wakeup reason
     esp_sleep_wakeup_cause_t reason = esp_sleep_get_wakeup_cause();

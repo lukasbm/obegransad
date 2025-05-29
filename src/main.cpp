@@ -50,13 +50,7 @@ void setup()
 
   panel_init();
 
-  // display the wifi logo while connecting
-  panel_clear();
-  panel_drawSprite(3, 5, wifi_sprite.data, wifi_sprite.width, wifi_sprite.height);
-  panel_show();
-  panel_hold();
-
-  // mostly wifi setup in here
+  display_wifi_setup_prompt();
   DeviceError err = wifi_setup();
 
   // NTP sync
@@ -85,6 +79,16 @@ static void conduct_checks()
   // {
   //   enter_light_sleep() // TODO: make it also return the sleep duration
   // }
+
+  // check wifi health
+  if (!wifi_check())
+  {
+    Serial.println("Wi-Fi is not connected, trying to reconnect …");
+  }
+  else
+  {
+    Serial.println("Wi-Fi is healthy.");
+  }
 }
 
 void loop()

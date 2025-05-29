@@ -21,3 +21,5 @@ void wifi_clear_credentials(void);
 bool wifi_check(void);
 DeviceError enter_light_sleep(uint64_t seconds);
 
+void display_wifi_setup_prompt(void);
+void display_device_error(DeviceError err);
