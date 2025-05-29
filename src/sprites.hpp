@@ -4,6 +4,7 @@
 
 // NOTE: sprite are always stacked on top of each other (y-axis)
 
+// for a single sprite (image)
 struct SingleSprite
 {
     const uint8_t *data;
@@ -58,9 +59,9 @@ private:
 };
 
 // for animations
-struct SpriteSheet : TextureAtlas
+struct AnimationSheet : TextureAtlas
 {
-    constexpr SpriteSheet(const uint8_t *data, const uint8_t spriteWidth, const uint8_t spriteHeight, const uint8_t spriteCount, const uint8_t spriteBytes)
+    constexpr AnimationSheet(const uint8_t *data, const uint8_t spriteWidth, const uint8_t spriteHeight, const uint8_t spriteCount, const uint8_t spriteBytes)
         : TextureAtlas(data, spriteWidth, spriteHeight, spriteCount, spriteBytes) {}
 
     const uint8_t *nextFrame() const

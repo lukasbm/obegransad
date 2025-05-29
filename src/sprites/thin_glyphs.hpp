@@ -4,7 +4,7 @@
 #include "sprites.hpp"
 
 // sprite size: 4x6 (4x390 total)
-constexpr uint8_t data_thinGlyph[65 * 6] = {
+static constexpr uint8_t data[65 * 6] = {
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //
 	0x34, 0x34, 0x34, 0x34, 0x00, 0x34, //
 	0x33, 0x33, 0x00, 0x00, 0x00, 0x00, //
@@ -72,4 +72,7 @@ constexpr uint8_t data_thinGlyph[65 * 6] = {
 	0x3c, 0x00, 0x00, 0x00, 0x00, 0x00, //
 };
 
-constexpr FontSheet font_thin(data_thinGlyph, 4, 6, 65, 6, 32);
+struct ThinFont : FontSheet
+{
+	constexpr ThinFont() : FontSheet(data, 4, 6, 65, 6, 32) {}
+};
