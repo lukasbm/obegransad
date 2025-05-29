@@ -13,5 +13,5 @@ static constexpr uint8_t sun_animation_data[4 * 21] = {
 
 struct SunAnimation : AnimationSheet
 {
-    constexpr SunAnimation() : AnimationSheet(data, 9, 9, 4, 21) {}
+    constexpr SunAnimation() : AnimationSheet(sun_animation_data, 9, 9, 4, 21) {}
 };

@@ -8,7 +8,7 @@ static constexpr uint8_t cloud_sprite_data[12] = {0x0f, 0xcf, 0x0c, 0x2c, 0xbc, 
 
 struct CloudSprite : SingleSprite
 {
-    constexpr CloudSprite() : SingleSprite(data, 9, 5, 12) {}
+    constexpr CloudSprite() : SingleSprite(cloud_sprite_data, 9, 5, 12) {}
 };
 
 // global instance as there is no instance state

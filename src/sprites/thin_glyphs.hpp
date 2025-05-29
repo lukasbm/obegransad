@@ -74,7 +74,7 @@ static constexpr uint8_t thin_font_data[65 * 6] = {
 
 struct ThinFont : FontSheet
 {
-    constexpr ThinFont() : FontSheet(data, 4, 6, 65, 6, 32) {}
+    constexpr ThinFont() : FontSheet(thin_font_data, 4, 6, 65, 6, 32) {}
 };
 
 // global instance as there is no instance state

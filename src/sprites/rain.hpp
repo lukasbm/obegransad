@@ -22,5 +22,5 @@ static constexpr uint8_t rain_animation_data[13 * 14] = {
 
 struct RainAnimation : AnimationSheet
 {
-    constexpr RainAnimation() : AnimationSheet(data, 7, 8, 13, 14) {}
+    constexpr RainAnimation() : AnimationSheet(rain_animation_data, 7, 8, 13, 14) {}
 };

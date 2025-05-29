@@ -14,5 +14,5 @@ static constexpr uint8_t heart_animation_data[5 * 18] = {
 
 struct HeartAnimation : AnimationSheet
 {
-    constexpr HeartAnimation() : AnimationSheet(data, 9, 8, 5, 18) {}
+    constexpr HeartAnimation() : AnimationSheet(heart_animation_data, 9, 8, 5, 18) {}
 };

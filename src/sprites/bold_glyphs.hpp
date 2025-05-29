@@ -103,7 +103,7 @@ static constexpr uint8_t font_bold_data[94 * 11] = {
 
 struct FontBold : FontSheet
 {
-    constexpr FontBold() : FontSheet(data, 6, 7, 94, 11, 32) {}
+    constexpr FontBold() : FontSheet(font_bold_data, 6, 7, 94, 11, 32) {}
 };
 
 // global instance as there is no instance state

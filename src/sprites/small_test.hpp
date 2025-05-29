@@ -11,7 +11,7 @@ static constexpr uint8_t test_atlas_data[2 * 4] = {
 
 struct TestAtlas : TextureAtlas
 {
-    constexpr TestAtlas() : TextureAtlas(data, 4, 4, 2, 4) {}
+    constexpr TestAtlas() : TextureAtlas(test_atlas_data, 4, 4, 2, 4) {}
 };
 
 // global instance as there is no instance state

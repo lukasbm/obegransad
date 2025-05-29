@@ -17,7 +17,7 @@ static constexpr uint8_t moon_atlas_data[8 * 21] = {
 
 struct MoonAtlas : TextureAtlas
 {
-    constexpr MoonAtlas() : TextureAtlas(data, 9, 9, 8, 21) {}
+    constexpr MoonAtlas() : TextureAtlas(moon_atlas_data, 9, 9, 8, 21) {}
 };
 
 // global instance as there is no instance state
