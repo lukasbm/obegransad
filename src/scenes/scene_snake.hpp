@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include "scene.h"
 #include "led.h"
+#include "scenes/helper.hpp"
 
 // A simple scene where a snake moves around the screen with a tail following
 // moves once a second
@@ -9,7 +10,6 @@
 class SnakeScene : public Scene
 {
 private:
-    unsigned long lastUpdateTime = 0;
     short headPos = 0;
 
     void drawSnake()
@@ -32,32 +32,6 @@ private:
         panel_setPixel(y, x, BRIGHTNESS_1);
     }
 
-    // pos is one of the 60 corner pixels. writes the x and y coordinates.
-    // pos 0 is top left, moving clockwise
-    void ring_coord(uint8_t pos, uint8_t &x, uint8_t &y)
-    {
-        if (pos < 16) // 16 in the top row
-        {
-            x = pos;
-            y = 0;
-        }
-        else if (pos < 30) // 16 in the top row and 14 down
-        {
-            x = 15;
-            y = pos - 15;
-        }
-        else if (pos < 46)
-        {
-            x = 45 - pos;
-            y = 15;
-        }
-        else
-        {
-            x = 0;
-            y = 60 - pos;
-        }
-    }
-
 public:
     void activate() override
     {
@@ -65,6 +39,8 @@ public:
     }
     void update() override
     {
+        static unsigned long lastUpdateTime = 0;
+
         if (millis() > lastUpdateTime + 1000)
         {
             panel_clear();

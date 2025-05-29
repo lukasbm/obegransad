@@ -4,6 +4,7 @@
 #include "clock.h"
 #include "sprites/bold_glyphs.hpp"
 
+// bold clock scene
 class ClockScene : public Scene
 {
 private:

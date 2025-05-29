@@ -2,6 +2,8 @@
 #include "scene.h"
 #include "led.h"
 
+// simple debug scene that sets each pixel to a unique brightness value
+// this is useful for testing the panel and the brightness levels
 class BrightnessScene : public Scene
 {
 public:
