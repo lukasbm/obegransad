@@ -4,7 +4,7 @@
 #include "sprites.hpp"
 
 // sprite size: 4x6 (total: 4x390)
-static constexpr uint8_t data[65 * 6] = {
+static constexpr uint8_t thin_font_data[65 * 6] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //
     0x34, 0x34, 0x34, 0x34, 0x00, 0x34, //
     0x33, 0x33, 0x00, 0x00, 0x00, 0x00, //
@@ -76,3 +76,6 @@ struct ThinFont : FontSheet
 {
     constexpr ThinFont() : FontSheet(data, 4, 6, 65, 6, 32) {}
 };
+
+// global instance as there is no instance state
+const ThinFont thin_font;

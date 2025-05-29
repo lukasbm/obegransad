@@ -20,20 +20,20 @@ FRONT_MATTER = """#pragma once
 #include "sprites.hpp"
 """
 
-def cpp_dataArray1D(packedArray: np.ndarray) -> str:
+def cpp_dataArray1D(packed: np.ndarray, array_name: str) -> str:
     # convert to hex
-    hexSprite = np.array2string(packedArray, separator=", ", max_line_width=200, formatter={'int': lambda x: f"0x{x:02x}"})
+    hexSprite = np.array2string(packed, separator=", ", max_line_width=200, formatter={'int': lambda x: f"0x{x:02x}"})
     # fix formatting
     hexSpritePost = hexSprite.replace("[", "{").replace("]", "}")
-    return f"static constexpr uint8_t data[{len(packedArray)}] = {hexSpritePost};\n"
+    return f"static constexpr uint8_t {array_name}[{len(packed)}] = {hexSpritePost};\n"
 
 
-def cpp_dataArray2D(packedArrays: list[np.ndarray]) -> str:
-    assert len(packedArrays) > 0, "packedArrays is empty"
-    spriteLen = len(packedArrays[0])
-    atlasLen  = len(packedArrays)
-    res = f"static constexpr uint8_t data[{atlasLen} * {spriteLen}] = {{\n"
-    for packed in packedArrays:
+def cpp_dataArray2D(packed: list[np.ndarray], array_name) -> str:
+    assert len(packed) > 0, "packedArrays is empty"
+    spriteLen = len(packed[0])
+    atlasLen  = len(packed)
+    res = f"static constexpr uint8_t {array_name}[{atlasLen} * {spriteLen}] = {{\n"
+    for packed in packed:
         # convert to hex
         hexSprite = np.array2string(packed, separator=", ", max_line_width=200, formatter={'int': lambda x: f"0x{x:02x}"})
         # fix formatting
@@ -57,7 +57,7 @@ def SingleSprite(img_path: str, class_name: str, color_depth : int = 2):
         print(packed)
     else:
         print(f"// image size: {spriteWidth}x{spriteHeight}")
-        print(cpp_dataArray1D(packed))
+        print(cpp_dataArray1D(packed, f"{camel_to_snake(class_name)}_data"))
     
     if not DEBUG:
         print(f"struct {class_name} : SingleSprite")
@@ -66,7 +66,7 @@ def SingleSprite(img_path: str, class_name: str, color_depth : int = 2):
         print("};")
         print()
         print("// global instance as there is no instance state")
-        print(f"constexpr {class_name} {camel_to_snake(class_name)};")
+        print(f"const {class_name} {camel_to_snake(class_name)};")
 
 
 def TextureAtlas(img_path: str, class_name: str,  spriteWidth: int, spriteHeight: int, color_depth: int = 2):
@@ -88,7 +88,7 @@ def TextureAtlas(img_path: str, class_name: str,  spriteWidth: int, spriteHeight
             print("===")
     else:
         print(f"// sprite size: {spriteWidth}x{spriteHeight} (total: {imgWidth}x{imgHeight})")
-        print(cpp_dataArray2D(packed))
+        print(cpp_dataArray2D(packed, f"{camel_to_snake(class_name)}_data"))
     
     # wrapper
     if not DEBUG:
@@ -98,7 +98,7 @@ def TextureAtlas(img_path: str, class_name: str,  spriteWidth: int, spriteHeight
         print("};")
         print()
         print("// global instance as there is no instance state")
-        print(f"constexpr {class_name} {camel_to_snake(class_name)};")
+        print(f"const {class_name} {camel_to_snake(class_name)};")
 
 
 def AnimationSheet(img_path: str, class_name: str, spriteWidth: int, spriteHeight: int, color_depth: int = 2):
@@ -120,7 +120,7 @@ def AnimationSheet(img_path: str, class_name: str, spriteWidth: int, spriteHeigh
             print("===")
     else:
         print(f"// sprite size: {spriteWidth}x{spriteHeight} (total: {imgWidth}x{imgHeight})")
-        print(cpp_dataArray2D(packed))
+        print(cpp_dataArray2D(packed, f"{camel_to_snake(class_name)}_data"))
     
     # wrapper
     if not DEBUG:
@@ -149,7 +149,7 @@ def FontSheet(img_path: str, class_name: str, spriteWidth: int, spriteHeight: in
             print("===")
     else:
         print(f"// sprite size: {spriteWidth}x{spriteHeight} (total: {imgWidth}x{imgHeight})")
-        print(cpp_dataArray2D(packed))
+        print(cpp_dataArray2D(packed, f"{camel_to_snake(class_name)}_data"))
     
     # wrapper
     if not DEBUG:
@@ -159,7 +159,7 @@ def FontSheet(img_path: str, class_name: str, spriteWidth: int, spriteHeight: in
         print("};")
         print()
         print("// global instance as there is no instance state")
-        print(f"constexpr {class_name} {camel_to_snake(class_name)};")
+        print(f"const {class_name} {camel_to_snake(class_name)};")
 
 #############################
 #==== Conversion functions
