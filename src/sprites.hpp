@@ -12,8 +12,8 @@ struct SingleSprite
     const uint8_t height;
     const size_t bytes;
 
-    constexpr SingleSprite(const uint8_t *d, const uint8_t w, const uint8_t h)
-        : data(d), width(w), height(h), bytes(sizeof(d)) {}
+    constexpr SingleSprite(const uint8_t *d, const uint8_t w, const uint8_t h, const size_t spriteBytes)
+        : data(d), width(w), height(h), bytes(spriteBytes) {}
 };
 
 // for many static sprites
@@ -41,6 +41,8 @@ struct TextureAtlas
 // for fonts (ASCII subset)
 struct FontSheet : TextureAtlas
 {
+    const char asciiStart;
+
     constexpr FontSheet(const uint8_t *data, const uint8_t spriteWidth, const uint8_t spriteHeight, const uint8_t spriteCount, const size_t spriteBytes, const char asciiStart)
         : TextureAtlas(data, spriteWidth, spriteHeight, spriteCount, spriteBytes), asciiStart(asciiStart) {}
 
@@ -53,9 +55,6 @@ struct FontSheet : TextureAtlas
         unsigned short index = c - asciiStart;
         return getByIndex(index);
     }
-
-private:
-    const char asciiStart;
 };
 
 // for animations
