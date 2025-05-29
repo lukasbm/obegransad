@@ -23,14 +23,14 @@ WeatherScene weatherScene;
 ClockScene clockScene;
 
 // switcher
-constexpr size_t NUM_SCENES = 4; // number of scenes
+constexpr size_t NUM_SCENES = 1; // number of scenes
 SceneSwitcher<NUM_SCENES> sceneSwitcher(
     std::array<Scene *, NUM_SCENES>{
         // &emptyScene,
         // &spriteTestScene,
         &snakeScene,
-        &weatherScene,
-        &clockScene,
+        // &weatherScene,
+        // &clockScene,
     });
 
 OneButton button;
@@ -51,19 +51,18 @@ void setup()
 
   panel_init();
 
-  // display_wifi_setup_prompt();
-  Serial.println("Setting up Wi-Fi...");
-  // DeviceError err = wifi_setup();
+  display_wifi_setup_prompt();
+  DeviceError err = wifi_setup();
 
   // NTP sync
-  // time_setup();
+  time_setup();
 
   // // accept new configs
-  // setup_config_server();
+  setup_config_server();
 
-  // Serial.println("Setup done!");
+  Serial.println("Setup done!");
 
-  // conduct_checks();
+  conduct_checks();
 
   // Start with the first scene
   sceneSwitcher.nextScene();

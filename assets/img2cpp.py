@@ -49,6 +49,7 @@ def SingleSprite(img_path: str, class_name: str, color_depth : int = 2):
     spriteWidth = img.shape[1]
     packed = convertSpriteToPacked(img, color_depth)
     spriteBytes = len(packed)
+    data_name = f"{camel_to_snake(class_name)}_data"
 
     if not DEBUG:
         print(FRONT_MATTER)
@@ -57,12 +58,12 @@ def SingleSprite(img_path: str, class_name: str, color_depth : int = 2):
         print(packed)
     else:
         print(f"// image size: {spriteWidth}x{spriteHeight}")
-        print(cpp_dataArray1D(packed, f"{camel_to_snake(class_name)}_data"))
+        print(cpp_dataArray1D(packed, data_name))
     
     if not DEBUG:
         print(f"struct {class_name} : SingleSprite")
         print("{")
-        print(f"    constexpr {class_name}() : SingleSprite(data, {spriteWidth}, {spriteHeight}, {spriteBytes}) {{}}")
+        print(f"    constexpr {class_name}() : SingleSprite({data_name}, {spriteWidth}, {spriteHeight}, {spriteBytes}) {{}}")
         print("};")
         print()
         print("// global instance as there is no instance state")
@@ -77,6 +78,7 @@ def TextureAtlas(img_path: str, class_name: str,  spriteWidth: int, spriteHeight
     assert len(packed) > 0
     spriteBytes = len(packed[0])
     spriteCount  = len(packed)
+    data_name = f"{camel_to_snake(class_name)}_data"
 
     if not DEBUG:
         print(FRONT_MATTER)
@@ -88,13 +90,13 @@ def TextureAtlas(img_path: str, class_name: str,  spriteWidth: int, spriteHeight
             print("===")
     else:
         print(f"// sprite size: {spriteWidth}x{spriteHeight} (total: {imgWidth}x{imgHeight})")
-        print(cpp_dataArray2D(packed, f"{camel_to_snake(class_name)}_data"))
+        print(cpp_dataArray2D(packed, data_name))
     
     # wrapper
     if not DEBUG:
         print(f"struct {class_name} : TextureAtlas")
         print("{")
-        print(f"    constexpr {class_name}() : TextureAtlas(data, {spriteWidth}, {spriteHeight}, {spriteCount}, {spriteBytes}) {{}}")
+        print(f"    constexpr {class_name}() : TextureAtlas({data_name}, {spriteWidth}, {spriteHeight}, {spriteCount}, {spriteBytes}) {{}}")
         print("};")
         print()
         print("// global instance as there is no instance state")
@@ -109,6 +111,7 @@ def AnimationSheet(img_path: str, class_name: str, spriteWidth: int, spriteHeigh
     assert len(packed) > 0
     spriteBytes = len(packed[0])
     spriteCount  = len(packed)
+    data_name = f"{camel_to_snake(class_name)}_data"
 
     if not DEBUG:
         print(FRONT_MATTER)
@@ -120,13 +123,13 @@ def AnimationSheet(img_path: str, class_name: str, spriteWidth: int, spriteHeigh
             print("===")
     else:
         print(f"// sprite size: {spriteWidth}x{spriteHeight} (total: {imgWidth}x{imgHeight})")
-        print(cpp_dataArray2D(packed, f"{camel_to_snake(class_name)}_data"))
+        print(cpp_dataArray2D(packed, data_name))
     
     # wrapper
     if not DEBUG:
         print(f"struct {class_name} : AnimationSheet")
         print("{")
-        print(f"    constexpr {class_name}() : AnimationSheet(data, {spriteWidth}, {spriteHeight}, {spriteCount}, {spriteBytes}) {{}}")
+        print(f"    constexpr {class_name}() : AnimationSheet({data_name}, {spriteWidth}, {spriteHeight}, {spriteCount}, {spriteBytes}) {{}}")
         print("};")
 
 
@@ -138,6 +141,7 @@ def FontSheet(img_path: str, class_name: str, spriteWidth: int, spriteHeight: in
     assert len(packed) > 0
     spriteBytes = len(packed[0])
     spriteCount  = len(packed)
+    data_name = f"{camel_to_snake(class_name)}_data"
 
     if not DEBUG:
         print(FRONT_MATTER)
@@ -149,13 +153,13 @@ def FontSheet(img_path: str, class_name: str, spriteWidth: int, spriteHeight: in
             print("===")
     else:
         print(f"// sprite size: {spriteWidth}x{spriteHeight} (total: {imgWidth}x{imgHeight})")
-        print(cpp_dataArray2D(packed, f"{camel_to_snake(class_name)}_data"))
+        print(cpp_dataArray2D(packed, data_name))
     
     # wrapper
     if not DEBUG:
         print(f"struct {class_name} : FontSheet")
         print("{")
-        print(f"    constexpr {class_name}() : FontSheet(data, {spriteWidth}, {spriteHeight}, {spriteCount}, {spriteBytes}, {ascii_offset}) {{}}")
+        print(f"    constexpr {class_name}() : FontSheet({data_name}, {spriteWidth}, {spriteHeight}, {spriteCount}, {spriteBytes}, {ascii_offset}) {{}}")
         print("};")
         print()
         print("// global instance as there is no instance state")

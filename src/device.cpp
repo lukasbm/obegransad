@@ -127,9 +127,10 @@ DeviceError wifi_setup(void)
     Serial.println("Connected to WiFi!");
     Serial.print("IP Address: ");
     Serial.println(WiFi.localIP());
-    delay(5000);                 // give phone time to finish
+    // migrate from AP to STA mode
+    delay(3000);                 // give phone time to finish
     WiFi.softAPdisconnect(true); // drop the hotspot
-    WiFi.mode(WIFI_STA);
+    WiFi.mode(WIFI_STA);         // switch to STA mode
 
     return ERR_NONE;
 }

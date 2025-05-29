@@ -8,7 +8,7 @@ static constexpr uint8_t wifi_sprite_data[20] = {0x0f, 0xff, 0x03, 0x00, 0x0c, 0
 
 struct WifiSprite : SingleSprite
 {
-    constexpr WifiSprite() : SingleSprite(data, 10, 8, 20) {}
+    constexpr WifiSprite() : SingleSprite(wifi_sprite_data, 10, 8, 20) {}
 };
 
 // global instance as there is no instance state
