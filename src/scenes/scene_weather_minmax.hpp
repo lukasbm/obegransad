@@ -4,7 +4,7 @@
 #include "sprites/thin_glyphs.hpp"
 
 // a line for the next 7 days forcast. temperature relative to current.
-class WeatherMinMax : public Scene
+class WeatherMinMaxScene : public Scene
 {
 public:
     void activate() override

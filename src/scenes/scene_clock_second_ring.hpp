@@ -6,7 +6,7 @@
 #include "scenes/helper.hpp"
 
 // bold clock scene
-class ClockScene : public Scene
+class ClockSceneWithSecondHand : public Scene
 {
 private:
     void drawTime(uint8_t hour, uint8_t minute, uint8_t second = 0)

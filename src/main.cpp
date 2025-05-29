@@ -7,38 +7,44 @@
 #include "led.h"
 #include "sprites/wifi.hpp"
 #include "clock.h"
-#include "scenes/switcher.hpp"
+#include "scenes/scene_anniversary.hpp"
 #include "scenes/scene_brightness.hpp"
+#include "scenes/scene_clock_second_ring.hpp"
 #include "scenes/scene_clock.hpp"
 #include "scenes/scene_empty.hpp"
 #include "scenes/scene_snake.hpp"
 #include "scenes/scene_test.hpp"
+#include "scenes/scene_weather_forecast.hpp"
+#include "scenes/scene_weather_minmax.hpp"
 #include "scenes/scene_weather.hpp"
+#include "scenes/switcher.hpp"
 
-// all scenes live here, in RAM
-// EmptyScene emptyScene;
-// SpriteTestScene spriteTestScene;
-SnakeScene snakeScene;
-WeatherScene weatherScene;
-ClockScene clockScene;
-
-// switcher
-constexpr size_t NUM_SCENES = 1; // number of scenes
-SceneSwitcher<NUM_SCENES> sceneSwitcher(
-    std::array<Scene *, NUM_SCENES>{
-        // &emptyScene,
-        // &spriteTestScene,
-        &snakeScene,
-        // &weatherScene,
-        // &clockScene,
-    });
-
+// button definitions
 OneButton button;
 void buttonSetup();
 void buttonSingleClick();
 void buttonLongPressStart();
 void buttonLongPressStop();
 int buttonLongPressTimer = 0;
+
+// all scenes live here, in RAM
+AnniversaryScene anniversaryScene;
+BrightnessScenes brightnessScene;
+ClockSceneWithSecondHand clockSceneSecond;
+ClockScene clockScene;
+EmptyScene emptyScene;
+SnakeScene snakeScene;
+WeatherForecastScene weatherForecastScene;
+WeatherMinMaxScene weatherMinMaxScene;
+WeatherScene weatherScene;
+
+// switcher
+constexpr size_t NUM_SCENES = 2; // number of scenes
+SceneSwitcher<NUM_SCENES> sceneSwitcher(
+    std::array<Scene *, NUM_SCENES>{
+        &snakeScene,
+        &clockSceneSecond,
+    });
 
 static void conduct_checks();
 
@@ -70,12 +76,12 @@ void setup()
 
 void loop()
 {
-  // static unsigned long lastChecks = millis();
-  // if (millis() - lastChecks > 10000) // check every 10 seconds
-  // {
-  //   conduct_checks();
-  //   lastChecks = millis();
-  // }
+  static unsigned long lastChecks = millis();
+  if (millis() - lastChecks > 10000) // check every 10 seconds
+  {
+    conduct_checks();
+    lastChecks = millis();
+  }
 
   // Update the button
   button.tick();
@@ -130,6 +136,7 @@ static void conduct_checks()
 {
   Serial.println("Conducting checks...");
   struct tm time = time_fetch();
+
   // adjust brightness
   gBright = isNight(time) ? settings.brightness_night : settings.brightness_day;
 
