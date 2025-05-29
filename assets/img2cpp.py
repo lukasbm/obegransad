@@ -5,7 +5,6 @@ output is given on stdout
 from fire import Fire
 from PIL import Image
 import numpy as np
-from math import log2, ceil
 import os
 
 DEBUG = os.getenv("DEBUG", False)
@@ -14,9 +13,7 @@ DEBUG = os.getenv("DEBUG", False)
 #==== Printing functions
 #############################
 
-data_array_name = "spriteData"
-
-front_matter = """#pragma once
+FRONT_MATTER = """#pragma once
 
 #include <Arduino.h>
 #include "sprites.hpp"
@@ -27,37 +24,134 @@ def cpp_dataArray1D(packedArray: np.ndarray) -> str:
     # convert to hex
     hexSprite = np.array2string(packedArray, separator=", ", max_line_width=200, formatter={'int': lambda x: f"0x{x:02x}"})
     # fix formatting
-    hexSpritePost = "\t" + hexSprite.replace("[", "{").replace("]", "}")
-    return f"constexpr uint8_t {data_array_name}[{len(packedArray)}] = {hexSpritePost};\n"
+    hexSpritePost = hexSprite.replace("[", "{").replace("]", "}")
+    return f"static constexpr uint8_t data[{len(packedArray)}] = {hexSpritePost};\n"
 
 
 def cpp_dataArray2D(packedArrays: list[np.ndarray]) -> str:
     assert len(packedArrays) > 0, "packedArrays is empty"
     spriteLen = len(packedArrays[0])
     atlasLen  = len(packedArrays)
-    res = f"constexpr uint8_t {data_array_name}[{atlasLen}*{spriteLen}] = {{\n"
+    res = f"static constexpr uint8_t data[{atlasLen}*{spriteLen}] = {{\n"
     for packed in packedArrays:
         # convert to hex
         hexSprite = np.array2string(packed, separator=", ", max_line_width=200, formatter={'int': lambda x: f"0x{x:02x}"})
         # fix formatting
-        hexSpritePost = "\t" + hexSprite.replace("[", "").replace("]", "")
-        res += f"\t{hexSpritePost}, //\n"
+        hexSpritePost = hexSprite.replace("[", "").replace("]", "")
+        res += f"    {hexSpritePost}, //\n"
     res += "};\n"
     return res
 
 
-# TODO: add byte size per sprite!
-def cpp_textureAtlasClass(spriteWidth: int, spriteHeight: int, numSprites:int) -> str:
-    return f"constexpr TextureAtlas atlas({data_array_name}, {spriteWidth}, {spriteHeight}, {numSprites});"
+def SingleSprite(img_path: str, class_name: str, color_depth : int = 2):
+    img = load_image(img_path)
+    height = img.shape[0]
+    width = img.shape[1]
+    packed = convertSpriteToPacked(img, color_depth)
 
+    if not DEBUG:
+        print(FRONT_MATTER)
 
-def cpp_spriteSheetClass(spriteWidth: int, spriteHeight: int, numSprites:int) -> str:
-    return f"constexpr SpriteSheet atlas({data_array_name}, {spriteWidth}, {spriteHeight}, {numSprites});"
+    if DEBUG:
+        print(packed)
+    else:
+        print(f"// image size: {width}x{height}")
+        print(cpp_dataArray1D(packed))
+    
+    if not DEBUG:
+        print(f"""
+            struct {class_name} : SingleSprite
+            {{
+                constexpr {class_name}() : SingleSprite(data, {width}, {height}) {{}}
+            }};
+        """)
 
+def TextureAtlas(img_path: str, class_name: str,  spriteWidth: int, spriteHeight: int, color_depth: int = 2):
+    img = load_image(img_path)
+    imgHeight = img.shape[0]
+    imgWidth = img.shape[1]
+    packed = convertSpriteSheetToPacked(img, spriteHeight, spriteWidth, color_depth)
+    assert len(packed) > 0
+    spriteBytes = len(packed[0])
+    spriteCount  = len(packed)
 
-def cpp_fontClass(spriteWidth: int, spriteHeight: int, numSprites:int, ascii_offset: int) -> str:
-    return f"constexpr FontSheet atlas({data_array_name}, {spriteWidth}, {spriteHeight}, {numSprites}, {ascii_offset});"
+    if not DEBUG:
+        print(FRONT_MATTER)
+    
+    # data
+    if DEBUG:
+        for p in packed:
+            print(p)
+            print("===")
+    else:
+        print(f"// sprite size: {spriteWidth}x{spriteHeight} (total: {imgWidth}x{imgHeight})")
+        print(cpp_dataArray2D(packed))
+    
+    # wrapper
+    if not DEBUG:
+        print()
+        print(f"struct {class_name} : TextureAtlas")
+        print("{")
+        print(f"    constexpr {class_name}() : TextureAtlas(data, {spriteWidth}, {spriteHeight}, {spriteCount}, {spriteBytes}) {{}}")
+        print("};")
 
+def AnimationSheet(img_path: str, class_name: str, spriteWidth: int, spriteHeight: int, color_depth: int = 2):
+    img = load_image(img_path)
+    imgHeight = img.shape[0]
+    imgWidth = img.shape[1]
+    packed = convertSpriteSheetToPacked(img, spriteHeight, spriteWidth, color_depth)
+    assert len(packed) > 0
+    spriteBytes = len(packed[0])
+    spriteCount  = len(packed)
+
+    if not DEBUG:
+        print(FRONT_MATTER)
+    
+    # data
+    if DEBUG:
+        for p in packed:
+            print(p)
+            print("===")
+    else:
+        print(f"// sprite size: {spriteWidth}x{spriteHeight} (total: {imgWidth}x{imgHeight})")
+        print(cpp_dataArray2D(packed))
+    
+    # wrapper
+    if not DEBUG:
+        print()
+        print(f"struct {class_name} : AnimationSheet")
+        print("{")
+        print(f"    constexpr {class_name}() : AnimationSheet(data, {spriteWidth}, {spriteHeight}, {spriteCount}, {spriteBytes}) {{}}")
+        print("};")
+
+def FontSheet(img_path: str, class_name: str, spriteWidth: int, spriteHeight: int, ascii_offset: int = 32, color_depth: int = 2):
+    img = load_image(img_path)
+    imgHeight = img.shape[0]
+    imgWidth = img.shape[1]
+    packed = convertSpriteSheetToPacked(img, spriteHeight, spriteWidth, color_depth)
+    assert len(packed) > 0
+    spriteBytes = len(packed[0])
+    spriteCount  = len(packed)
+
+    if not DEBUG:
+        print(FRONT_MATTER)
+    
+    # data
+    if DEBUG:
+        for p in packed:
+            print(p)
+            print("===")
+    else:
+        print(f"// sprite size: {spriteWidth}x{spriteHeight} (total: {imgWidth}x{imgHeight})")
+        print(cpp_dataArray2D(packed))
+    
+    # wrapper
+    if not DEBUG:
+        print()
+        print(f"struct {class_name} : FontSheet")
+        print("{")
+        print(f"    constexpr {class_name}() : FontSheet(data, {spriteWidth}, {spriteHeight}, {spriteCount}, {spriteBytes}, {ascii_offset}) {{}}")
+        print("};")
 
 #############################
 #==== Conversion functions
@@ -83,7 +177,7 @@ def convertSpriteToPacked(sprite: np.ndarray, bits_per_pixel: int) -> np.ndarray
     spriteList = sprite.ravel().tolist()
     # map each pixel to desired color depth
     mappedSprite = map(lambda x: map_value(x, out_max=2**bits_per_pixel-1), spriteList)
-    # binarize the pixel
+    # map/downscale/dither the value.
     binaryMappedSprite = map(lambda x: np.binary_repr(x, width=bits_per_pixel), mappedSprite)
     # join into a long binary string
     binarySpriteString = "".join(binaryMappedSprite)
@@ -123,64 +217,10 @@ def load_image(input_file: str) -> np.ndarray:
     img = Image.open(input_file).convert("L")
     return np.array(img)
 
-
-
-#############################
-#==== main functions
-#############################
-
-# for a single sprite
-def parse_single_sprite(input_file: str, color_depth: int = 2) -> None:
-    arr = load_image(input_file)
-    imgHeight = arr.shape[0]
-    imgWidth = arr.shape[1]
-
-    if not DEBUG:
-        print(front_matter)
-
-    packed = convertSpriteToPacked(arr, color_depth)
-    if DEBUG:
-        print(packed)
-
-    # print the packed array
-    if not DEBUG:
-        print(f"// img size: {imgWidth}x{imgHeight}")
-        print(cpp_dataArray1D(packed))
-
-
-# for a sprite atlas
-def parse_sprite_sheet(input_file: str, spriteWidth: int, spriteHeight: int, color_depth: int = 2) -> None:
-    arr = load_image(input_file)
-    imgHeight = arr.shape[0]
-    imgWidth = arr.shape[1]
-
-    if not DEBUG:
-        print(front_matter)
-
-    # get packed arrays
-    packedArrays = convertSpriteSheetToPacked(arr, spriteHeight, spriteWidth, color_depth)
-
-    # print the packed arrays
-    if DEBUG:
-        for packed in packedArrays:
-            print(packed)
-            print("===")
-    else:
-        print(f"// sprite size: {spriteWidth}x{spriteHeight} ({imgWidth}x{imgHeight} total)")
-        print(cpp_dataArray2D(packedArrays))
-
-    numSprites = len(packedArrays)
-
-    # add the atlas class
-    if not DEBUG:
-        print("// keep only ONE of the following:")
-        print(cpp_textureAtlasClass(spriteWidth, spriteHeight, numSprites))
-        print(cpp_spriteSheetClass(spriteWidth, spriteHeight, numSprites))
-        print(cpp_fontClass(spriteWidth, spriteHeight, numSprites, 32))
-
-
 if __name__ == "__main__":
     Fire({
-        "single": parse_single_sprite,
-        "sheet": parse_sprite_sheet,
+        "single": SingleSprite,
+        "atlas": TextureAtlas,
+        "animation": AnimationSheet,
+        "font": FontSheet
     })
