@@ -68,6 +68,7 @@ public:
         drawWeatherData();
     }
 
+    // TODO: move fetching to weather module!
     void update() override
     {
         static unsigned long lastFetch = millis();

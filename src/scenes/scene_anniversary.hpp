@@ -8,7 +8,6 @@
 // scene to display anniversary dates with a heart animation
 class HeartScene : public Scene
 {
-
 private:
     HeartAnimation animation_heart;
 
