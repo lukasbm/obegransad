@@ -32,19 +32,19 @@ private:
 
         // hour first digit
         sprite = thin_font.getGlyph((hour / 10) + 48); // hour/10 is 0,1 or 2
-        panel_drawSprite(3, 2, sprite, thin_font.spriteWidth, thin_font.spriteHeight);
+        panel_drawSprite(3, 1, sprite, thin_font.spriteWidth, thin_font.spriteHeight);
 
         // hour second digit
         sprite = thin_font.getGlyph((hour % 10) + 48); // hour % 10 is 0-9
-        panel_drawSprite(9, 2, sprite, thin_font.spriteWidth, thin_font.spriteHeight);
+        panel_drawSprite(9, 1, sprite, thin_font.spriteWidth, thin_font.spriteHeight);
 
         // minute first digit
         sprite = thin_font.getGlyph((minute / 10) + 48); // minute/10 is 0-5
-        panel_drawSprite(3, 8, sprite, thin_font.spriteWidth, thin_font.spriteHeight);
+        panel_drawSprite(3, 9, sprite, thin_font.spriteWidth, thin_font.spriteHeight);
 
         // minute second digit
         sprite = thin_font.getGlyph((minute % 10) + 48); // minute % 10 is 0-9
-        panel_drawSprite(9, 8, sprite, thin_font.spriteWidth, thin_font.spriteHeight);
+        panel_drawSprite(9, 9, sprite, thin_font.spriteWidth, thin_font.spriteHeight);
     }
 
 public:
