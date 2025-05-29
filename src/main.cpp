@@ -57,7 +57,7 @@ void setup()
   panel_hold();
 
   // mostly wifi setup in here
-  setup_device();
+  DeviceError err = wifi_setup();
 
   // NTP sync
   time_setup();
