@@ -23,6 +23,8 @@ struct Config
     double weather_latitude;
     double weather_longitude;
     String timezone;
+    uint8_t anniversary_day;
+    uint8_t anniversary_month;
 
     Config();
     bool fromJson(const JsonObject &root);

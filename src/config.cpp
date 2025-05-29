@@ -8,7 +8,9 @@ Config::Config()
       brightness_night(30),
       weather_latitude(49.4613909),
       weather_longitude(11.1540788),
-      timezone("CET-1CEST,M3.5.0,M10.5.0/3")
+      timezone("CET-1CEST,M3.5.0,M10.5.0/3"),
+      anniversary_day(21),
+      anniversary_month(5)
 {
     // default off-times
     off_time_everyday.push_back({0, 0, 6, 0});     // everyday 0:00-6:00
