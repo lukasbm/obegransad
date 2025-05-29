@@ -45,60 +45,38 @@ static void conduct_checks();
 void setup()
 {
   Serial.begin(115200);
+  Serial.println("Starting setup...");
 
   buttonSetup();
 
   panel_init();
 
-  display_wifi_setup_prompt();
-  DeviceError err = wifi_setup();
+  // display_wifi_setup_prompt();
+  Serial.println("Setting up Wi-Fi...");
+  // DeviceError err = wifi_setup();
 
   // NTP sync
-  time_setup();
+  // time_setup();
 
-  // accept new configs
-  setup_config_server();
+  // // accept new configs
+  // setup_config_server();
 
-  Serial.println("Setup done!");
+  // Serial.println("Setup done!");
 
-  conduct_checks();
+  // conduct_checks();
 
   // Start with the first scene
   sceneSwitcher.nextScene();
 }
 
-static void conduct_checks()
-{
-  Serial.println("Conducting checks...");
-  struct tm time = time_fetch();
-  // adjust brightness
-  gBright = isNight(time) ? settings.brightness_night : settings.brightness_day;
-
-  // also check if it is time to shut off!
-  // if (shouldTurnOff(time))
-  // {
-  //   enter_light_sleep() // TODO: make it also return the sleep duration
-  // }
-
-  // check wifi health
-  if (!wifi_check())
-  {
-    Serial.println("Wi-Fi is not connected, trying to reconnect …");
-  }
-  else
-  {
-    Serial.println("Wi-Fi is healthy.");
-  }
-}
-
 void loop()
 {
-  static unsigned long lastChecks = millis();
-  if (millis() - lastChecks > 10000) // check every 10 seconds
-  {
-    conduct_checks();
-    lastChecks = millis();
-  }
+  // static unsigned long lastChecks = millis();
+  // if (millis() - lastChecks > 10000) // check every 10 seconds
+  // {
+  //   conduct_checks();
+  //   lastChecks = millis();
+  // }
 
   // Update the button
   button.tick();
@@ -114,6 +92,7 @@ void loop()
 
 void buttonSetup()
 {
+  pinMode(BUTTON_PIN, INPUT_PULLUP); // set the button pin as input with pull-up resistor
   button.setup(
       BUTTON_PIN,   // Input pin for the button
       INPUT_PULLUP, // INPUT and enable the internal pull-up resistor
@@ -145,5 +124,29 @@ void buttonLongPressStop()
   {
     Serial.println("Button long press -> reset WiFi credentials");
     wifi_clear_credentials();
+  }
+}
+
+static void conduct_checks()
+{
+  Serial.println("Conducting checks...");
+  struct tm time = time_fetch();
+  // adjust brightness
+  gBright = isNight(time) ? settings.brightness_night : settings.brightness_day;
+
+  // also check if it is time to shut off!
+  // if (shouldTurnOff(time))
+  // {
+  //   enter_light_sleep() // TODO: make it also return the sleep duration
+  // }
+
+  // check wifi health
+  if (!wifi_check())
+  {
+    Serial.println("Wi-Fi is not connected, trying to reconnect …");
+  }
+  else
+  {
+    Serial.println("Wi-Fi is healthy.");
   }
 }

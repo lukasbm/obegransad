@@ -112,6 +112,7 @@ DeviceError wifi_setup(void)
         add_captive_portal_spoof(s);
     }
 
+    Serial.println("Trying to open captive portal...");
     if (!wifiManager.autoConnect(PORTAL_NAME))
     {
         Serial.println("Portal timed out or aborted!");
