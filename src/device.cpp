@@ -2,10 +2,11 @@
 #include "led.h"
 #include "sprites/wifi.hpp"
 
-WiFiManager wifiManager;
+WiFiManager wm;
 
 static const char *PORTAL_NAME = "Obegransad";
 
+// FIXME: do i really need the function?
 // handles the cases when connection is lost in AP/STA mode
 // the driver fires the event typically every 3-10 seconds when disconnected
 static void on_STA_disconnected(WiFiEvent_t event, WiFiEventInfo_t info)
@@ -25,7 +26,7 @@ static void on_STA_disconnected(WiFiEvent_t event, WiFiEventInfo_t info)
         Serial.println("Failed to reconnect, starting captive portal again…");
         failCount = 0;
         display_wifi_setup_prompt();                // show the wifi logo
-        wifiManager.startConfigPortal(PORTAL_NAME); // blocking until user fixes wifi.
+        wm.startConfigPortal(PORTAL_NAME); // blocking until user fixes wifi.
     }
 }
 
@@ -73,7 +74,7 @@ bool wifi_check(void)
 void wifi_clear_credentials(void)
 {
     // clear stored credentials
-    wifiManager.resetSettings();
+    wm.resetSettings();
 }
 
 // add some endpoints to trick android and IOS into showing the captive portal
@@ -100,28 +101,28 @@ static void add_captive_portal_spoof(WebServer *s)
 DeviceError wifi_setup(void)
 {
     // if WiFi connection not in flash, start captive portal
-    wifiManager.setConfigPortalTimeout(600); // 10 minutes
+    wm.setConfigPortalTimeout(600); // 10 minutes
 
 #if DEBUG
-    wifiManager.setDebugOutput(true);
+    wm.setDebugOutput(true);
 #endif
 
     // make the captive portal actually appear on device
-    if (WebServer *s = wifiManager.server.get())
+    if (WebServer *s = wm.server.get())
     {
         add_captive_portal_spoof(s);
     }
 
     Serial.println("Trying to open captive portal...");
-    if (!wifiManager.autoConnect(PORTAL_NAME))
+    if (!wm.autoConnect(PORTAL_NAME))
     {
         Serial.println("Portal timed out or aborted!");
         ESP.restart();
     }
 
-    // register callback for connection loss
-    WiFi.onEvent(on_STA_disconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
-    WiFi.setAutoReconnect(true); // one automatic retry after disconnect
+    // FIXME: register callback for connection loss
+    // WiFi.onEvent(on_STA_disconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+    // WiFi.setAutoReconnect(true); // one automatic retry after disconnect
 
     // clean up after success
     Serial.println("Connected to WiFi!");

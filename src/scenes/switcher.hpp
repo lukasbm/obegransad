@@ -39,6 +39,21 @@ public:
         scenes[currIdx]->activate();
     }
 
+    void skipTo(size_t idx)
+    {
+        if (idx >= numScenes)
+        {
+            return; // out of bounds
+        }
+        if (currIdx >= 0) // edge case at startup
+        {
+            scenes[currIdx]->deactivate();
+        }
+        currIdx = idx;
+        panel_clear();
+        scenes[currIdx]->activate();
+    }
+
     void tick()
     {
         scenes[currIdx]->update();
