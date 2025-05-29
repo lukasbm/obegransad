@@ -3,14 +3,14 @@
 #include "led.h"
 #include "sprites/thin_glyphs.hpp"
 #include "sprites/sprite_heart.hpp"
+#include "config.h"
 
 // scene to display anniversary dates with a heart animation
 class HeartScene : public Scene
 {
 
 private:
-    uint8_t anniversaryDay;
-    uint8_t anniversaryMonth;
+    HeartAnimation animation_heart;
 
     void drawHeart(uint8_t day, uint8_t month)
     {
@@ -40,25 +40,20 @@ private:
     }
 
 public:
-    constexpr HeartScene(uint8_t day, uint8_t month)
-        : Scene(),
-          anniversaryDay(day),
-          anniversaryMonth(month) {}
-
     void activate() override
     {
         Serial.println("Heart scene activated");
-        drawHeart(anniversaryDay, anniversaryMonth);
+        drawHeart(settings.anniversary_day, settings.anniversary_month);
     }
 
     void update() override
     {
         static int lastDraw = millis();
 
-        // update animation (4 times a second)
+        // update animation (4 times a second - 4 FPS)
         if (millis() - lastDraw > 250)
         {
-            drawHeart(anniversaryDay, anniversaryMonth);
+            drawHeart(settings.anniversary_day, settings.anniversary_month);
             lastDraw = millis();
         }
     }
