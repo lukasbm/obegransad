@@ -3,10 +3,10 @@
 #include <Arduino.h>
 #include "sprites.hpp"
 
-// img size: 10x8
+// image size: 10x8
 static constexpr uint8_t data[20] = {0x0f, 0xff, 0x03, 0x00, 0x0c, 0xc0, 0x00, 0x30, 0x3f, 0xc0, 0x0c, 0x03, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x00, 0x0f, 0x00};
 
-struct SpriteWiFi : SingleSprite
+struct WiFiSprite : SingleSprite
 {
-    constexpr SpriteWiFi() : SingleSprite(data, 10, 8) {}
+    constexpr WiFiSprite() : SingleSprite(data, 10, 8) {}
 };

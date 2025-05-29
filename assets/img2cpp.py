@@ -17,7 +17,6 @@ FRONT_MATTER = """#pragma once
 
 #include <Arduino.h>
 #include "sprites.hpp"
-
 """
 
 def cpp_dataArray1D(packedArray: np.ndarray) -> str:
@@ -32,7 +31,7 @@ def cpp_dataArray2D(packedArrays: list[np.ndarray]) -> str:
     assert len(packedArrays) > 0, "packedArrays is empty"
     spriteLen = len(packedArrays[0])
     atlasLen  = len(packedArrays)
-    res = f"static constexpr uint8_t data[{atlasLen}*{spriteLen}] = {{\n"
+    res = f"static constexpr uint8_t data[{atlasLen} * {spriteLen}] = {{\n"
     for packed in packedArrays:
         # convert to hex
         hexSprite = np.array2string(packed, separator=", ", max_line_width=200, formatter={'int': lambda x: f"0x{x:02x}"})
@@ -45,8 +44,8 @@ def cpp_dataArray2D(packedArrays: list[np.ndarray]) -> str:
 
 def SingleSprite(img_path: str, class_name: str, color_depth : int = 2):
     img = load_image(img_path)
-    height = img.shape[0]
-    width = img.shape[1]
+    spriteHeight = img.shape[0]
+    spriteWidth = img.shape[1]
     packed = convertSpriteToPacked(img, color_depth)
 
     if not DEBUG:
@@ -55,16 +54,15 @@ def SingleSprite(img_path: str, class_name: str, color_depth : int = 2):
     if DEBUG:
         print(packed)
     else:
-        print(f"// image size: {width}x{height}")
+        print(f"// image size: {spriteWidth}x{spriteHeight}")
         print(cpp_dataArray1D(packed))
     
     if not DEBUG:
-        print(f"""
-            struct {class_name} : SingleSprite
-            {{
-                constexpr {class_name}() : SingleSprite(data, {width}, {height}) {{}}
-            }};
-        """)
+        print(f"struct {class_name} : SingleSprite")
+        print("{")
+        print(f"    constexpr {class_name}() : SingleSprite(data, {spriteWidth}, {spriteHeight}) {{}}")
+        print("};")
+
 
 def TextureAtlas(img_path: str, class_name: str,  spriteWidth: int, spriteHeight: int, color_depth: int = 2):
     img = load_image(img_path)
@@ -89,11 +87,11 @@ def TextureAtlas(img_path: str, class_name: str,  spriteWidth: int, spriteHeight
     
     # wrapper
     if not DEBUG:
-        print()
         print(f"struct {class_name} : TextureAtlas")
         print("{")
         print(f"    constexpr {class_name}() : TextureAtlas(data, {spriteWidth}, {spriteHeight}, {spriteCount}, {spriteBytes}) {{}}")
         print("};")
+
 
 def AnimationSheet(img_path: str, class_name: str, spriteWidth: int, spriteHeight: int, color_depth: int = 2):
     img = load_image(img_path)
@@ -118,11 +116,11 @@ def AnimationSheet(img_path: str, class_name: str, spriteWidth: int, spriteHeigh
     
     # wrapper
     if not DEBUG:
-        print()
         print(f"struct {class_name} : AnimationSheet")
         print("{")
         print(f"    constexpr {class_name}() : AnimationSheet(data, {spriteWidth}, {spriteHeight}, {spriteCount}, {spriteBytes}) {{}}")
         print("};")
+
 
 def FontSheet(img_path: str, class_name: str, spriteWidth: int, spriteHeight: int, ascii_offset: int = 32, color_depth: int = 2):
     img = load_image(img_path)
@@ -147,7 +145,6 @@ def FontSheet(img_path: str, class_name: str, spriteWidth: int, spriteHeight: in
     
     # wrapper
     if not DEBUG:
-        print()
         print(f"struct {class_name} : FontSheet")
         print("{")
         print(f"    constexpr {class_name}() : FontSheet(data, {spriteWidth}, {spriteHeight}, {spriteCount}, {spriteBytes}, {ascii_offset}) {{}}")
