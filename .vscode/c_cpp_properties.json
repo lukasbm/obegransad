@@ -9,6 +9,7 @@
             "name": "PlatformIO",
             "includePath": [
                 "/home/lukas/Documents/projects/obegransad/src",
+                "/home/lukas/.platformio/packages/framework-arduinoespressif32/libraries/Preferences/src",
                 "/home/lukas/.platformio/packages/framework-arduinoespressif32/libraries/HTTPClient/src",
                 "/home/lukas/.platformio/packages/framework-arduinoespressif32/libraries/WiFiClientSecure/src",
                 "/home/lukas/Documents/projects/obegransad/.pio/libdeps/seeed_xiao_esp32c3/WiFiManager",
@@ -229,7 +230,6 @@
                 "/home/lukas/.platformio/packages/framework-arduinoespressif32/libraries/Insights/src",
                 "/home/lukas/.platformio/packages/framework-arduinoespressif32/libraries/LittleFS/src",
                 "/home/lukas/.platformio/packages/framework-arduinoespressif32/libraries/NetBIOS/src",
-                "/home/lukas/.platformio/packages/framework-arduinoespressif32/libraries/Preferences/src",
                 "/home/lukas/.platformio/packages/framework-arduinoespressif32/libraries/RainMaker/src",
                 "/home/lukas/.platformio/packages/framework-arduinoespressif32/libraries/SD/src",
                 "/home/lukas/.platformio/packages/framework-arduinoespressif32/libraries/SD_MMC/src",
@@ -246,6 +246,7 @@
                 "limitSymbolsToIncludedHeaders": true,
                 "path": [
                     "/home/lukas/Documents/projects/obegransad/src",
+                    "/home/lukas/.platformio/packages/framework-arduinoespressif32/libraries/Preferences/src",
                     "/home/lukas/.platformio/packages/framework-arduinoespressif32/libraries/HTTPClient/src",
                     "/home/lukas/.platformio/packages/framework-arduinoespressif32/libraries/WiFiClientSecure/src",
                     "/home/lukas/Documents/projects/obegransad/.pio/libdeps/seeed_xiao_esp32c3/WiFiManager",
@@ -466,7 +467,6 @@
                     "/home/lukas/.platformio/packages/framework-arduinoespressif32/libraries/Insights/src",
                     "/home/lukas/.platformio/packages/framework-arduinoespressif32/libraries/LittleFS/src",
                     "/home/lukas/.platformio/packages/framework-arduinoespressif32/libraries/NetBIOS/src",
-                    "/home/lukas/.platformio/packages/framework-arduinoespressif32/libraries/Preferences/src",
                     "/home/lukas/.platformio/packages/framework-arduinoespressif32/libraries/RainMaker/src",
                     "/home/lukas/.platformio/packages/framework-arduinoespressif32/libraries/SD/src",
                     "/home/lukas/.platformio/packages/framework-arduinoespressif32/libraries/SD_MMC/src",

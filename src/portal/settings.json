@@ -20,5 +20,5 @@
     "time_useNTP": true,
     "anniversary_day": 12,
     "anniversary_month": 5,
-    "wifi_ssid": "Vodafone BE-44"
+    // "wifi_ssid": "Vodafone BE-44"
 }

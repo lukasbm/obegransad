@@ -6,6 +6,52 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="./style.css">
     <title>Settings</title>
+    <style>
+        /* Ensure the form itself stretches if needed */
+        form {
+            width: 100%;
+            max-width: 800px;
+            margin: auto;
+        }
+
+        /* Force inputs and similar elements to full width */
+        input[type="text"],
+        input[type="email"],
+        input[type="number"],
+        input[type="password"],
+        input[type="url"],
+        input[type="tel"],
+        input[type="search"],
+        textarea,
+        select {
+            display: block;
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+            font-size: 1rem;
+        }
+
+        /* Optional: improve readability of placeholders */
+        input::placeholder,
+        textarea::placeholder {
+            opacity: 0.7;
+        }
+
+        /* Add spacing between elements */
+        form>* {
+            margin-bottom: 1rem;
+        }
+
+        /* Tweak button layout */
+        button {
+            margin-top: 0.5rem;
+            padding: 0.6rem 1.2rem;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+    </style>
+
+
 </head>
 
 <body>
@@ -518,7 +564,7 @@
 
             </div>
             <!-- Current time -->
-            <div class="form-row">
+            <div>
                 <label>
                     Hour
                     <input type="number" name="time_hour" min="0" max="23">
@@ -551,7 +597,7 @@
 
         <fieldset>
             <legend>Anniversary</legend>
-            <div class="form-row">
+            <div>
                 <label>
                     Day
                     <input type="number" name="anniversary_day" min="1" max="31">
@@ -565,7 +611,7 @@
         <fieldset>
             <legend>Weather</legend>
 
-            <div class="form-row">
+            <div>
                 <label>
                     Latitude
                     <input type="number" step="any" name="weather_latitude">
@@ -741,9 +787,20 @@
             </div>
         </fieldset>
 
-        <button type="reset">Reset</button>
+        <button type="button" onclick="deleteDialog.showModal()">Reset</button>
         <button type="submit">Submit</button>
     </form>
+
+    <dialog id="deleteDialog">
+        <header>Attention!</header>
+        <form method="dialog">
+            <p>Do you really want to delete all settings?</p>
+            <menu>
+                <button value="no">No</button>
+                <button value="yes">Yes</button>
+            </menu>
+        </form>
+    </dialog>
 
     <script>
         // pre populate the fields with current settings
@@ -777,7 +834,20 @@
             });
         });
 
-        document.forms[0].addEventListener('submit', async e => {
+        document.getElementById("deleteDialog").addEventListener('close', e => {
+            if (e.target.returnValue === 'yes') {
+                // Reset settings
+                fetch('settings', { method: 'DELETE' })
+                    .then(() => {
+                        alert('Settings reset successfully!');
+                        window.close();
+                    }
+                    )
+                    .catch(err => console.error('Error resetting settings:', err));
+            }
+        });
+
+        document.forms[0].addEventListener('submit', e => {
             e.preventDefault();
             /* create an object from ALL current form fields   */
             const obj = Object.fromEntries(new FormData(e.target));
@@ -789,20 +859,18 @@
             console.log(obj);
 
             /* POST as JSON (can be full object or just one key) */
-            await fetch('/api/settings', {
+            fetch('/api/settings', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(obj)          // send everything
+            }).then(() => {
+                console.log('Settings saved successfully');
+                alert('Saved ✓');
+                // close window
+                window.close();
+            }).catch(err => {
+                console.error('Error saving settings:', err);
             });
-
-            alert('Saved ✓');
-        });
-
-        // --- 2. reset button
-        document.forms[0].addEventListener('reset', async e => {
-            e.preventDefault();
-
-            alert("will reset");
         });
     </script>
 
