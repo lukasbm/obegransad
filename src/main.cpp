@@ -117,7 +117,7 @@ void loop()
     if (now - lastWeatherTick > 600000 && hasWiFi) // check weather every 10 minutes
     {
         Serial.println("Checking weather...");
-        weather_update();
+        // FIXME: weather_update();
         lastWeatherTick = millis();
     }
 
@@ -145,45 +145,6 @@ void loop()
     delay(10); // yield to other (low prio) tasks
 }
 
-///// button stuff
-
-void buttonSetup()
-{
-    pinMode(BUTTON_PIN, INPUT_PULLUP); // set the button pin as input with pull-up resistor
-    button.setup(
-        BUTTON_PIN,   // Input pin for the button
-        INPUT_PULLUP, // INPUT and enable the internal pull-up resistor
-        true          // Active low button (pressed = LOW)
-    );
-    button.attachClick(buttonSingleClick);
-    button.attachLongPressStart(buttonLongPressStart);
-    button.attachLongPressStop(buttonLongPressStop);
-}
-
-void buttonSingleClick()
-{
-    Serial.println("Button - Single click -> next scene");
-    sceneSwitcher.nextScene();
-}
-
-void buttonLongPressStart()
-{
-    Serial.println("Button - Long press start");
-    buttonLongPressTimer = millis();
-}
-
-void buttonLongPressStop()
-{
-    Serial.println("Button - Long press stop");
-    int duration = millis() - buttonLongPressTimer;
-    Serial.printf("Button long press duration: %d ms\n", duration);
-    if (duration > 10000)
-    {
-        Serial.println("Button long press -> reset WiFi credentials");
-        wifi_clear_credentials();
-    }
-}
-
 static void conduct_checks()
 {
     Serial.println("Conducting checks...");
@@ -208,5 +169,52 @@ static void conduct_checks()
     else
     {
         Serial.println("Wi-Fi is healthy.");
+    }
+}
+
+///// button stuff
+
+void buttonSetup()
+{
+    pinMode(BUTTON_PIN, INPUT_PULLUP); // set the button pin as input with pull-up resistor
+    button.setup(
+        BUTTON_PIN,   // Input pin for the button
+        INPUT_PULLUP, // INPUT and enable the internal pull-up resistor
+        true          // Active low button (pressed = LOW)
+    );
+    button.attachClick(buttonSingleClick);
+    button.attachLongPressStart(buttonLongPressStart);
+    button.attachLongPressStop(buttonLongPressStop);
+}
+
+void buttonSingleClick()
+{
+    if (wifiManager.getConfigPortalActive())
+    {
+        Serial.println("Button - Single click -> stop config portal");
+        wifiManager.stopConfigPortal();
+    }
+    else
+    {
+        Serial.println("Button - Single click -> next scene");
+        sceneSwitcher.nextScene();
+    }
+}
+
+void buttonLongPressStart()
+{
+    Serial.println("Button - Long press start");
+    buttonLongPressTimer = millis();
+}
+
+void buttonLongPressStop()
+{
+    Serial.println("Button - Long press stop");
+    int duration = millis() - buttonLongPressTimer;
+    Serial.printf("Button long press duration: %d ms\n", duration);
+    if (duration > 10000)
+    {
+        Serial.println("Button long press -> reset WiFi credentials");
+        wifi_clear_credentials();
     }
 }

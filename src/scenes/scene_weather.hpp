@@ -48,7 +48,7 @@ private:
             panel_setPixel(8, i, BRIGHTNESS_4);
         }
 
-        ///////////////// TODO: symbols at top (top 9 pixels)
+        ///////////////// TODO: symbols at top based on weather code (top 9 pixels)
 
         // cloud
         panel_drawSprite(0, 0, cloud_sprite.data, cloud_sprite.width, cloud_sprite.height);

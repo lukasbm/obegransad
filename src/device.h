@@ -18,9 +18,12 @@ enum DeviceError
 
 extern WiFiManager wifiManager;
 
-DeviceError wifi_setup(void);
+void wifi_setup(void);
 void wifi_clear_credentials(void);
 bool wifi_check(void);
+void wifi_start_captive_portal(void);
+void wifi_stop_captive_portal(void);
+
 DeviceError enter_light_sleep(uint64_t seconds);
 
 void display_wifi_setup_prompt(void);

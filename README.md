@@ -14,6 +14,7 @@ IKEA obegränsad hack
 - [ ] also need to introduce error code in case some setup stuff goes wrong
 - [ ] make it also usable without WiFi. e.g. by pressing the button while in AP mode!
 - [ ] a simple HTML file that the user can copy to any device that contains a UI for the configuration. Ideally that file is automatically generated based on a json-schema of the config. Then the form inputs are submitted to the ESP for update!
+    Alternatively make the asyncHTTPserver provide it (maybe not dynamically, that might be slow!)
 
 ## Hardware
 
