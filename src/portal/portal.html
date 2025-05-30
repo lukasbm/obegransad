@@ -30,6 +30,15 @@
             font-size: 1rem;
         }
 
+        input[type="checkbox"] {
+            width: 1.5em;
+            height: 1.5em;
+            accent-color: #007acc;
+            /* modern browsers: changes check color */
+            cursor: pointer;
+            vertical-align: middle;
+        }
+
         form>* {
             margin-bottom: 1rem;
         }
@@ -41,6 +50,11 @@
 
         .form-row>* {
             flex: 1;
+        }
+
+        .danger-button {
+            background-color: #c23131;
+            color: white;
         }
     </style>
 </head>
@@ -629,35 +643,35 @@
         <fieldset>
             <legend>Shut-Off Times 1</legend>
 
-            <div>
+            <div class="form-row">
                 <label>
-                    Monday
+                    MON
+                    <input type="checkbox" name="offtimes1_monday">
                 </label>
-                <input type="checkbox" name="offtimes1_monday">
                 <label>
-                    tuesday
+                    TUE
+                    <input type="checkbox" name="offtimes1_tuesday">
                 </label>
-                <input type="checkbox" name="offtimes1_tuesday">
                 <label>
-                    wednesday
+                    WED
+                    <input type="checkbox" name="offtimes1_wednesday">
                 </label>
-                <input type="checkbox" name="offtimes1_wednesday">
                 <label>
-                    thursday
+                    THU
+                    <input type="checkbox" name="offtimes1_thursday">
                 </label>
-                <input type="checkbox" name="offtimes1_thursday">
                 <label>
-                    friday
+                    FRI
+                    <input type="checkbox" name="offtimes1_friday">
                 </label>
-                <input type="checkbox" name="offtimes1_friday">
                 <label>
-                    saturday
+                    SAT
+                    <input type="checkbox" name="offtimes1_saturday">
                 </label>
-                <input type="checkbox" name="offtimes1_saturday">
                 <label>
-                    sunday
+                    SUN
+                    <input type="checkbox" name="offtimes1_sunday">
                 </label>
-                <input type="checkbox" name="offtimes1_sunday">
             </div>
 
             <div class="form-row">
@@ -690,8 +704,10 @@
             </div>
         </fieldset>
 
-        <button type="button" onclick="deleteDialog.showModal()">Reset</button>
-        <button type="submit">Submit</button>
+        <div class="form-row">
+            <button type="button" class="danger-button" onclick="deleteDialog.showModal()">Reset</button>
+            <button type="submit">Submit</button>
+        </div>
     </form>
 
     <dialog id="deleteDialog">
@@ -700,7 +716,7 @@
             <p>Do you really want to delete all settings?</p>
             <menu>
                 <button value="no">No</button>
-                <button value="yes">Yes</button>
+                <button value="yes" class="danger-button">Yes</button>
             </menu>
         </form>
     </dialog>
