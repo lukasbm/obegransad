@@ -13,6 +13,7 @@ IKEA obegränsad hack
 - [ ] How to handle WiFi outages? Maybe need a general error screen that replaces weather and other wifi dependent stuff
 - [ ] also need to introduce error code in case some setup stuff goes wrong
 - [ ] make it also usable without WiFi. e.g. by pressing the button while in AP mode!
+- [ ] a simple HTML file that the user can copy to any device that contains a UI for the configuration. Ideally that file is automatically generated based on a json-schema of the config. Then the form inputs are submitted to the ESP for update!
 
 ## Hardware
 

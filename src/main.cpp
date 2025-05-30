@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <OneButton.h>
+#include <esp_timer.h>
 
 #include "weather.h"
 #include "device.h"
@@ -51,6 +52,23 @@ SceneSwitcher<NUM_SCENES> sceneSwitcher(
 
 static void conduct_checks();
 
+/* ULTRA FAST panel refresh 500 Hz */
+void IRAM_ATTR panel_isr(void)
+{
+    panel_show();
+}
+void start_panel_timer()
+{
+    hw_timer_t *t = timerBegin(0, 80, true); // 1 µs tick (80 MHz / 80 = 1 MHz)
+    timerAttachInterrupt(t, panel_isr, true);
+    timerAlarmWrite(t, 2000, true); // 2 ms
+    timerAlarmEnable(t);
+}
+
+////////////////
+//////// ARDUINO
+////////////////
+
 void setup()
 {
     Serial.begin(115200);
@@ -64,10 +82,12 @@ void setup()
     // DeviceError err = wifi_setup();
 
     // NTP sync
-    // time_setup();
+    time_setup();
 
     // // accept new configs
     // setup_config_server();
+
+    start_panel_timer();
 
     Serial.println("Setup done!");
 
@@ -79,21 +99,50 @@ void setup()
 
 void loop()
 {
-    static unsigned long lastChecks = millis();
-    if (millis() - lastChecks > 10000) // check every 10 seconds
+    static uint32_t lastSceneTick = 0;
+    static uint32_t lastWeatherTick = 0;
+    static uint32_t lastNTPTick = 0;
+    static uint32_t lastCheck = 0;
+
+    auto now = millis();
+
+    auto hasWiFi = wifi_check();
+
+    if (now - lastCheck > 10000) // check every 10 seconds
     {
         conduct_checks();
-        lastChecks = millis();
+        lastCheck = millis();
+    }
+
+    if (now - lastWeatherTick > 600000 && hasWiFi) // check weather every 10 minutes
+    {
+        Serial.println("Checking weather...");
+        weather_update();
+        lastWeatherTick = millis();
+    }
+
+    if (now - lastNTPTick > 3600000 && hasWiFi) // sync time every hour
+    {
+        Serial.println("Syncing time with NTP...");
+        time_syncNTP();
+        lastNTPTick = millis();
+    }
+
+    if (now - lastSceneTick > 100) // update scene every 100 ms
+    {
+        lastSceneTick = millis();
     }
 
     // Update the button
     button.tick();
 
+    // tick the wifi manager (as it is non-blocking)
+    wifiManager.process();
+
     // Update the current scene
     sceneSwitcher.tick();
 
-    // refresh the display
-    panel_show();
+    delay(10); // yield to other (low prio) tasks
 }
 
 ///// button stuff
@@ -141,7 +190,9 @@ static void conduct_checks()
     struct tm time = time_fetch();
 
     // adjust brightness
-    gBright = isNight(time) ? settings.brightness_night : settings.brightness_day;
+    uint8_t brightness = isNight(time) ? settings.brightness_night : settings.brightness_day;
+    Serial.printf("Setting brightness to %d\n", brightness);
+    panel_setBrightness(brightness);
 
     // also check if it is time to shut off!
     // if (shouldTurnOff(time))

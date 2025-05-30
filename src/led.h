@@ -87,3 +87,12 @@ static const Brightness colorMap[4] = {
 
 // draws a sprite starting at the top left corner (tlX, tlY)
 void panel_drawSprite(uint8_t tlX, uint8_t tlY, const uint8_t *data, uint8_t width, uint8_t height);
+
+inline void panel_setBrightness(uint8_t brightness)
+{
+    if (brightness > 255)
+    {
+        brightness = 255; // clamp to max brightness
+    }
+    gBright = brightness;
+}

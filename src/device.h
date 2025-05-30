@@ -16,6 +16,8 @@ enum DeviceError
     ERR_SLEEP,
 };
 
+extern WiFiManager wifiManager;
+
 DeviceError wifi_setup(void);
 void wifi_clear_credentials(void);
 bool wifi_check(void);
