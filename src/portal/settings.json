@@ -1,0 +1,21 @@
+{
+    "brightness_day": 200,
+    "brightness_night": 40,
+    "off_times_1": {
+        "monday": true,
+        "tuesday": false,
+        "wednesday": true,
+        "thursday": true,
+        "friday": true,
+        "saturday": false,
+        "sunday": true
+    },
+    "weather_latitude": 49.4613909,
+    "weather_longitude": 11.1540788,
+    "time_zone": "CET-1CEST,M3.5.0,M10.5.0/3",
+    "time_hour": 12,
+    "time_minute": 12,
+    "time_useNTP": true,
+    "anniversary_day": 12,
+    "anniversary_month": 5
+}
