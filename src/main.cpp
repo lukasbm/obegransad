@@ -78,13 +78,10 @@ void setup()
 
     panel_init();
 
-    // display_wifi_setup_prompt();
-    // DeviceError err = wifi_setup();
+    display_wifi_setup_prompt();
+    wifi_setup();
 
-    // NTP sync
-    time_setup();
-
-    // // accept new configs
+    // accept new configs
     // setup_config_server();
 
     start_panel_timer();
@@ -117,18 +114,19 @@ void loop()
     if (now - lastWeatherTick > 600000 && hasWiFi) // check weather every 10 minutes
     {
         Serial.println("Checking weather...");
-        // FIXME: weather_update();
+        // FIXME: weather_update();  // update global weather data
         lastWeatherTick = millis();
     }
 
-    if (now - lastNTPTick > 3600000 && hasWiFi) // sync time every hour
-    {
-        Serial.println("Syncing time with NTP...");
-        time_syncNTP();
-        lastNTPTick = millis();
-    }
+    // FIXME: not needed now, fetch_time takes care of it
+    // if (now - lastNTPTick > 3600000 && hasWiFi) // sync time every hour
+    // {
+    //     Serial.println("Syncing time with NTP...");
+    //     time_syncNTP();
+    //     lastNTPTick = millis();
+    // }
 
-    if (now - lastSceneTick > 100) // update scene every 100 ms
+    if (now - lastSceneTick > 100) // update scene every 100 ms (10FPS)
     {
         lastSceneTick = millis();
     }
@@ -189,16 +187,8 @@ void buttonSetup()
 
 void buttonSingleClick()
 {
-    if (wifiManager.getConfigPortalActive())
-    {
-        Serial.println("Button - Single click -> stop config portal");
-        wifiManager.stopConfigPortal();
-    }
-    else
-    {
-        Serial.println("Button - Single click -> next scene");
-        sceneSwitcher.nextScene();
-    }
+    Serial.println("Button - Single click -> next scene");
+    sceneSwitcher.nextScene();
 }
 
 void buttonLongPressStart()

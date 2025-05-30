@@ -6,36 +6,14 @@ WiFiManager wifiManager;
 
 static const char *PORTAL_NAME = "Obegransad-Setup"; // captive portal name (SSID)
 
-void wifi_start_captive_portal(void)
-{
-    // Ensure WiFi is in AP or AP+STA mode before starting the captive portal
-    WiFi.mode(WIFI_AP_STA);
-    wifiManager.startConfigPortal(PORTAL_NAME);
-}
-
-// stop captive portal and switch to station mode
-void wifi_stop_captive_portal(void)
-{
-    wifiManager.stopConfigPortal(); // shuts DNS + HTTP server
-    WiFi.softAPdisconnect(true);    // beacon off
-    WiFi.mode(WIFI_STA);            // station only
-}
-
-// fires once the STA finally gets an IP address
-static void onGotIP(WiFiEvent_t, WiFiEventInfo_t info)
-{
-    Serial.printf("STA is up (%s)\n", IPAddress(info.got_ip.ip_info.ip.addr).toString().c_str());
-    wifi_stop_captive_portal();
-}
-
 // handles the cases when connection is lost in AP/STA mode
 // the driver fires the event typically every 3-10 seconds when disconnected
-static void onStaDisconnected(WiFiEvent_t event, WiFiEventInfo_t info)
+static void callback_sta_disconnected(WiFiEvent_t event, WiFiEventInfo_t info)
 {
     static uint8_t failCount = 0;
 
     // print reason
-    Serial.printf("Driver Wi-Fi lost event (onStaDisconnected), reason %d … reconnecting\n", info.wifi_sta_disconnected.reason);
+    Serial.printf("Driver Wi-Fi lost event (callback_sta_disconnected), reason %d … reconnecting\n", info.wifi_sta_disconnected.reason);
 
     if (++failCount < 10)
     {
@@ -124,15 +102,14 @@ static void add_captive_portal_spoof(WebServer *s)
 void wifi_setup(void)
 {
     // configure arduino WiFi abstraction lib
-    WiFi.mode(WIFI_AP_STA);                                               // set mode to AP+STA
-    WiFi.setHostname("Obegransad");                                       // set hostname
-    WiFi.onEvent(onStaDisconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED); // register callback
-    WiFi.setAutoReconnect(true);                                          // one automatic retry after disconnect
-    WiFi.onEvent(onGotIP, ARDUINO_EVENT_WIFI_STA_GOT_IP);                 // register callback for got IP event
+    WiFi.mode(WIFI_AP_STA);                                                       // set mode to AP+STA
+    WiFi.setHostname("Obegransad");                                               // set hostname
+    WiFi.onEvent(callback_sta_disconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED); // register callback
+    WiFi.setAutoReconnect(true);                                                  // one automatic retry after disconnect
 
     // configure the Wi-Fi manager (uses WiFi interally)
-    wifiManager.setConfigPortalTimeout(600);    // 10 minutes
-    wifiManager.setConfigPortalBlocking(false); // non-blocking mode
+    wifiManager.setConfigPortalBlocking(true); // blocking mode
+    wifiManager.setConfigPortalTimeout(6);     // FIXME: 1 min
 #if DEBUG
     wifiManager.setDebugOutput(true);
 #endif
@@ -144,7 +121,19 @@ void wifi_setup(void)
     }
 
     Serial.println("opening captive portal...");
-    bool already_connected = wifiManager.autoConnect(PORTAL_NAME);
+    if (!wifiManager.autoConnect(PORTAL_NAME))
+    {
+        Serial.println("Portal timed out or aborted!");
+    }
+
+    // clean up after success
+    Serial.println("Connected to WiFi!");
+    Serial.print("IP Address: ");
+    Serial.println(WiFi.localIP());
+    // migrate from AP to STA mode
+    delay(3000);                 // give phone time to finish
+    WiFi.softAPdisconnect(true); // drop the hotspot
+    WiFi.mode(WIFI_STA);         // switch to STA mod
 }
 
 DeviceError enter_light_sleep(uint64_t seconds)
@@ -209,7 +198,7 @@ DeviceError enter_light_sleep(uint64_t seconds)
     // re-auth to wifi
     if (!WiFi.reconnect())
     {
-        // will call onStaDisconnected if it fails
+        // will call callback_sta_disconnected if it fails
         Serial.println("Failed to reconnect to WiFi after sleep");
         return ERR_WIFI;
     }
