@@ -19,20 +19,20 @@
             <div>
                 <label>
                     Networks
-                    <table>
+                    <table id="wifi-networks">
                         <thead>
-                            <td>SSID</td>
+                            <td>Name</td>
                             <td>Strength</td>
                         </thead>
-                        <tr>
-                            <td>Test</td>
-                            <td>5</td>
-                        </tr>
+                        <tbody>
+                            <!-- will be filed by javascript -->
+                        </tbody>
                     </table>
                 </label>
                 <label>
                     SSID
-                    <input type="text" id="ssid" name="ssid" \>
+                    <input type="text" id="ssid" name="wifi_ssid"
+                        placeholder="click on a network in the table or enter your SSID" \>
                 </label>
             </div>
             <div>
@@ -52,12 +52,12 @@
                 <label>
                     Timezone
                     <select name="time_zone" spellcheck="false">
+                        <option value="CET-1CEST,M3.5.0,M10.5.0/3">Europe/Berlin</option>
                         <option value="CET-1CEST,M3.5.0,M10.5.0/3">Europe/Amsterdam</option>
                         <option value="CET-1CEST,M3.5.0,M10.5.0/3">Europe/Andorra</option>
                         <option value="<+04>-4">Europe/Astrakhan</option>
                         <option value="EET-2EEST,M3.5.0/3,M10.5.0/4">Europe/Athens</option>
                         <option value="CET-1CEST,M3.5.0,M10.5.0/3">Europe/Belgrade</option>
-                        <option value="CET-1CEST,M3.5.0,M10.5.0/3">Europe/Berlin</option>
                         <option value="CET-1CEST,M3.5.0,M10.5.0/3">Europe/Bratislava</option>
                         <option value="CET-1CEST,M3.5.0,M10.5.0/3">Europe/Brussels</option>
                         <option value="EET-2EEST,M3.5.0/3,M10.5.0/4">Europe/Bucharest</option>
@@ -568,16 +568,16 @@
             <div class="form-row">
                 <label>
                     Latitude
-                    <input type="number" name="weather_latitude">
+                    <input type="number" step="any" name="weather_latitude">
                 </label>
                 <label>
                     Longitude
-                    <input type="number" name="weather_longitude">
+                    <input type="number" step="any" name="weather_longitude">
             </div>
         </fieldset>
 
         <fieldset>
-            <legend>OffTimes 1</legend>
+            <legend>Shut-Off Times 1</legend>
 
             <div>
                 <label>
@@ -632,7 +632,7 @@
         </fieldset>
 
         <fieldset>
-            <legend>OffTimes 2</legend>
+            <legend>Shut-Off Times 2</legend>
 
             <div>
                 <label>
@@ -687,7 +687,7 @@
         </fieldset>
 
         <fieldset>
-            <legend>OffTimes 3</legend>
+            <legend>Shut-Off Times 3</legend>
 
             <div>
                 <label>
@@ -750,8 +750,10 @@
         fetch('/settings.json').then(r => r.json()).then(cfg => {
             for (const [k, v] of Object.entries(cfg)) {
                 const el = document.forms[0][k];
-                if (!el) continue;
-                // TODO: need special handling for offtimes?
+                if (!el) {
+                    console.warn(`No form element found for key: ${k}`);
+                    continue;
+                };
                 if (el.type === 'checkbox') el.checked = v;
                 else el.value = v;
             }
@@ -759,10 +761,22 @@
 
         // populate nearby network list
         fetch('/networks.json').then(r => r.json()).then(nets => {
-            // TODO: build the table!
+            const tableBody = document.querySelector("#wifi-networks tbody");
+            const inputField = document.getElementById("ssid");
+
+            nets.forEach(entry => {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td>${entry.name}</td><td>${entry.strength}</td>`;
+
+                // Add click listener to copy name
+                row.addEventListener('click', () => {
+                    inputField.value = entry.name;
+                });
+
+                tableBody.appendChild(row);
+            });
         });
 
-        // --- 2. submit as JSON
         document.forms[0].addEventListener('submit', async e => {
             e.preventDefault();
             /* create an object from ALL current form fields   */
@@ -780,6 +794,7 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(obj)          // send everything
             });
+
             alert('Saved ✓');
         });
 

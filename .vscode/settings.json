@@ -64,6 +64,7 @@
         "ndarray",
         "Obegransad",
         "Obengransad",
+        "offtimes",
         "packbits"
     ]
 }
