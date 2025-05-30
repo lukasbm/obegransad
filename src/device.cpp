@@ -315,3 +315,10 @@ void wifi_reconnect()
         Serial.println("\nReconnected to Wi-Fi!");
     }
 }
+
+// void onGotIP(WiFiEvent_t, WiFiEventInfo_t) {
+//     if (WiFi.getMode() == WIFI_AP_STA) {        // still hosting AP?
+//         WiFi.softAPdisconnect(true);            // stop beacons
+//         WiFi.mode(WIFI_STA);                    // pure station mode
+//     }
+// }

@@ -122,12 +122,44 @@ static void handle_get_networks(AsyncWebServerRequest *request)
     request->send(200, "application/json", out);
 }
 
+static void offtime_helper(JsonDocument &obj, const OffTime &offtime, const String &prefix)
+{
+    obj[prefix + "from_hour"] = offtime.from_hour;
+    obj[prefix + "from_minute"] = offtime.from_minute;
+    obj[prefix + "to_hour"] = offtime.to_hour;
+    obj[prefix + "to_minute"] = offtime.to_minute;
+    // spread bitmask
+    obj[prefix + "sunday"] = bool(offtime.sunday);
+    obj[prefix + "monday"] = bool(offtime.monday);
+    obj[prefix + "tuesday"] = bool(offtime.tuesday);
+    obj[prefix + "wednesday"] = bool(offtime.wednesday);
+    obj[prefix + "thursday"] = bool(offtime.thursday);
+    obj[prefix + "friday"] = bool(offtime.friday);
+    obj[prefix + "saturday"] = bool(offtime.saturday);
+}
+
 static void handle_get_settings(AsyncWebServerRequest *request)
 {
     String out;
     JsonDocument doc;
     // same names as in Settings struct and preferences (NVS)
-    settings.to_json(doc);
+
+    doc["wifi_ssid"] = settings.ssid;
+    doc["wifi_password"] = settings.password;
+    doc["brightness_day"] = settings.brightness_day;
+    doc["brightness_night"] = settings.brightness_night;
+    // off times 1
+    offtime_helper(doc, settings.offtime1, "offtime1_");
+    // off times 2
+    offtime_helper(doc, settings.offtime2, "offtime2_");
+    // off times 3
+    offtime_helper(doc, settings.offtime3, "offtime3_");
+    doc["weather_latitude"] = settings.weather_latitude;
+    doc["weather_longitude"] = settings.weather_longitude;
+    doc["timezone"] = settings.timezone;
+    doc["anniversary_day"] = settings.anniversary_day;
+    doc["anniversary_month"] = settings.anniversary_month;
+    // serialize the document to JSON
     serializeJson(doc, out);
     request->send(200, "application/json", out);
 }
@@ -164,10 +196,58 @@ void handle_post_settings(AsyncWebServerRequest *req,
         req->send(400, "application/json", R"({"error":"bad json"})");
     }
 
+    // TODO: validate settings
+
     // merge only what’s present
-    cfg.from_json(doc);
+    settings.brightness_day = doc["brightness_day"] | settings.brightness_day;
+    settings.brightness_night = doc["brightness_night"] | settings.brightness_night;
+    settings.ssid = doc["wifi_ssid"] | settings.ssid;
+    settings.password = doc["wifi_password"] | settings.password;
+    settings.weather_latitude = doc["weather_latitude"] | settings.weather_latitude;
+    settings.weather_longitude = doc["weather_longitude"] | settings.weather_longitude;
+    settings.timezone = doc["timezone"] | settings.timezone;
+    settings.anniversary_day = doc["anniversary_day"] | settings.anniversary_day;
+    settings.anniversary_month = doc["anniversary_month"] | settings.anniversary_month;
+    // off times 1
+    settings.offtime1.from_hour = doc["offtime1_from_hour"] | settings.offtime1.from_hour;
+    settings.offtime1.from_minute = doc["offtime1_from_minute"] | settings.offtime1.from_minute;
+    settings.offtime1.to_hour = doc["offtime1_to_hour"] | settings.offtime1.to_hour;
+    settings.offtime1.to_minute = doc["offtime1_to_minute"] | settings.offtime1.to_minute;
+    settings.offtime1.sunday = doc["offtime1_sunday"] | settings.offtime1.sunday;
+    settings.offtime1.monday = doc["offtime1_monday"] | settings.offtime1.monday;
+    settings.offtime1.tuesday = doc["offtime1_tuesday"] | settings.offtime1.tuesday;
+    settings.offtime1.wednesday = doc["offtime1_wednesday"] | settings.offtime1.wednesday;
+    settings.offtime1.thursday = doc["offtime1_thursday"] | settings.offtime1.thursday;
+    settings.offtime1.friday = doc["offtime1_friday"] | settings.offtime1.friday;
+    settings.offtime1.saturday = doc["offtime1_saturday"] | settings.offtime1.saturday;
+    // off times 2
+    settings.offtime2.from_hour = doc["offtime2_from_hour"] | settings.offtime2.from_hour;
+    settings.offtime2.from_minute = doc["offtime2_from_minute"] | settings.offtime2.from_minute;
+    settings.offtime2.to_hour = doc["offtime2_to_hour"] | settings.offtime2.to_hour;
+    settings.offtime2.to_minute = doc["offtime2_to_minute"] | settings.offtime2.to_minute;
+    settings.offtime2.sunday = doc["offtime2_sunday"] | settings.offtime2.sunday;
+    settings.offtime2.monday = doc["offtime2_monday"] | settings.offtime2.monday;
+    settings.offtime2.tuesday = doc["offtime2_tuesday"] | settings.offtime2.tuesday;
+    settings.offtime2.wednesday = doc["offtime2_wednesday"] | settings.offtime2.wednesday;
+    settings.offtime2.thursday = doc["offtime2_thursday"] | settings.offtime2.thursday;
+    settings.offtime2.friday = doc["offtime2_friday"] | settings.offtime2.friday;
+    settings.offtime2.saturday = doc["offtime2_saturday"] | settings.offtime2.saturday;
+    // off times 3
+    settings.offtime3.from_hour = doc["offtime3_from_hour"] | settings.offtime3.from_hour;
+    settings.offtime3.from_minute = doc["offtime3_from_minute"] | settings.offtime3.from_minute;
+    settings.offtime3.to_hour = doc["offtime3_to_hour"] | settings.offtime3.to_hour;
+    settings.offtime3.to_minute = doc["offtime3_to_minute"] | settings.offtime3.to_minute;
+    settings.offtime3.sunday = doc["offtime3_sunday"] | settings.offtime3.sunday;
+    settings.offtime3.monday = doc["offtime3_monday"] | settings.offtime3.monday;
+    settings.offtime3.tuesday = doc["offtime3_tuesday"] | settings.offtime3.tuesday;
+    settings.offtime3.wednesday = doc["offtime3_wednesday"] | settings.offtime3.wednesday;
+    settings.offtime3.thursday = doc["offtime3_thursday"] | settings.offtime3.thursday;
+    settings.offtime3.friday = doc["offtime3_friday"] | settings.offtime3.friday;
+    settings.offtime3.saturday = doc["offtime3_saturday"] | settings.offtime3.saturday;
 
     // save settings to persistent storage
-    write_to_persistent_storage(cfg);
+    settings.save();
+
+    // respond
     req->send(200, "application/json", R"({"ok":true})");
 }
