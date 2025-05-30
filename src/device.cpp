@@ -315,13 +315,3 @@ void wifi_reconnect()
         Serial.println("\nReconnected to Wi-Fi!");
     }
 }
-void wifi_print_status()
-{
-    Serial.println("Wi-Fi Status:");
-    Serial.printf("SSID: %s\n", WiFi.SSID().c_str());
-    Serial.printf("BSSID: %s\n", WiFi.BSSIDstr().c_str());
-    Serial.printf("Channel: %d\n", WiFi.channel());
-    Serial.printf("RSSI: %d dBm\n", WiFi.RSSI());
-    Serial.printf("Encryption Type: %d\n", WiFi.encryptionType());
-    Serial.printf("IP Address: %s\n", WiFi.localIP().toString().c_str());
-}

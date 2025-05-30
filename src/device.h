@@ -31,6 +31,10 @@ bool wifi_check(void);
 std::vector<NetworkInfo> wifi_nearby_networks(void);
 uint8_t wifi_rssi_quality(int rssi);
 
+void wifi_connect(const String &ssid, const String &password);
+void wifi_disconnect();
+void wifi_reconnect();
+
 DeviceError enter_light_sleep(uint64_t seconds);
 
 // displays a wifi symbol on the panel to indicate the device is in AP mode.
