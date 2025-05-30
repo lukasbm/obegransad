@@ -24,12 +24,12 @@ static void callback_sta_disconnected(WiFiEvent_t event, WiFiEventInfo_t info)
     {
         Serial.println("Failed to reconnect, starting captive portal again…");
         failCount = 0;
-        display_wifi_setup_prompt();                // show the wifi logo
+        display_wifi_symbol();                      // show the wifi logo
         wifiManager.startConfigPortal(PORTAL_NAME); // blocking until user fixes wifi.
     }
 }
 
-void display_wifi_setup_prompt(void)
+void display_wifi_symbol(void)
 {
     // display the wifi logo while connecting
     panel_clear();
@@ -204,4 +204,124 @@ DeviceError enter_light_sleep(uint64_t seconds)
     }
 
     return ERR_NONE;
+}
+
+std::vector<NetworkInfo> wifi_nearby_networks(void)
+{
+    Serial.println("Scanning for nearby Wi-Fi networks...");
+
+    // start scan
+    if (WiFi.scanNetworks(true, true) < 0)
+    {
+        Serial.println("Failed to start Wi-Fi scan");
+        return;
+    }
+
+    // wait for scan to complete
+    while (WiFi.scanComplete() == WIFI_SCAN_RUNNING)
+    {
+        delay(100);
+    }
+
+    // print results
+    int numNetworks = WiFi.scanComplete();
+    Serial.printf("Found %d networks:\n", numNetworks);
+
+    std::vector<NetworkInfo> sortedNetworks; // vector to hold sorted networks
+    sortedNetworks.clear();                  // clear the sorted networks list
+    for (int i = 0; i < numNetworks; ++i)
+    {
+        // create a network info object
+        NetworkInfo netInfo;
+        netInfo.ssid = WiFi.SSID(i);
+        netInfo.rssi = WiFi.RSSI(i);
+        netInfo.quality = wifi_rssi_quality(netInfo.rssi); // calculate quality
+        netInfo.encryptionType = WiFi.encryptionType(i);
+        netInfo.channel = WiFi.channel(i);
+        // add to the sorted list
+        sortedNetworks.push_back(netInfo);
+    }
+
+    // reset scan results
+    WiFi.scanDelete();
+
+    return sortedNetworks; // return the sorted networks
+}
+
+uint8_t wifi_rssi_quality(int rssi)
+{
+    int quality = 0;
+    if (rssi <= -100)
+    {
+        quality = 0;
+    }
+    else if (rssi >= -50)
+    {
+        quality = 100;
+    }
+    else
+    {
+        quality = 2 * (rssi + 100);
+    }
+    return quality;
+}
+
+void wifi_connect(const String &ssid, const String &password)
+{
+    Serial.printf("Connecting to Wi-Fi SSID: %s\n", ssid.c_str());
+
+    WiFi.mode(WIFI_STA); // ensure we are in STA mode
+    WiFi.begin(ssid.c_str(), password.c_str());
+
+    unsigned long startTime = millis();
+    while (WiFi.status() != WL_CONNECTED)
+    {
+        if (millis() - startTime > 10000) // timeout after 10 seconds
+        {
+            Serial.println("Failed to connect to Wi-Fi");
+            return;
+        }
+        delay(500);
+        Serial.print(".");
+    }
+
+    Serial.println("\nConnected to Wi-Fi!");
+    Serial.print("IP Address: ");
+    Serial.println(WiFi.localIP());
+}
+void wifi_disconnect()
+{
+    Serial.println("Disconnecting from Wi-Fi...");
+    WiFi.disconnect();
+    Serial.println("Disconnected from Wi-Fi");
+}
+void wifi_reconnect()
+{
+    Serial.println("Reconnecting to Wi-Fi...");
+    if (WiFi.status() != WL_CONNECTED)
+    {
+        WiFi.reconnect();
+        unsigned long startTime = millis();
+        while (WiFi.status() != WL_CONNECTED)
+        {
+            if (millis() - startTime > 10000) // timeout after 10 seconds
+            {
+                Serial.println("Failed to reconnect to Wi-Fi");
+                return;
+            }
+            delay(500);
+            Serial.print(".");
+        }
+        Serial.println("\nReconnected to Wi-Fi!");
+    }
+}
+void wifi_print_status()
+{
+    Serial.println("Wi-Fi Status:");
+    Serial.printf("SSID: %s\n", WiFi.SSID().c_str());
+    Serial.printf("BSSID: %s\n", WiFi.BSSIDstr().c_str());
+    Serial.printf("Channel: %d\n", WiFi.channel());
+    Serial.printf("RSSI: %d dBm\n", WiFi.RSSI());
+    Serial.printf("Encryption Type: %d\n", WiFi.encryptionType());
+    Serial.printf("IP Address: %s\n", WiFi.localIP().toString().c_str());
 }

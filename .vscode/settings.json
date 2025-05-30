@@ -65,6 +65,7 @@
         "Obegransad",
         "Obengransad",
         "offtimes",
-        "packbits"
+        "packbits",
+        "rssi"
     ]
 }

@@ -78,7 +78,7 @@ void setup()
 
     panel_init();
 
-    display_wifi_setup_prompt();
+    display_wifi_symbol();
     wifi_setup();
 
     // accept new configs

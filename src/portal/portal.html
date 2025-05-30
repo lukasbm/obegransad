@@ -722,8 +722,19 @@
     </dialog>
 
     <script>
+        const SETTING_ENDPOINT = "/settings.json"; // "/settings";
+        const NETWORK_ENDPOINT = "/networks.json"; // "/networks";
+
         // pre populate the fields with current settings
-        fetch('/settings.json').then(r => r.json()).then(cfg => {
+        fetch(SETTING_ENDPOINT).then(r => {
+            if (!r.ok) {
+                console.error('Error loading settings:', r);
+                alert('Error loading settings: ' + r.statusText);
+                return;
+            }
+            return r.json()
+        }).then(cfg => {
+            // populate form fields
             for (const [k, v] of Object.entries(cfg)) {
                 const el = document.forms[0][k];
                 if (!el) {
@@ -736,19 +747,23 @@
         });
 
         // populate nearby network list
-        fetch('/networks.json').then(r => r.json()).then(nets => {
+        fetch(NETWORK_ENDPOINT).then(r => {
+            if (!r.ok) {
+                console.error('Error loading networks:', r);
+                alert('Error loading settings: ' + r.statusText);
+                return;
+            }
+            return r.json()
+        }).then(nets => {
+            // populate network table
             const tableBody = document.querySelector("#wifi-networks tbody");
             const inputField = document.getElementById("ssid");
-
             nets.forEach(entry => {
                 const row = document.createElement('tr');
                 row.innerHTML = `<td>${entry.name}</td><td>${entry.strength}</td>`;
-
-                // Add click listener to copy name
                 row.addEventListener('click', () => {
                     inputField.value = entry.name;
                 });
-
                 tableBody.appendChild(row);
             });
         });
@@ -756,39 +771,67 @@
         document.getElementById("deleteDialog").addEventListener('close', e => {
             if (e.target.returnValue === 'yes') {
                 // Reset settings
-                fetch('settings', { method: 'DELETE' })
-                    .then(() => {
-                        alert('Settings reset successfully!');
-                        window.close();
-                    }
-                    )
-                    .catch(err => console.error('Error resetting settings:', err));
+                fetch(SETTING_ENDPOINT, { method: 'DELETE' })
+                    .then(r => {
+                        if (!r.ok) {
+                            console.error('Error resetting settings:', r);
+                            alert('Error loading settings: ' + r.statusText);
+                        } else {
+                            console.log('Settings reset successfully', r);
+                            alert('Settings reset successfully!');
+                            window.close();
+                        }
+                    }).catch(err => {
+                        console.error('Error resetting settings:', err);
+                    });
             }
         });
 
+        // main form submit handler
         document.forms[0].addEventListener('submit', e => {
             e.preventDefault();
-            /* create an object from ALL current form fields   */
-            const obj = Object.fromEntries(new FormData(e.target));
 
-            /* Optional: convert checkbox string "on"/undefined to boolean */
-            // obj.dhcp = e.target.dhcp.;
-            // obj.led = e.target.led.;
+            const form = e.target;
+            const obj = Object.fromEntries(new FormData(form));
+
+            // include checkboxes
+            form.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                obj[cb.name] = cb.checked;
+            });
+
+            // convert number form inputs to json numbers
+            form.querySelectorAll('input[type="number"]').forEach(input => {
+                const name = input.name;
+                const value = input.value;
+
+                if (value === '') return; // Skip empty fields
+
+                // Determine if it's an integer field
+                const isInteger = !input.step || input.step === '1';
+
+                obj[name] = isInteger ? parseInt(value, 10) : parseFloat(value);
+            });
 
             console.log(obj);
 
-            /* POST as JSON (can be full object or just one key) */
-            fetch('/api/settings', {
+            Number()
+
+            fetch(SETTING_ENDPOINT, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(obj)          // send everything
-            }).then(() => {
-                console.log('Settings saved successfully');
-                alert('Saved ✓');
-                // close window
-                window.close();
+                body: JSON.stringify(obj) // send everything
+            }).then(res => {
+                if (!res.ok) {
+                    console.error('Error saving settings:', res);
+                    alert('Error saving settings: ' + res.statusText);
+                }
+                else {
+                    console.log('Settings saved successfully', res);
+                    alert('Saved ✓');
+                    window.close();
+                }
             }).catch(err => {
-                console.error('Error saving settings:', err);
+                alert('Error submitting settings:' + err.message);
             });
         });
     </script>

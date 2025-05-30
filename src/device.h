@@ -16,13 +16,23 @@ enum DeviceError
     ERR_SLEEP,
 };
 
-extern WiFiManager wifiManager;
+struct NetworkInfo
+{
+    String ssid;
+    int32_t rssi;
+    wifi_auth_mode_t encryptionType;
+    uint8_t channel;
+    uint8_t quality; // 0-100
+};
 
 void wifi_setup(void);
 void wifi_clear_credentials(void);
 bool wifi_check(void);
+std::vector<NetworkInfo> wifi_nearby_networks(void);
+uint8_t wifi_rssi_quality(int rssi);
 
 DeviceError enter_light_sleep(uint64_t seconds);
 
-void display_wifi_setup_prompt(void);
+// displays a wifi symbol on the panel to indicate the device is in AP mode.
+void display_wifi_symbol(void);
 void display_device_error(DeviceError err);
