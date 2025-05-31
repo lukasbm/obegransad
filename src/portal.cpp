@@ -1,7 +1,6 @@
 #include "portal.h"
-#include "device.h"  // FIXME: including this causes the dependency error!!!
+#include "device.h"
 #include "config.h"
-
 
 // portal
 
@@ -11,14 +10,43 @@ Portal::Portal() : server(), dns()
 
 void Portal::start()
 {
+    // switch mode
+    WiFi.mode(WIFI_AP); // switch to AP mode
+
+    if (!WiFi.softAPsetHostname(PORTAL_NAME))
+    {
+        Serial.println("[PORTAL] Failed to set hostname for soft AP");
+        WiFi.mode(WIFI_STA); // switch back to STA mode
+        return;
+    }
+
+    // start the soft AP
+    if (!WiFi.softAP(PORTAL_NAME, nullptr, 0, false, 2, false))
+    {
+        Serial.println("[PORTAL] Failed to start soft AP");
+        WiFi.mode(WIFI_STA); // switch back to STA mode
+        return;
+    }
+    Serial.println("[PORTAL] Soft AP started");
+
+    // set the IP address of the soft AP
+    if (!WiFi.softAPConfig(PORTAL_IP, PORTAL_IP, IPAddress(255, 255, 255, 0)))
+    {
+        Serial.println("[PORTAL] Failed to set soft AP config");
+        WiFi.softAPdisconnect(true); // disconnect the soft AP
+        WiFi.mode(WIFI_STA);         // switch back to STA mode
+        return;
+    }
+
+    Serial.println("[PORTAL] Soft AP config set");
+
     // start DNS server
     if (!dns.start(53, "*", WiFi.softAPIP()))
     {
         Serial.println("[PORTAL] Failed to start DNS server");
-        LittleFS.end();
         return;
     }
-
+    
     // start the HTTP server
     server.start();
 

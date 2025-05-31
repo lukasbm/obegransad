@@ -8,6 +8,7 @@
 #include <Preferences.h>
 
 static const char *PORTAL_NAME = "Obegransad-Setup"; // captive portal name (SSID)
+static const IPAddress PORTAL_IP(192, 168, 4, 1); // captive portal IP address
 
 class SettingsServer
 {
@@ -33,3 +34,8 @@ private:
     void stop(void);
     void tick(void);
 };
+
+
+// TODO: draw a state machine about of wifi and so on
+
+//https://github.com/copilot/c/39104fee-961b-44c4-adfb-4286e53e51cb
