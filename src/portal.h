@@ -1,10 +1,13 @@
 #pragma once
 
 #include <Arduino.h>
+#include <LittleFS.h>
+#include <ESPAsyncWebServer.h>
+#include <DNSServer.h>
+#include <ArduinoJson.h>
+#include <Preferences.h>
 
-
-void portal_start(void);
-void portal_stop(void);
+static const char *PORTAL_NAME = "Obegransad-Setup"; // captive portal name (SSID)
 
 class SettingsServer
 {

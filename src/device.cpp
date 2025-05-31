@@ -2,10 +2,6 @@
 #include "led.h"
 #include "sprites/wifi.hpp"
 
-WiFiManager wifiManager;
-
-static const char *PORTAL_NAME = "Obegransad-Setup"; // captive portal name (SSID)
-
 // handles the cases when connection is lost in AP/STA mode
 // the driver fires the event typically every 3-10 seconds when disconnected
 static void callback_sta_disconnected(WiFiEvent_t event, WiFiEventInfo_t info)
@@ -25,7 +21,7 @@ static void callback_sta_disconnected(WiFiEvent_t event, WiFiEventInfo_t info)
         Serial.println("Failed to reconnect, starting captive portal again…");
         failCount = 0;
         display_wifi_symbol();                      // show the wifi logo
-        wifiManager.startConfigPortal(PORTAL_NAME); // blocking until user fixes wifi.
+        // wifiManager.startConfigPortal(PORTAL_NAME); // blocking until user fixes wifi.
     }
 }
 
@@ -72,68 +68,42 @@ bool wifi_check(void)
     }
 }
 
-void wifi_clear_credentials(void)
-{
-    // clear stored credentials
-    wifiManager.resetSettings();
-}
-
-// add some endpoints to trick android and IOS into showing the captive portal
-// this is needed to make the captive portal appear on the device
-static void add_captive_portal_spoof(WebServer *s)
-{
-    s->on(
-        "/generate_204",
-        HTTP_ANY,
-        [s]()
-        {
-      s->sendHeader("Location", "/");
-      s->send(302, "text/plain", ""); });
-
-    s->on(
-        "/hotspot-detect.html",
-        HTTP_ANY,
-        [s]()
-        {
-            s->send(200, "text/html", "<!doctype html>");
-        });
-}
 
 void wifi_setup(void)
 {
-    // configure arduino WiFi abstraction lib
-    WiFi.mode(WIFI_AP_STA);                                                       // set mode to AP+STA
-    WiFi.setHostname("Obegransad");                                               // set hostname
-    WiFi.onEvent(callback_sta_disconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED); // register callback
-    WiFi.setAutoReconnect(true);                                                  // one automatic retry after disconnect
+//     // configure arduino WiFi abstraction lib
+//     WiFi.mode(WIFI_AP_STA);                                                       // set mode to AP+STA
+//     WiFi.setHostname("Obegransad");                                               // set hostname
+//     WiFi.onEvent(callback_sta_disconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED); // register callback
+//     WiFi.setAutoReconnect(true);                                                  // one automatic retry after disconnect
 
-    // configure the Wi-Fi manager (uses WiFi interally)
-    wifiManager.setConfigPortalBlocking(true); // blocking mode
-    wifiManager.setConfigPortalTimeout(6);     // FIXME: 1 min
-#if DEBUG
-    wifiManager.setDebugOutput(true);
-#endif
+//     // configure the Wi-Fi manager (uses WiFi internally)
+//     wifiManager.setConfigPortalBlocking(true); // blocking mode
+//     wifiManager.setConfigPortalTimeout(6);     // FIXME: 1 min
+// #if DEBUG
+//     wifiManager.setDebugOutput(true);
+// #endif
 
-    // hack to make the captive portal actually appear on device
-    if (WebServer *s = wifiManager.server.get())
-    {
-        add_captive_portal_spoof(s);
-    }
+//     // hack to make the captive portal actually appear on device
+//     if (WebServer *s = wifiManager.server.get())
+//     {
+//         add_captive_portal_spoof(s);
+//     }
 
-    Serial.println("opening captive portal...");
-    if (!wifiManager.autoConnect(PORTAL_NAME))
-    {
-        Serial.println("Portal timed out or aborted!");
-    }
+//     Serial.println("opening captive portal...");
+//     if (!wifiManager.autoConnect(PORTAL_NAME))
+//     {
+//         Serial.println("Portal timed out or aborted!");
+//     }
 
-    // clean up after success
-    Serial.println("Connected to WiFi!");
-    Serial.print("IP Address: ");
-    Serial.println(WiFi.localIP());
-    // migrate from AP to STA mode
-    delay(3000);                 // give phone time to finish
-    WiFi.softAPdisconnect(true); // drop the hotspot
-    WiFi.mode(WIFI_STA);         // switch to STA mod
+//     // clean up after success
+//     Serial.println("Connected to WiFi!");
+//     Serial.print("IP Address: ");
+//     Serial.println(WiFi.localIP());
+//     // migrate from AP to STA mode
+//     delay(3000);                 // give phone time to finish
+//     WiFi.softAPdisconnect(true); // drop the hotspot
+//     WiFi.mode(WIFI_STA);         // switch to STA mod
 }
 
 DeviceError enter_light_sleep(uint64_t seconds)
@@ -214,7 +184,7 @@ std::vector<NetworkInfo> wifi_nearby_networks(void)
     if (WiFi.scanNetworks(true, true) < 0)
     {
         Serial.println("Failed to start Wi-Fi scan");
-        return;
+        return std::vector<NetworkInfo>(); // return empty vector on failure
     }
 
     // wait for scan to complete

@@ -84,6 +84,7 @@ void write_to_persistent_storage(Settings &settings)
 
 bool OffTime::isInside(const struct tm &time) const
 {
+
     if ((days & (1 << time.tm_wday)) == 0)
         return false; // day is not in the range
 

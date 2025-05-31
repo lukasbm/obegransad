@@ -46,9 +46,6 @@ struct Settings
     uint8_t anniversary_month;
 
     Settings();
-
-    void save() { write_to_persistent_storage(*this); }
-    void load() { read_from_persistent_storage(this); }
 };
 
 void write_to_persistent_storage(Settings &settings);

@@ -29,6 +29,7 @@ bool isNight(struct tm &time)
 inline bool shouldTurnOffSingle(struct tm &time, const OffTime &offtime)
 {
     // TODO: check if the time is within the off time range
+    return true;
 }
 
 bool shouldTurnOff(struct tm &time)

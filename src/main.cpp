@@ -135,7 +135,7 @@ void loop()
     button.tick();
 
     // tick the wifi manager (as it is non-blocking)
-    wifiManager.process();
+    // wifiManager.process();
 
     // Update the current scene
     sceneSwitcher.tick();

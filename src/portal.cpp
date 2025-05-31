@@ -1,14 +1,7 @@
 #include "portal.h"
-#include "device.h"
+#include "device.h"  // FIXME: including this causes the dependency error!!!
 #include "config.h"
 
-#include <LittleFS.h>
-#include <ESPAsyncWebServer.h>
-#include <ArduinoJson.h>
-#include <cstdint>
-#include <Preferences.h>
-#include <DNSServer.h>
-#include <WiFi.h>
 
 // portal
 
@@ -56,61 +49,18 @@ void Portal::tick()
 
 /// Server
 
-void SettingsServer::start()
-{
-    // initialize LittleFS
-    if (!LittleFS.begin())
-    {
-        Serial.println("[PORTAL] Failed to mount LittleFS");
-        return;
-    }
-
-    // handle root page
-    server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
-              { request->send(LittleFS, "/index.html", "text/html"); });
-
-    // handle static files
-    server.serveStatic("/", LittleFS, "/")
-        .setDefaultFile("index.html");
-
-    // captive portal URLs
-    server.on("/generate_204", HTTP_ANY, [](AsyncWebServerRequest *request) { // Android
-        request->redirect("/");
-    });
-    server.on("/hotspot-detect.html", HTTP_ANY, [](AsyncWebServerRequest *request) { // iOS
-        request->send(200, "text/html", "<!doctype html>");
-    });
-
-    // handle API requests
-    server.on("/api/settings", HTTP_GET, handle_get_settings);
-    server.on("/api/networks", HTTP_GET, handle_get_networks);
-    server.on("/api/settings", HTTP_DELETE, handle_delete_settings);
-    server.on("/api/settings", HTTP_POST, [](AsyncWebServerRequest *req) {}, nullptr, handle_post_settings);
-
-    // start the server
-    server.begin();
-
-    Serial.println("[PORTAL] Server started");
-}
-
-void SettingsServer::stop()
-{
-    server.end(); // stop the HTTP server
-    LittleFS.end();
-}
-
 // handler functions
 
 static void handle_get_networks(AsyncWebServerRequest *request)
 {
     String out;
-    StaticJsonDocument<256> doc;
+    JsonDocument doc;
     JsonArray networksArray = doc.to<JsonArray>();
     // get wifi networks from last scan
     std::vector<NetworkInfo> networks = wifi_nearby_networks();
     for (const auto &network : networks)
     {
-        JsonObject net = networksArray.createNestedObject();
+        JsonObject net = networksArray.add<JsonObject>();
         net["ssid"] = network.ssid;
         net["rssi"] = network.rssi;
         net["encryptionType"] = network.encryptionType;
@@ -246,8 +196,51 @@ void handle_post_settings(AsyncWebServerRequest *req,
     settings.offtime3.saturday = doc["offtime3_saturday"] | settings.offtime3.saturday;
 
     // save settings to persistent storage
-    settings.save();
+    write_to_persistent_storage(settings);
 
     // respond
     req->send(200, "application/json", R"({"ok":true})");
+}
+
+void SettingsServer::start()
+{
+    // initialize LittleFS
+    if (!LittleFS.begin())
+    {
+        Serial.println("[PORTAL] Failed to mount LittleFS");
+        return;
+    }
+
+    // handle root page
+    server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
+              { request->send(LittleFS, "/index.html", "text/html"); });
+
+    // handle static files
+    server.serveStatic("/", LittleFS, "/")
+        .setDefaultFile("index.html");
+
+    // captive portal URLs
+    server.on("/generate_204", HTTP_ANY, [](AsyncWebServerRequest *request) { // Android
+        request->redirect("/");
+    });
+    server.on("/hotspot-detect.html", HTTP_ANY, [](AsyncWebServerRequest *request) { // iOS
+        request->send(200, "text/html", "<!doctype html>");
+    });
+
+    // handle API requests
+    // server.on("/api/settings", HTTP_GET, handle_get_settings);
+    // server.on("/api/networks", HTTP_GET, handle_get_networks);
+    // server.on("/api/settings", HTTP_DELETE, handle_delete_settings);
+    // server.on("/api/settings", HTTP_POST, [](AsyncWebServerRequest *req) {}, nullptr, handle_post_settings);
+
+    // start the server
+    server.begin();
+
+    Serial.println("[PORTAL] Server started");
+}
+
+void SettingsServer::stop()
+{
+    server.end(); // stop the HTTP server
+    LittleFS.end();
 }

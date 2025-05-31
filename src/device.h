@@ -1,11 +1,11 @@
 #pragma once
 
+#include <Arduino.h>
 #include <WiFi.h>
 #include <esp_sleep.h>
 #include <string.h>
-#include <Arduino.h>
-#include <WiFiManager.h>
-#include <stdint.h>
+#include <vector>
+#include <esp_wifi.h>
 
 #define BUTTON_PIN 20 // D7 (GPIO 20)
 
