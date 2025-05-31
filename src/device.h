@@ -26,7 +26,6 @@ struct NetworkInfo
 };
 
 void wifi_setup(void);
-void wifi_clear_credentials(void);
 bool wifi_check(void);
 std::vector<NetworkInfo> wifi_nearby_networks(void);
 uint8_t wifi_rssi_quality(int rssi);

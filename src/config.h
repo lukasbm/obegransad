@@ -44,11 +44,9 @@ struct Settings
     String timezone;
     uint8_t anniversary_day;
     uint8_t anniversary_month;
-
-    Settings();
 };
 
 void write_to_persistent_storage(Settings &settings);
 void read_from_persistent_storage(const Settings *settings);
 
-Settings settings = Settings(); // global settings structure
+extern Settings settings; // global settings structure

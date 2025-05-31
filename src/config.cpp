@@ -1,6 +1,8 @@
 #include "config.h"
 #include <Preferences.h>
 
+Settings settings = Settings();
+
 // implicitly sets default values.
 void read_from_persistent_storage(Settings &settings)
 {

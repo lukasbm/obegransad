@@ -8,9 +8,9 @@ void time_setup();
 
 void time_syncNTP();
 
-bool isNight(struct tm time);
+bool isNight(struct tm const &time);
 
-bool shouldTurnOff(struct tm time);
+bool shouldTurnOff(struct tm const &time);
 
 // gets local time and updates if needed
 struct tm time_fetch();
@@ -27,4 +27,4 @@ enum MoonPhase : uint8_t
     WANING_CRESCENT,
 };
 
-MoonPhase calculateMoonPhase(struct tm time);
+MoonPhase calculateMoonPhase(struct tm const &time);

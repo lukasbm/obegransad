@@ -17,7 +17,7 @@ void time_syncNTP()
     }
 }
 
-bool isNight(struct tm &time)
+bool isNight(struct tm const &time)
 {
     if (time.tm_hour >= 22 || time.tm_hour < 6)
     {

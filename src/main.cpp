@@ -202,9 +202,9 @@ void buttonLongPressStop()
     Serial.println("Button - Long press stop");
     int duration = millis() - buttonLongPressTimer;
     Serial.printf("Button long press duration: %d ms\n", duration);
-    if (duration > 10000)
+    if (duration > 5000)
     {
-        Serial.println("Button long press -> reset WiFi credentials");
-        wifi_clear_credentials();
+        Serial.println("Button long press -> open captive portal");
+        // TODO: open captive portal
     }
 }
