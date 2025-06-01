@@ -14,6 +14,12 @@ struct SingleSprite
 
     constexpr SingleSprite(const uint8_t *d, const uint8_t w, const uint8_t h, const size_t spriteBytes)
         : data(d), width(w), height(h), bytes(spriteBytes) {}
+
+    void draw(const uint8_t tlX, const uint8_t tlY) const
+    {
+        // draw the sprite at the top-left corner (tlX, tlY)
+        panel_drawSprite(tlX, tlY, data, width, height);
+    }
 };
 
 // for many static sprites
@@ -36,6 +42,15 @@ struct TextureAtlas
         }
         return &data[index * spriteBytes];
     }
+
+    void drawByIndex(const unsigned short index, const uint8_t tlX, const uint8_t tlY) const
+    {
+        const uint8_t *spriteData = getByIndex(index);
+        if (spriteData)
+        {
+            panel_drawSprite(tlX, tlY, spriteData, spriteWidth, spriteHeight);
+        }
+    }
 };
 
 // for fonts (ASCII subset)
@@ -55,6 +70,15 @@ struct FontSheet : TextureAtlas
         unsigned short index = c - asciiStart;
         return getByIndex(index);
     }
+
+    void drawGlyph(const char c, const uint8_t tlX, const uint8_t tlY) const
+    {
+        const uint8_t *glyphData = getGlyph(c);
+        if (glyphData)
+        {
+            panel_drawSprite(tlX, tlY, glyphData, spriteWidth, spriteHeight);
+        }
+    }
 };
 
 // for animations
@@ -72,5 +96,14 @@ struct AnimationSheet : TextureAtlas
             currFrame = 0;
         }
         return getByIndex(currFrame++);
+    }
+
+    void drawNextFrame(const uint8_t tlX, const uint8_t tlY) const
+    {
+        const uint8_t *frameData = nextFrame();
+        if (frameData)
+        {
+            panel_drawSprite(tlX, tlY, frameData, spriteWidth, spriteHeight);
+        }
     }
 };

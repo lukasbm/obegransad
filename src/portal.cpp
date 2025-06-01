@@ -2,12 +2,15 @@
 #include "device.h"
 #include "config.h"
 
-// portal
+/*
+* PORTAL
+*/
 
 Portal::Portal() : server(), dns()
 {
 }
 
+// TODO: fix error handling. Should return everything into same state again on failure!
 void Portal::start()
 {
     // switch mode
@@ -75,7 +78,9 @@ void Portal::tick()
     // No need to call server.handleClient() for AsyncWebServer
 }
 
-/// Server
+/*
+* SETTINGS SERVER
+*/
 
 // handler functions
 

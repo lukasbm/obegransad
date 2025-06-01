@@ -25,9 +25,8 @@ struct NetworkInfo
     uint8_t quality; // 0-100
 };
 
-void wifi_setup(void);
 bool wifi_check(void);
-std::vector<NetworkInfo> wifi_nearby_networks(void);
+std::vector<NetworkInfo> wifi_nearby_networks(void); // TODO: need a caching mechanism to avoid scanning every time
 uint8_t wifi_rssi_quality(int rssi);
 
 void wifi_connect(const String &ssid, const String &password);
