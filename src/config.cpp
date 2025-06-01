@@ -8,6 +8,8 @@ void read_from_persistent_storage(Settings &settings)
 {
     Preferences p;
     p.begin("app", true); // read-only mode
+    // setup
+    settings.initial_setup_done = p.getBool("initial_setup_done", false); // default is false, so captive portal will open on first boot
     // wifi
     settings.ssid = p.getString("wifi_ssid", "");
     settings.password = p.getString("wifi_password", "");

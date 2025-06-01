@@ -8,8 +8,8 @@ IKEA obegränsad hack
 - [ ] Would be nice if i didn't have to wait on the weatherData. This would mean caching and refreshing it outside the scene, e.g. the Weather module or a new Data Access module that also takes care of other things. Alternatively the "conduct_checks" loop could update the weather data
 - [ ] Redesign the weather scene. Instead it should show the max temperature in bold (on the top), the min temperature (bottom left) and maybe an icon in the bottom right.
     Alternatively have two weather scenes. One with the numbers and one with the icons.
-- [ ] Add more animations/screensaver style scenes.
-- [ ] Refactor scenes into one file each!
+- [x] Add more animations/screensaver style scenes.
+- [x] Refactor scenes into one file each!
 - [ ] How to handle WiFi outages? Maybe need a general error screen that replaces weather and other wifi dependent stuff
 - [ ] also need to introduce error code in case some setup stuff goes wrong
 - [ ] make it also usable without WiFi. e.g. by pressing the button while in AP mode!

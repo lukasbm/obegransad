@@ -8,6 +8,7 @@
 #include "led.h"
 #include "sprites/wifi.hpp"
 #include "clock.h"
+#include "portal.h"
 #include "scenes/scene_anniversary.hpp"
 #include "scenes/scene_brightness.hpp"
 #include "scenes/scene_clock_second_ring.hpp"
@@ -21,9 +22,12 @@
 #include "scenes/switcher.hpp"
 #include "scenes/scene_concentric_circles.hpp"
 
+// captive portal
+Portal captivePortal;
+
 // button definitions
 OneButton button;
-void buttonSetup();
+void button_setup();
 void buttonSingleClick();
 void buttonLongPressStart();
 void buttonLongPressStop();
@@ -56,6 +60,7 @@ static void conduct_checks();
 void IRAM_ATTR panel_isr(void)
 {
     panel_show();
+    button.tick(); // update the button state
 }
 void start_panel_timer()
 {
@@ -74,21 +79,22 @@ void setup()
     Serial.begin(115200);
     Serial.println("Starting setup...");
 
-    buttonSetup();
-
+    button_setup();
     panel_init();
-
-    display_wifi_symbol();
-    wifi_setup();
-
-    // accept new configs
-    // setup_config_server();
-
     start_panel_timer();
 
-    Serial.println("Setup done!");
-
-    conduct_checks();
+    if (!settings.initial_setup_done)
+    {
+        Serial.println("Initial setup not done, starting captive portal...");
+        captivePortal.start();
+    }
+    else
+    {
+        Serial.println("Initial setup done, starting normally.");
+        wifi_connect(settings.ssid, settings.password); // connect to Wi-Fi
+        time_syncNTP();                                 // sync time with NTP server
+        conduct_checks();                               // perform initial checks
+    }
 
     // Start with the first scene
     sceneSwitcher.nextScene();
@@ -132,10 +138,7 @@ void loop()
     }
 
     // Update the button
-    button.tick();
-
-    // tick the wifi manager (as it is non-blocking)
-    // wifiManager.process();
+    // Is updated together with the panel ISR
 
     // Update the current scene
     sceneSwitcher.tick();
@@ -172,7 +175,7 @@ static void conduct_checks()
 
 ///// button stuff
 
-void buttonSetup()
+void button_setup()
 {
     pinMode(BUTTON_PIN, INPUT_PULLUP); // set the button pin as input with pull-up resistor
     button.setup(

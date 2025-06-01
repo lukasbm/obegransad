@@ -32,6 +32,7 @@ struct OffTime
 // trying to use the names consistent between this struct, json and preferences (NVS)
 struct Settings
 {
+    bool initial_setup_done; // true if the initial setup has been done, false otherwise. If false, then the captive portal open on every boot.
     String ssid;
     String password;
     uint8_t brightness_day;

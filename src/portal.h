@@ -8,7 +8,7 @@
 #include <Preferences.h>
 
 static const char *PORTAL_NAME = "Obegransad-Setup"; // captive portal name (SSID)
-static const IPAddress PORTAL_IP(192, 168, 4, 1); // captive portal IP address
+static const IPAddress PORTAL_IP(192, 168, 4, 1);    // captive portal IP address
 
 class SettingsServer
 {
@@ -26,16 +26,14 @@ class Portal
 public:
     Portal();
 
-private:
-    SettingsServer server; // HTTP server for captive portal
-    DNSServer dns;         // DNS server for captive portal
-
     void start(void);
     void stop(void);
     void tick(void);
+
+private:
+    SettingsServer server; // HTTP server for captive portal
+    DNSServer dns;         // DNS server for captive portal
 };
 
-
 // TODO: draw a state machine about of wifi and so on
-
-//https://github.com/copilot/c/39104fee-961b-44c4-adfb-4286e53e51cb
+// https://github.com/copilot/c/39104fee-961b-44c4-adfb-4286e53e51cb
