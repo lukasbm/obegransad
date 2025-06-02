@@ -276,6 +276,8 @@ DeviceError SettingsServer::start()
     server.begin();
 
     Serial.println("[PORTAL] Server started");
+
+    return ERR_NONE;
 }
 
 void SettingsServer::stop()

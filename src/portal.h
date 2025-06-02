@@ -6,6 +6,7 @@
 #include <DNSServer.h>
 #include <ArduinoJson.h>
 #include <Preferences.h>
+#include "device.h"
 
 static const char *PORTAL_NAME = "Obegransad-Setup"; // captive portal name (SSID)
 static const IPAddress PORTAL_IP(192, 168, 4, 1);    // captive portal IP address
