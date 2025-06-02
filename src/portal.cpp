@@ -13,10 +13,9 @@ Portal::Portal() : server(), dns()
 // TODO: fix error handling. Should return everything into same state again on failure!
 void Portal::start()
 {
-    // switch mode
+    WiFi.disconnect(true, true);
     WiFi.mode(WIFI_AP); // switch to AP mode
-
-    WiFi.setAutoReconnect(false);
+    // WiFi.setAutoReconnect(false);
 
     // Problem: if the captive portal is non-blocking, how can we ensure that nothing else is changing the wifi mode and connection status?
     // the server uses ISRs, so the regular main loop might change the Wi-Fi mode or connection status.
@@ -68,7 +67,7 @@ void Portal::stop()
 
     dns.stop();
 
-    WiFi.softAPdisconnect(true);
+    WiFi.softAPdisconnect(true); // turn beacon off
 
     WiFi.mode(WIFI_STA);
 

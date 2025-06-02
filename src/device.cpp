@@ -72,36 +72,36 @@ DeviceError enter_light_sleep(uint64_t seconds)
     Serial.flush();
 
     // stop wifi
-    if (!esp_wifi_stop())
+    if (esp_wifi_stop() != ESP_OK)
     {
         Serial.println("Failed to stop WiFi");
         return ERR_WIFI;
     }
 
     // set up wake timer
-    if (!esp_sleep_enable_timer_wakeup(seconds * 1000000ULL))
+    if (esp_sleep_enable_timer_wakeup(seconds * 1000000ULL) != ESP_OK)
     {
         Serial.println("Failed to set timer wakeup");
         return ERR_SLEEP;
     }
 
     // set up wake up sources (button)
-    if (!gpio_wakeup_enable(static_cast<gpio_num_t>(BUTTON_PIN), GPIO_INTR_LOW_LEVEL))
+    if (gpio_wakeup_enable(static_cast<gpio_num_t>(BUTTON_PIN), GPIO_INTR_LOW_LEVEL) != ESP_OK)
     {
         Serial.printf("Failed to set GPIO wakeup for pin %d\n", BUTTON_PIN);
         return ERR_SLEEP;
     }
 
     // enable GPIO wakeup
-    if (!esp_sleep_enable_gpio_wakeup())
+    if (esp_sleep_enable_gpio_wakeup() != ESP_OK)
     {
         Serial.println("Failed to enable GPIO wakeup");
         return ERR_SLEEP;
     }
 
-    // enter sleep returns ESP_OK on wakeup)
-    esp_err_t res = esp_light_sleep_start(); // returns ESP_OK on wakeup
-    if (!res)
+    // enter sleep (returns ESP_OK on wakeup)
+    esp_err_t res = esp_light_sleep_start();
+    if (res != ESP_OK)
     {
         Serial.print("Failed to enter light sleep: ");
         Serial.println(esp_err_to_name(res));
@@ -115,7 +115,7 @@ DeviceError enter_light_sleep(uint64_t seconds)
     Serial.printf("Wakeup cause: %d\n", reason);
 
     // bring back wifi
-    if (!esp_wifi_start())
+    if (esp_wifi_start() != ESP_OK)
     {
         Serial.println("Failed to start WiFi after sleep");
         return ERR_WIFI;
@@ -192,29 +192,20 @@ uint8_t wifi_rssi_quality(int rssi)
     return quality;
 }
 
-void wifi_connect(const String &ssid, const String &password)
+bool wifi_connect(const String &ssid, const String &password, unsigned int timeout_ms = 8000)
 {
-    Serial.printf("Connecting to Wi-Fi SSID: %s\n", ssid.c_str());
-
     WiFi.mode(WIFI_STA); // ensure we are in STA mode
     WiFi.begin(ssid.c_str(), password.c_str());
 
     unsigned long startTime = millis();
-    while (WiFi.status() != WL_CONNECTED)
-    {
-        if (millis() - startTime > 10000) // timeout after 10 seconds
-        {
-            Serial.println("Failed to connect to Wi-Fi");
-            return;
-        }
+    while (WiFi.status() != WL_CONNECTED && millis() - startTime < timeout_ms)
         delay(500);
-        Serial.print(".");
-    }
-
     Serial.println("\nConnected to Wi-Fi!");
     Serial.print("IP Address: ");
     Serial.println(WiFi.localIP());
+    return WiFi.status() == WL_CONNECTED; // return true if connected
 }
+
 void wifi_disconnect()
 {
     Serial.println("Disconnecting from Wi-Fi...");
