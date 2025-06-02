@@ -14,6 +14,10 @@ enum DeviceError
     ERR_NONE = 0,
     ERR_WIFI,
     ERR_SLEEP,
+    ERR_LITTLE_FS,
+    ERR_PREFERENCES,
+    ERR_JSON,
+    ERR_UNKNOWN, // catch-all for unknown errors
 };
 
 struct NetworkInfo

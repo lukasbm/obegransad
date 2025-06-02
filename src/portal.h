@@ -17,7 +17,7 @@ private:
 
 public:
     SettingsServer() : server(80) {}
-    void start(void);
+    DeviceError start(void);
     void stop(void);
 };
 
@@ -29,8 +29,10 @@ public:
     void start(void);
     void stop(void);
     void tick(void);
+    bool isOpen(void) const;
 
 private:
+    bool open = false;     // true if the portal is open, false otherwise
     SettingsServer server; // HTTP server for captive portal
     DNSServer dns;         // DNS server for captive portal
 };

@@ -3,11 +3,13 @@
 
 Settings settings = Settings();
 
+static const char *PREF_NAME = "app"; // preferences namespace
+
 // implicitly sets default values.
 void read_from_persistent_storage(Settings &settings)
 {
     Preferences p;
-    p.begin("app", true); // read-only mode
+    p.begin(PREF_NAME, true); // read-only mode
     // setup
     settings.initial_setup_done = p.getBool("initial_setup_done", false); // default is false, so captive portal will open on first boot
     // wifi
@@ -49,7 +51,7 @@ void read_from_persistent_storage(Settings &settings)
 void write_to_persistent_storage(Settings &settings)
 {
     Preferences p;
-    p.begin("app", false); // read-write mode
+    p.begin(PREF_NAME, false); // read-write mode
     // wifi
     p.putString("wifi_ssid", settings.ssid);
     p.putString("wifi_password", settings.password);
@@ -83,6 +85,14 @@ void write_to_persistent_storage(Settings &settings)
     p.putUChar("anniversary_day", settings.anniversary_day);
     p.putUChar("anniversary_month", settings.anniversary_month);
 
+    p.end();
+}
+
+void clear_persistent_storage(void)
+{
+    Preferences p;
+    p.begin(PREF_NAME, false); // read-write mode
+    p.clear();                 // clear all keys
     p.end();
 }
 

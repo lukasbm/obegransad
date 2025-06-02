@@ -46,6 +46,23 @@ While the captive portal is open, nothing else should be displayed on screen!
 
 ## Hardware
 
+### Firmware Update
+
+```bash
+# first compile the assets
+cd src/portal
+./compress.sh
+cd ../.. 
+# flash assets
+pio run -t uploadfs
+# build and flash firmware
+pio run -t build
+pio run -t upload
+# monitor
+pio run -t monitor
+```
+
+
 ### RTC Clock
 
 The ESP32 has an RTC:

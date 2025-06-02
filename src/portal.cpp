@@ -3,8 +3,8 @@
 #include "config.h"
 
 /*
-* PORTAL
-*/
+ * PORTAL
+ */
 
 Portal::Portal() : server(), dns()
 {
@@ -15,6 +15,18 @@ void Portal::start()
 {
     // switch mode
     WiFi.mode(WIFI_AP); // switch to AP mode
+
+    WiFi.setAutoReconnect(false);
+
+    // Problem: if the captive portal is non-blocking, how can we ensure that nothing else is changing the wifi mode and connection status?
+    // the server uses ISRs, so the regular main loop might change the Wi-Fi mode or connection status.
+
+    // start DNS server
+    if (!dns.start(53, "*", WiFi.softAPIP()))
+    {
+        Serial.println("[PORTAL] Failed to start DNS server");
+        return;
+    }
 
     if (!WiFi.softAPsetHostname(PORTAL_NAME))
     {
@@ -43,16 +55,9 @@ void Portal::start()
 
     Serial.println("[PORTAL] Soft AP config set");
 
-    // start DNS server
-    if (!dns.start(53, "*", WiFi.softAPIP()))
-    {
-        Serial.println("[PORTAL] Failed to start DNS server");
-        return;
-    }
-    
     // start the HTTP server
     server.start();
-
+    open = true;
     Serial.println("[PORTAL] Server started");
 }
 
@@ -64,7 +69,11 @@ void Portal::stop()
     dns.stop();
 
     WiFi.softAPdisconnect(true);
+
     WiFi.mode(WIFI_STA);
+
+    WiFi.setAutoReconnect(true);
+
     wifi_connect(settings.ssid, settings.password); // reconnect to the configured Wi-Fi
 
     Serial.println("[PORTAL] Server stopped");
@@ -78,11 +87,14 @@ void Portal::tick()
     // No need to call server.handleClient() for AsyncWebServer
 }
 
-/*
-* SETTINGS SERVER
-*/
+bool Portal::isOpen() const
+{
+    return open;
+}
 
-// handler functions
+/*
+ * SETTINGS SERVER
+ */
 
 static void handle_get_networks(AsyncWebServerRequest *request)
 {
@@ -105,37 +117,34 @@ static void handle_get_networks(AsyncWebServerRequest *request)
     request->send(200, "application/json", out);
 }
 
-static void offtime_helper(JsonDocument &obj, const OffTime &offtime, const String &prefix)
-{
-    obj[prefix + "from_hour"] = offtime.from_hour;
-    obj[prefix + "from_minute"] = offtime.from_minute;
-    obj[prefix + "to_hour"] = offtime.to_hour;
-    obj[prefix + "to_minute"] = offtime.to_minute;
-    // spread bitmask
-    obj[prefix + "sunday"] = bool(offtime.sunday);
-    obj[prefix + "monday"] = bool(offtime.monday);
-    obj[prefix + "tuesday"] = bool(offtime.tuesday);
-    obj[prefix + "wednesday"] = bool(offtime.wednesday);
-    obj[prefix + "thursday"] = bool(offtime.thursday);
-    obj[prefix + "friday"] = bool(offtime.friday);
-    obj[prefix + "saturday"] = bool(offtime.saturday);
-}
-
 static void handle_get_settings(AsyncWebServerRequest *request)
 {
     String out;
     JsonDocument doc;
     // same names as in Settings struct and preferences (NVS)
 
+    auto offtime_helper = [](JsonDocument &obj, const OffTime &offtime, const String &prefix)
+    {
+        obj[prefix + "from_hour"] = offtime.from_hour;
+        obj[prefix + "from_minute"] = offtime.from_minute;
+        obj[prefix + "to_hour"] = offtime.to_hour;
+        obj[prefix + "to_minute"] = offtime.to_minute;
+        // spread bitmask
+        obj[prefix + "sunday"] = bool(offtime.sunday);
+        obj[prefix + "monday"] = bool(offtime.monday);
+        obj[prefix + "tuesday"] = bool(offtime.tuesday);
+        obj[prefix + "wednesday"] = bool(offtime.wednesday);
+        obj[prefix + "thursday"] = bool(offtime.thursday);
+        obj[prefix + "friday"] = bool(offtime.friday);
+        obj[prefix + "saturday"] = bool(offtime.saturday);
+    };
+
     doc["wifi_ssid"] = settings.ssid;
     doc["wifi_password"] = settings.password;
     doc["brightness_day"] = settings.brightness_day;
     doc["brightness_night"] = settings.brightness_night;
-    // off times 1
     offtime_helper(doc, settings.offtime1, "offtime1_");
-    // off times 2
     offtime_helper(doc, settings.offtime2, "offtime2_");
-    // off times 3
     offtime_helper(doc, settings.offtime3, "offtime3_");
     doc["weather_latitude"] = settings.weather_latitude;
     doc["weather_longitude"] = settings.weather_longitude;
@@ -150,10 +159,7 @@ static void handle_get_settings(AsyncWebServerRequest *request)
 static void handle_delete_settings(AsyncWebServerRequest *request)
 {
     // delete all settings
-    Preferences p;
-    p.begin("app", false); // RW
-    p.clear();
-    p.end();
+    clear_persistent_storage();
     request->send(200, "application/json", R"({"ok":true})");
     // restart the device to apply changes
     ESP.restart();
@@ -235,13 +241,13 @@ void handle_post_settings(AsyncWebServerRequest *req,
     req->send(200, "application/json", R"({"ok":true})");
 }
 
-void SettingsServer::start()
+DeviceError SettingsServer::start()
 {
     // initialize LittleFS
     if (!LittleFS.begin())
     {
         Serial.println("[PORTAL] Failed to mount LittleFS");
-        return;
+        return ERR_LITTLE_FS;
     }
 
     // handle root page
@@ -261,10 +267,10 @@ void SettingsServer::start()
     });
 
     // handle API requests
-    // server.on("/api/settings", HTTP_GET, handle_get_settings);
-    // server.on("/api/networks", HTTP_GET, handle_get_networks);
-    // server.on("/api/settings", HTTP_DELETE, handle_delete_settings);
-    // server.on("/api/settings", HTTP_POST, [](AsyncWebServerRequest *req) {}, nullptr, handle_post_settings);
+    server.on("/api/settings", HTTP_GET, handle_get_settings);
+    server.on("/api/networks", HTTP_GET, handle_get_networks);
+    server.on("/api/settings", HTTP_DELETE, handle_delete_settings);
+    server.on("/api/settings", HTTP_POST, [](AsyncWebServerRequest *req) {}, nullptr, handle_post_settings);
 
     // start the server
     server.begin();
@@ -274,6 +280,6 @@ void SettingsServer::start()
 
 void SettingsServer::stop()
 {
-    server.end(); // stop the HTTP server
+    server.end();
     LittleFS.end();
 }

@@ -20,7 +20,7 @@ static void callback_sta_disconnected(WiFiEvent_t event, WiFiEventInfo_t info)
     {
         Serial.println("Failed to reconnect, starting captive portal again…");
         failCount = 0;
-        display_wifi_symbol();                      // show the wifi logo
+        display_wifi_symbol(); // show the wifi logo
         // wifiManager.startConfigPortal(PORTAL_NAME); // blocking until user fixes wifi.
     }
 }
@@ -44,100 +44,56 @@ void display_device_error(DeviceError err)
 
 bool wifi_check(void)
 {
-    // return WiFi.status == WL_CONNECTED; // FIXME: would this be enough as there is the onSTADisconnected event?
-
-    static unsigned long lastTry = 0;
-
-    if (WiFi.status() != WL_CONNECTED)
-    {
-        if (millis() - lastTry > 30000)
-        {
-            lastTry = millis();
-            return WiFi.reconnect();
-        }
-        else
-        {
-            return false; // not connected, but not yet time to retry
-        }
-    }
-    else
-    {
-        // reset the timer when connected
-        lastTry = 0;
-        return true;
-    }
+    return WiFi.status() == WL_CONNECTED; // check if Wi-Fi is connected
 }
-
 
 void wifi_setup(void)
 {
-//     // configure arduino WiFi abstraction lib
-//     WiFi.mode(WIFI_AP_STA);                                                       // set mode to AP+STA
-//     WiFi.setHostname("Obegransad");                                               // set hostname
-//     WiFi.onEvent(callback_sta_disconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED); // register callback
-//     WiFi.setAutoReconnect(true);                                                  // one automatic retry after disconnect
+    WiFi.mode(WIFI_STA);         // set Wi-Fi mode to STA (Station)
+    WiFi.setAutoConnect(true);   // enable auto-connect, a single connection attempt with last saved credentials on driver startup
+    WiFi.setAutoReconnect(true); // enable auto-reconnect, will try to reconnect (exponential back-off) if connection is lost
+    WiFi.setHostname("Obegransad");
+    WiFi.onEvent(callback_sta_disconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
 
-//     // configure the Wi-Fi manager (uses WiFi internally)
-//     wifiManager.setConfigPortalBlocking(true); // blocking mode
-//     wifiManager.setConfigPortalTimeout(6);     // FIXME: 1 min
-// #if DEBUG
-//     wifiManager.setDebugOutput(true);
-// #endif
-
-//     // hack to make the captive portal actually appear on device
-//     if (WebServer *s = wifiManager.server.get())
-//     {
-//         add_captive_portal_spoof(s);
-//     }
-
-//     Serial.println("opening captive portal...");
-//     if (!wifiManager.autoConnect(PORTAL_NAME))
-//     {
-//         Serial.println("Portal timed out or aborted!");
-//     }
-
-//     // clean up after success
-//     Serial.println("Connected to WiFi!");
-//     Serial.print("IP Address: ");
-//     Serial.println(WiFi.localIP());
-//     // migrate from AP to STA mode
-//     delay(3000);                 // give phone time to finish
-//     WiFi.softAPdisconnect(true); // drop the hotspot
-//     WiFi.mode(WIFI_STA);         // switch to STA mod
+    //     // clean up after success
+    //     Serial.println("Connected to WiFi!");
+    //     Serial.print("IP Address: ");
+    //     Serial.println(WiFi.localIP());
+    //     // migrate from AP to STA mode
+    //     delay(3000);                 // give phone time to finish
+    //     WiFi.softAPdisconnect(true); // drop the hotspot
+    //     WiFi.mode(WIFI_STA);         // switch to STA mod
 }
 
+// Make sure to flush sockets (e.g. web server and http client) before entering light sleep.
 DeviceError enter_light_sleep(uint64_t seconds)
 {
     // flush serial output
     Serial.flush();
 
-    // flush sockets
-    // TODO: flush async web server sockets from config?
-    // maybe need to merge device and config module
-
     // stop wifi
-    if (esp_wifi_stop() != ESP_OK)
+    if (!esp_wifi_stop())
     {
         Serial.println("Failed to stop WiFi");
         return ERR_WIFI;
     }
 
     // set up wake timer
-    if (esp_sleep_enable_timer_wakeup(seconds * 1000000ULL) != ESP_OK)
+    if (!esp_sleep_enable_timer_wakeup(seconds * 1000000ULL))
     {
         Serial.println("Failed to set timer wakeup");
         return ERR_SLEEP;
     }
 
     // set up wake up sources (button)
-    if (gpio_wakeup_enable(static_cast<gpio_num_t>(BUTTON_PIN), GPIO_INTR_LOW_LEVEL) != ESP_OK)
+    if (!gpio_wakeup_enable(static_cast<gpio_num_t>(BUTTON_PIN), GPIO_INTR_LOW_LEVEL))
     {
         Serial.printf("Failed to set GPIO wakeup for pin %d\n", BUTTON_PIN);
         return ERR_SLEEP;
     }
 
     // enable GPIO wakeup
-    if (esp_sleep_enable_gpio_wakeup() != ESP_OK)
+    if (!esp_sleep_enable_gpio_wakeup())
     {
         Serial.println("Failed to enable GPIO wakeup");
         return ERR_SLEEP;
@@ -145,7 +101,7 @@ DeviceError enter_light_sleep(uint64_t seconds)
 
     // enter sleep returns ESP_OK on wakeup)
     esp_err_t res = esp_light_sleep_start(); // returns ESP_OK on wakeup
-    if (res != ESP_OK)
+    if (!res)
     {
         Serial.print("Failed to enter light sleep: ");
         Serial.println(esp_err_to_name(res));
@@ -159,7 +115,7 @@ DeviceError enter_light_sleep(uint64_t seconds)
     Serial.printf("Wakeup cause: %d\n", reason);
 
     // bring back wifi
-    if (esp_wifi_start() != ESP_OK)
+    if (!esp_wifi_start())
     {
         Serial.println("Failed to start WiFi after sleep");
         return ERR_WIFI;
@@ -285,10 +241,3 @@ void wifi_reconnect()
         Serial.println("\nReconnected to Wi-Fi!");
     }
 }
-
-// void onGotIP(WiFiEvent_t, WiFiEventInfo_t) {
-//     if (WiFi.getMode() == WIFI_AP_STA) {        // still hosting AP?
-//         WiFi.softAPdisconnect(true);            // stop beacons
-//         WiFi.mode(WIFI_STA);                    // pure station mode
-//     }
-// }

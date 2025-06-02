@@ -60,7 +60,6 @@ static void conduct_checks();
 void IRAM_ATTR panel_isr(void)
 {
     panel_show();
-    button.tick(); // update the button state
 }
 void start_panel_timer()
 {
@@ -138,7 +137,7 @@ void loop()
     }
 
     // Update the button
-    // Is updated together with the panel ISR
+    button.tick();
 
     // Update the current scene
     sceneSwitcher.tick();
@@ -208,6 +207,6 @@ void buttonLongPressStop()
     if (duration > 5000)
     {
         Serial.println("Button long press -> open captive portal");
-        // TODO: open captive portal
+        captivePortal.start();
     }
 }

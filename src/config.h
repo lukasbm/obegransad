@@ -49,5 +49,6 @@ struct Settings
 
 void write_to_persistent_storage(Settings &settings);
 void read_from_persistent_storage(const Settings *settings);
+void clear_persistent_storage(void);
 
 extern Settings settings; // global settings structure
