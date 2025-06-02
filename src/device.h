@@ -30,7 +30,7 @@ struct NetworkInfo
 };
 
 bool wifi_check(void);
-std::vector<NetworkInfo> wifi_nearby_networks(void); // TODO: need a caching mechanism to avoid scanning every time
+std::vector<NetworkInfo> wifi_nearby_networks(void);
 uint8_t wifi_rssi_quality(int rssi);
 
 bool wifi_connect(const String &ssid, const String &password, unsigned int timeout_ms = 8000);

@@ -39,6 +39,7 @@ This means we use the following pins:
 On initial setup the device will open a captive portal to request the WiFi credentials.
 Just connect to the `Obegransad-Setup` wifi network with your phone.
 If the portal does not open automatically, enter the IP `192.168.4.1` in your browser.
+There is also a DNS server which redirects everything, so you can enter anything in your browser.
 
 ### Config
 

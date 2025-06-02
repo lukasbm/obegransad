@@ -6,6 +6,7 @@
 #include <DNSServer.h>
 #include <ArduinoJson.h>
 #include <Preferences.h>
+#include <vector>
 #include "device.h"
 
 static const char *PORTAL_NAME = "Obegransad-Setup"; // captive portal name (SSID)
@@ -36,7 +37,6 @@ private:
     bool open = false;     // true if the portal is open, false otherwise
     SettingsServer server; // HTTP server for captive portal
     DNSServer dns;         // DNS server for captive portal
-};
 
-// TODO: draw a state machine about of wifi and so on
-// https://github.com/copilot/c/39104fee-961b-44c4-adfb-4286e53e51cb
+    std::vector<NetworkInfo> networks;
+};

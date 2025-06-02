@@ -18,15 +18,19 @@ void Portal::start()
     WiFi.disconnect(true, true);
     Serial.println("[PORTAL] Wi-Fi disconnected");
 
-    WiFi.mode(WIFI_AP); // switch to AP mode
+    WiFi.mode(WIFI_AP_STA); // switch to AP + STA mode (to be able to scan for wifi networks)
     Serial.println("[PORTAL] Wi-Fi mode set to AP");
 
     // WiFi.setAutoReconnect(false);
 
+    // scan for networks (and save them for this session of the captive portal)
+    // TODO: do i need some mechanism to re-scan?
+    networks = wifi_nearby_networks();
+
     // Problem: if the captive portal is non-blocking, how can we ensure that nothing else is changing the wifi mode and connection status?
     // the server uses ISRs, so the regular main loop might change the Wi-Fi mode or connection status.
 
-    // start DNS server
+    // start DNS server (just so we can redirect everything to the captive portal)
     if (!dns.start(53, "*", WiFi.softAPIP()))
     {
         Serial.println("[PORTAL] Failed to start DNS server");
@@ -282,14 +286,6 @@ DeviceError SettingsServer::start()
         }
     }
 
-    // handle root page
-    server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
-              { request->send(LittleFS, "/index.html", "text/html"); });
-
-    // handle static files
-    server.serveStatic("/", LittleFS, "/")
-        .setDefaultFile("index.html");
-
     // captive portal URLs
     server.on("/generate_204", HTTP_ANY, [](AsyncWebServerRequest *request) { // Android
         request->redirect("/");
@@ -303,6 +299,11 @@ DeviceError SettingsServer::start()
     server.on("/api/networks", HTTP_GET, handle_get_networks);
     server.on("/api/settings", HTTP_DELETE, handle_delete_settings);
     server.on("/api/settings", HTTP_POST, [](AsyncWebServerRequest *req) {}, nullptr, handle_post_settings);
+
+    // serve everything statically from LittleFS
+    // empty path means portal
+    // needs to be last or it will catch everything
+    server.serveStatic("/", LittleFS, "/").setDefaultFile("portal.html"); // .setCacheControl("max-age=86400");
 
     // start the server
     server.begin();

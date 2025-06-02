@@ -88,7 +88,7 @@ void stop_panel_timer()
 
 void setup()
 {
-    delay(3000);          // wait for serial monitor to connect
+    delay(3000);          // wait for serial monitor to connect, otherwise monitor serial will not work
     Serial.begin(115200); // FIXME: broken again!
     Serial.println("Starting setup...");
 
