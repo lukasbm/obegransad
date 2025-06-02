@@ -57,16 +57,29 @@ SceneSwitcher<NUM_SCENES> sceneSwitcher(
 static void conduct_checks();
 
 /* ULTRA FAST panel refresh 500 Hz */
+// TODO: move this part to device.h in case portal.cpp needs it?
+static hw_timer_t *panelTimer = nullptr;
 void IRAM_ATTR panel_isr(void)
 {
     panel_show();
 }
 void start_panel_timer()
 {
-    hw_timer_t *t = timerBegin(0, 80, true); // 1 µs tick (80 MHz / 80 = 1 MHz)
-    timerAttachInterrupt(t, panel_isr, true);
-    timerAlarmWrite(t, 2000, true); // 2 ms
-    timerAlarmEnable(t);
+    panelTimer = timerBegin(0, 80, true); // 1 µs tick (80 MHz / 80 = 1 MHz)
+    timerAttachInterrupt(panelTimer, &panel_isr, true);
+    timerAlarmWrite(panelTimer, 2000, true); // 2 ms
+    timerAlarmEnable(panelTimer);
+}
+void stop_panel_timer()
+{
+    if (panelTimer)
+    {
+        // timerDetachInterrupt(panelTimer);
+        // timerEnd(panelTimer);
+
+        timerAlarmDisable(panelTimer);
+        panelTimer = nullptr;
+    }
 }
 
 ////////////////
@@ -75,32 +88,43 @@ void start_panel_timer()
 
 void setup()
 {
-    Serial.begin(115200);
+    delay(3000);          // wait for serial monitor to connect
+    Serial.begin(115200); // FIXME: broken again!
     Serial.println("Starting setup...");
 
     button_setup();
     panel_init();
-    start_panel_timer();
+    // start_panel_timer();
 
-    if (!settings.initial_setup_done)
-    {
-        Serial.println("Initial setup not done, starting captive portal...");
-        captivePortal.start();
-    }
-    else
-    {
-        Serial.println("Initial setup done, starting normally.");
-        wifi_connect(settings.ssid, settings.password); // connect to Wi-Fi
-        time_syncNTP();                                 // sync time with NTP server
-        conduct_checks();                               // perform initial checks
-    }
+    display_wifi_symbol();
 
-    // Start with the first scene
-    sceneSwitcher.nextScene();
+    // stop_panel_timer();
+    captivePortal.start();
+    // start_panel_timer();
+
+    // if (!settings.initial_setup_done)
+    // {
+    //     Serial.println("Initial setup not done, starting captive portal...");
+    //     captivePortal.start();
+    // }
+    // else
+    // {
+    //     Serial.println("Initial setup done, starting normally.");
+    //     wifi_connect(settings.ssid, settings.password); // connect to Wi-Fi
+    //     time_syncNTP();                                 // sync time with NTP server
+    //     conduct_checks();                               // perform initial checks
+    // }
+
+    // // Start with the first scene
+    // sceneSwitcher.nextScene();
 }
 
 void loop()
 {
+    captivePortal.tick(); // process captive portal requests
+    delay(10);
+    return;
+
     static uint32_t lastSceneTick = 0;
     static uint32_t lastWeatherTick = 0;
     static uint32_t lastNTPTick = 0;

@@ -192,7 +192,7 @@ uint8_t wifi_rssi_quality(int rssi)
     return quality;
 }
 
-bool wifi_connect(const String &ssid, const String &password, unsigned int timeout_ms = 8000)
+bool wifi_connect(const String &ssid, const String &password, unsigned int timeout_ms)
 {
     WiFi.mode(WIFI_STA); // ensure we are in STA mode
     WiFi.begin(ssid.c_str(), password.c_str());

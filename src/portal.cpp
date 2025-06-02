@@ -13,8 +13,14 @@ Portal::Portal() : server(), dns()
 // TODO: fix error handling. Should return everything into same state again on failure!
 void Portal::start()
 {
+    Serial.println("[PORTAL] Starting captive portal...");
+
     WiFi.disconnect(true, true);
+    Serial.println("[PORTAL] Wi-Fi disconnected");
+
     WiFi.mode(WIFI_AP); // switch to AP mode
+    Serial.println("[PORTAL] Wi-Fi mode set to AP");
+
     // WiFi.setAutoReconnect(false);
 
     // Problem: if the captive portal is non-blocking, how can we ensure that nothing else is changing the wifi mode and connection status?
@@ -26,6 +32,7 @@ void Portal::start()
         Serial.println("[PORTAL] Failed to start DNS server");
         return;
     }
+    Serial.println("[PORTAL] DNS server started");
 
     if (!WiFi.softAPsetHostname(PORTAL_NAME))
     {
@@ -33,6 +40,7 @@ void Portal::start()
         WiFi.mode(WIFI_STA); // switch back to STA mode
         return;
     }
+    Serial.println("[PORTAL] Hostname set for soft AP");
 
     // start the soft AP
     if (!WiFi.softAP(PORTAL_NAME, nullptr, 0, false, 2, false))
@@ -51,11 +59,17 @@ void Portal::start()
         WiFi.mode(WIFI_STA);         // switch back to STA mode
         return;
     }
-
     Serial.println("[PORTAL] Soft AP config set");
 
     // start the HTTP server
-    server.start();
+    DeviceError err = server.start();
+    if (err != ERR_NONE)
+    {
+        Serial.printf("[PORTAL] Failed to start server: %d\n", err);
+        WiFi.softAPdisconnect(true); // disconnect the soft AP
+        WiFi.mode(WIFI_STA);         // switch back to STA mode
+        return;
+    }
     open = true;
     Serial.println("[PORTAL] Server started");
 }
@@ -242,6 +256,14 @@ void handle_post_settings(AsyncWebServerRequest *req,
 
 DeviceError SettingsServer::start()
 {
+    // FIXME: protect against multiple starts
+    // if (server. isRunning())
+    // {
+    //     Serial.println("[PORTAL] Server already running");
+    //     return ERR_NONE;
+    // }
+    // Serial.println("[PORTAL] Starting settings server...");
+
     // initialize LittleFS
     if (!LittleFS.begin())
     {

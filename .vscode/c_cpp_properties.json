@@ -484,6 +484,7 @@
                 "ARDUINO_USB_MODE=1",
                 "ARDUINO_USB_CDC_ON_BOOT=1",
                 "DEBUG",
+                "CONFIG_SPI_FLASH_ENABLE_COUNTERS=1",
                 "HAVE_CONFIG_H",
                 "MBEDTLS_CONFIG_FILE=\"mbedtls/esp_config.h\"",
                 "UNITY_INCLUDE_CONFIG_H",
@@ -499,6 +500,7 @@
                 "ARDUINO_VARIANT=\"XIAO_ESP32C3\"",
                 "ARDUINO_BOARD=\"Seeed Studio XIAO ESP32C3\"",
                 "ARDUINO_PARTITION_default",
+                "__PLATFORMIO_BUILD_DEBUG__",
                 ""
             ],
             "cStandard": "gnu99",
