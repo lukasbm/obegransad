@@ -268,7 +268,18 @@ DeviceError SettingsServer::start()
     if (!LittleFS.begin())
     {
         Serial.println("[PORTAL] Failed to mount LittleFS");
-        return ERR_LITTLE_FS;
+        // try reformat
+        if (!LittleFS.format())
+        {
+            Serial.println("[PORTAL] Failed to format LittleFS");
+            return ERR_LITTLE_FS;
+        }
+        // try to mount again
+        if (!LittleFS.begin())
+        {
+            Serial.println("[PORTAL] Failed to mount LittleFS after formatting");
+            return ERR_LITTLE_FS;
+        }
     }
 
     // handle root page

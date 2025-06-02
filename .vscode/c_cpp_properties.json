@@ -499,7 +499,7 @@
                 "ARDUINO=10812",
                 "ARDUINO_VARIANT=\"XIAO_ESP32C3\"",
                 "ARDUINO_BOARD=\"Seeed Studio XIAO ESP32C3\"",
-                "ARDUINO_PARTITION_default",
+                "ARDUINO_PARTITION_default_16MB_littlefs",
                 "__PLATFORMIO_BUILD_DEBUG__",
                 ""
             ],
