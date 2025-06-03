@@ -722,11 +722,11 @@
     </dialog>
 
     <script>
-        const SETTING_ENDPOINT = "/settings.json"; // "/settings";
-        const NETWORK_ENDPOINT = "/networks.json"; // "/networks";
+        const SETTINGS_ENDPOINT = "/api/settings"; // "/settings.json";
+        const NETWORK_ENDPOINT = "/api/networks"; // "/networks.json";
 
         // pre populate the fields with current settings
-        fetch(SETTING_ENDPOINT).then(r => {
+        fetch(SETTINGS_ENDPOINT).then(r => {
             if (!r.ok) {
                 console.error('Error loading settings:', r);
                 alert('Error loading settings: ' + r.statusText);
@@ -750,7 +750,7 @@
         fetch(NETWORK_ENDPOINT).then(r => {
             if (!r.ok) {
                 console.error('Error loading networks:', r);
-                alert('Error loading settings: ' + r.statusText);
+                alert('Error loading networks: ' + r.statusText);
                 return;
             }
             return r.json()
@@ -771,7 +771,7 @@
         document.getElementById("deleteDialog").addEventListener('close', e => {
             if (e.target.returnValue === 'yes') {
                 // Reset settings
-                fetch(SETTING_ENDPOINT, { method: 'DELETE' })
+                fetch(SETTINGS_ENDPOINT, { method: 'DELETE' })
                     .then(r => {
                         if (!r.ok) {
                             console.error('Error resetting settings:', r);
@@ -816,7 +816,7 @@
 
             Number()
 
-            fetch(SETTING_ENDPOINT, {
+            fetch(SETTINGS_ENDPOINT, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(obj) // send everything
