@@ -25,7 +25,7 @@ void Portal::start()
 
     // scan for networks (and save them for this session of the captive portal)
     // TODO: do i need some mechanism to re-scan?
-    networks = wifi_nearby_networks();
+    networks = wifi_nearby_networks(); // FIXME: does it even work?
 
     // Problem: if the captive portal is non-blocking, how can we ensure that nothing else is changing the wifi mode and connection status?
     // the server uses ISRs, so the regular main loop might change the Wi-Fi mode or connection status.
@@ -119,7 +119,7 @@ static void handle_get_networks(AsyncWebServerRequest *request)
     JsonDocument doc;
     JsonArray networksArray = doc.to<JsonArray>();
     // get wifi networks from last scan
-    std::vector<NetworkInfo> networks = wifi_nearby_networks();
+    std::vector<NetworkInfo> networks = wifi_nearby_networks(); // FIXME: use instance var of portal
     for (const auto &network : networks)
     {
         JsonObject net = networksArray.add<JsonObject>();
@@ -203,6 +203,34 @@ void handle_post_settings(AsyncWebServerRequest *req,
     }
 
     // TODO: validate settings
+    if (!doc.is<JsonObject>())
+    {
+        req->send(400, "application/json", R"({"error":"not an object"})");
+        return;
+    }
+    JsonObject obj = doc.as<JsonObject>();
+    if (!obj.containsKey("wifi_ssid") || !obj.containsKey("wifi_password"))
+    {
+        req->send(400, "application/json", R"({"error":"missing wifi_ssid or wifi_password"})");
+        return;
+    }
+
+    auto offtime_helper = [](JsonDocument &obj, OffTime &offtime, const String &prefix)
+    {
+        // obj[prefix + "from_hour"] = offtime.from_hour;
+        offtime.from_hour = obj[prefix + "_from_hour"] | offtime.from_hour;
+        offtime.from_minute = obj[prefix + "_from_minute"] | offtime.from_minute;
+        offtime.to_hour = obj[prefix + "_to_hour"] | offtime.to_hour;
+        offtime.to_minute = obj[prefix + "_to_minute"] | offtime.to_minute;
+        offtime.sunday = obj[prefix + "_sunday"] | offtime.sunday;
+        offtime.monday = obj[prefix + "_monday"] | offtime.monday;
+        offtime.tuesday = obj[prefix + "_tuesday"] | offtime.tuesday;
+        offtime.wednesday = obj[prefix + "_wednesday"] | offtime.wednesday;
+        offtime.thursday = obj[prefix + "_thursday"] | offtime.thursday;
+        offtime.friday = obj[prefix + "_friday"] | offtime.friday;
+        offtime.saturday = obj[prefix + "_saturday"] | offtime.saturday;
+        return offtime;
+    };
 
     // merge only what’s present
     settings.brightness_day = doc["brightness_day"] | settings.brightness_day;
@@ -214,42 +242,9 @@ void handle_post_settings(AsyncWebServerRequest *req,
     settings.timezone = doc["timezone"] | settings.timezone;
     settings.anniversary_day = doc["anniversary_day"] | settings.anniversary_day;
     settings.anniversary_month = doc["anniversary_month"] | settings.anniversary_month;
-    // off times 1
-    settings.offtime1.from_hour = doc["offtime1_from_hour"] | settings.offtime1.from_hour;
-    settings.offtime1.from_minute = doc["offtime1_from_minute"] | settings.offtime1.from_minute;
-    settings.offtime1.to_hour = doc["offtime1_to_hour"] | settings.offtime1.to_hour;
-    settings.offtime1.to_minute = doc["offtime1_to_minute"] | settings.offtime1.to_minute;
-    settings.offtime1.sunday = doc["offtime1_sunday"] | settings.offtime1.sunday;
-    settings.offtime1.monday = doc["offtime1_monday"] | settings.offtime1.monday;
-    settings.offtime1.tuesday = doc["offtime1_tuesday"] | settings.offtime1.tuesday;
-    settings.offtime1.wednesday = doc["offtime1_wednesday"] | settings.offtime1.wednesday;
-    settings.offtime1.thursday = doc["offtime1_thursday"] | settings.offtime1.thursday;
-    settings.offtime1.friday = doc["offtime1_friday"] | settings.offtime1.friday;
-    settings.offtime1.saturday = doc["offtime1_saturday"] | settings.offtime1.saturday;
-    // off times 2
-    settings.offtime2.from_hour = doc["offtime2_from_hour"] | settings.offtime2.from_hour;
-    settings.offtime2.from_minute = doc["offtime2_from_minute"] | settings.offtime2.from_minute;
-    settings.offtime2.to_hour = doc["offtime2_to_hour"] | settings.offtime2.to_hour;
-    settings.offtime2.to_minute = doc["offtime2_to_minute"] | settings.offtime2.to_minute;
-    settings.offtime2.sunday = doc["offtime2_sunday"] | settings.offtime2.sunday;
-    settings.offtime2.monday = doc["offtime2_monday"] | settings.offtime2.monday;
-    settings.offtime2.tuesday = doc["offtime2_tuesday"] | settings.offtime2.tuesday;
-    settings.offtime2.wednesday = doc["offtime2_wednesday"] | settings.offtime2.wednesday;
-    settings.offtime2.thursday = doc["offtime2_thursday"] | settings.offtime2.thursday;
-    settings.offtime2.friday = doc["offtime2_friday"] | settings.offtime2.friday;
-    settings.offtime2.saturday = doc["offtime2_saturday"] | settings.offtime2.saturday;
-    // off times 3
-    settings.offtime3.from_hour = doc["offtime3_from_hour"] | settings.offtime3.from_hour;
-    settings.offtime3.from_minute = doc["offtime3_from_minute"] | settings.offtime3.from_minute;
-    settings.offtime3.to_hour = doc["offtime3_to_hour"] | settings.offtime3.to_hour;
-    settings.offtime3.to_minute = doc["offtime3_to_minute"] | settings.offtime3.to_minute;
-    settings.offtime3.sunday = doc["offtime3_sunday"] | settings.offtime3.sunday;
-    settings.offtime3.monday = doc["offtime3_monday"] | settings.offtime3.monday;
-    settings.offtime3.tuesday = doc["offtime3_tuesday"] | settings.offtime3.tuesday;
-    settings.offtime3.wednesday = doc["offtime3_wednesday"] | settings.offtime3.wednesday;
-    settings.offtime3.thursday = doc["offtime3_thursday"] | settings.offtime3.thursday;
-    settings.offtime3.friday = doc["offtime3_friday"] | settings.offtime3.friday;
-    settings.offtime3.saturday = doc["offtime3_saturday"] | settings.offtime3.saturday;
+    settings.offtime1 = offtime_helper(doc, settings.offtime1, "offtime1");
+    settings.offtime2 = offtime_helper(doc, settings.offtime2, "offtime2");
+    settings.offtime3 = offtime_helper(doc, settings.offtime3, "offtime3");
 
     // save settings to persistent storage
     write_to_persistent_storage(settings);
@@ -288,10 +283,13 @@ DeviceError SettingsServer::start()
 
     // captive portal URLs
     server.on("/generate_204", HTTP_ANY, [](AsyncWebServerRequest *request) { // Android
-        request->redirect("/");
+        request->redirect("/");                                               // redirect to portal
     });
     server.on("/hotspot-detect.html", HTTP_ANY, [](AsyncWebServerRequest *request) { // iOS
         request->send(200, "text/html", "<!doctype html>");
+    });
+    server.on("/static/hotspot.txt", HTTP_ANY, [](AsyncWebServerRequest *request) { // Samsung, Fedora
+        request->redirect("/");                                                     // redirect to portal
     });
 
     // handle API requests
