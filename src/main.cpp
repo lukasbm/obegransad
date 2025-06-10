@@ -40,6 +40,30 @@ WeatherMinMaxScene weatherMinMaxScene;
 WeatherScene weatherScene;
 ConcentricCircleScene concentricCircleScene;
 
+/* ULTRA FAST panel refresh 500 Hz */
+static hw_timer_t *panelTimer = nullptr;
+void IRAM_ATTR panel_isr(void)
+{
+    panel_show();
+}
+void start_panel_timer()
+{
+    panelTimer = timerBegin(0, 80, true); // 1 µs tick (80 MHz / 80 = 1 MHz)
+    timerAttachInterrupt(panelTimer, &panel_isr, true);
+    timerAlarmWrite(panelTimer, 2000, true); // 2 ms
+    timerAlarmEnable(panelTimer);
+}
+void stop_panel_timer()
+{
+    if (panelTimer)
+    {
+        // timerDetachInterrupt(panelTimer);
+        // timerEnd(panelTimer);
+        timerAlarmDisable(panelTimer);
+        panelTimer = nullptr;
+    }
+}
+
 // switcher
 constexpr size_t NUM_SCENES = 3; // number of scenes
 SceneSwitcher<NUM_SCENES> sceneSwitcher(
@@ -53,6 +77,7 @@ static void conduct_checks();
 
 void setup()
 {
+    delay(3000); // wait for serial monitor to connect, otherwise monitor serial will not work
     Serial.begin(115200);
     Serial.println("Starting setup...");
 
@@ -60,14 +85,14 @@ void setup()
 
     panel_init();
 
-    // display_wifi_setup_prompt();
-    // DeviceError err = wifi_setup();
+    display_wifi_setup_prompt(); // run in non-blocking mode!!!
+    DeviceError err = wifi_setup();
 
     // NTP sync
-    // time_setup();
+    time_setup();
 
-    // // accept new configs
-    // setup_config_server();
+    // accept new configs
+    setup_config_server();  // FIXME:!!!
 
     Serial.println("Setup done!");
 

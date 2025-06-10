@@ -1,0 +1,29 @@
+{
+    "brightness_day": 200,
+    "brightness_night": 40,
+    // offtimes1
+    "offtimes1_monday": true,
+    "offtimes1_tuesday": false,
+    "offtimes1_wednesday": true,
+    "offtimes1_thursday": true,
+    "offtimes1_friday": true,
+    "offtimes1_saturday": false,
+    "offtimes1_sunday": true,
+    "offtimes1_from_hour": 22,
+    "offtimes1_from_minute": 0,
+    "offtimes1_to_hour": 6,
+    "offtimes1_to_minute": 0,
+    // weather
+    "weather_latitude": 49.4613909,
+    "weather_longitude": 11.1540788,
+    // time
+    "timezone": "CET-1CEST,M3.5.0,M10.5.0/3",
+    "time_hour": 12,
+    "time_minute": 12,
+    // "time_useNTP": true,
+    // anniversary
+    "anniversary_day": 12,
+    "anniversary_month": 5,
+    // wifi
+    "wifi_ssid": "Vodafone BE-44"
+}

@@ -1,134 +1,113 @@
 #include "config.h"
+#include <Preferences.h>
 
-static AsyncWebServer server(80);
+Settings settings = Settings();
 
-// define default config
-Config::Config()
-    : brightness_day(200),
-      brightness_night(30),
-      weather_latitude(49.4613909),
-      weather_longitude(11.1540788),
-      timezone("CET-1CEST,M3.5.0,M10.5.0/3"),
-      anniversary_day(21),
-      anniversary_month(5)
+static const char *PREF_NAME = "app"; // preferences namespace
+
+// implicitly sets default values.
+void read_from_persistent_storage(Settings &settings)
 {
-    // default off-times
-    off_time_everyday.push_back({0, 0, 6, 0});     // everyday 0:00-6:00
-    off_time_weekdays.push_back({22, 30, 23, 59}); // weekdays 22:30-23:59
-    // weekends left empty
-    off_time_weekends.clear();
+    Preferences p;
+    p.begin(PREF_NAME, true); // read-only mode
+    // setup
+    settings.initial_setup_done = p.getBool("initial_setup_done", false); // default is false, so captive portal will open on first boot
+    // wifi
+    settings.ssid = p.getString("wifi_ssid", "");
+    settings.password = p.getString("wifi_password", "");
+    // panel
+    settings.brightness_day = p.getUChar("brightness_day", 200);
+    settings.brightness_night = p.getUChar("brightness_night", 50);
+    // offtime 1
+    settings.offtime1.from_hour = p.getUChar("offtime1_from_hour", 0);
+    settings.offtime1.from_minute = p.getUChar("offtime1_from_minute", 0);
+    settings.offtime1.to_hour = p.getUChar("offtime1_to_hour", 0);
+    settings.offtime1.to_minute = p.getUChar("offtime1_to_minute", 0);
+    settings.offtime1.days = p.getUChar("offtime1_days", 0b0); // no days
+    // offtime 2
+    settings.offtime2.from_hour = p.getUChar("offtime2_from_hour", 0);
+    settings.offtime2.from_minute = p.getUChar("offtime2_from_minute", 0);
+    settings.offtime2.to_hour = p.getUChar("offtime2_to_hour", 0);
+    settings.offtime2.to_minute = p.getUChar("offtime2_to_minute", 0);
+    settings.offtime2.days = p.getUChar("offtime2_days", 0b0); // no days
+    // offtime 3
+    settings.offtime3.from_hour = p.getUChar("offtime3_from_hour", 0);
+    settings.offtime3.from_minute = p.getUChar("offtime3_from_minute", 0);
+    settings.offtime3.to_hour = p.getUChar("offtime3_to_hour", 0);
+    settings.offtime3.to_minute = p.getUChar("offtime3_to_minute", 0);
+    settings.offtime3.days = p.getUChar("offtime3_days", 0b0); // no days
+    // weather
+    settings.weather_latitude = p.getDouble("weather_latitude", 0.0);   // equator
+    settings.weather_longitude = p.getDouble("weather_longitude", 0.0); // prime meridian
+    // timezone
+    settings.timezone = p.getString("timezone", "UTC");
+    // anniversary
+    settings.anniversary_day = p.getUChar("anniversary_day", 1);
+    settings.anniversary_month = p.getUChar("anniversary_month", 1);
+
+    p.end();
 }
 
-Config settings;
-
-bool Config::fromJson(const JsonObject &root)
+void write_to_persistent_storage(Settings &settings)
 {
-    // primitives (fall back to existing values if missing)
-    brightness_day = root["brightness_day"] | brightness_day;
-    brightness_night = root["brightness_night"] | brightness_night;
-    weather_latitude = root["weather_latitude"] | weather_latitude;
-    weather_longitude = root["weather_longitude"] | weather_longitude;
-    timezone = root["timezone"] | timezone;
+    Preferences p;
+    p.begin(PREF_NAME, false); // read-write mode
+    // wifi
+    p.putString("wifi_ssid", settings.ssid);
+    p.putString("wifi_password", settings.password);
+    // panel
+    p.putUChar("brightness_day", settings.brightness_day);
+    p.putUChar("brightness_night", settings.brightness_night);
+    // offtime 1
+    p.putUChar("offtime1_from_hour", settings.offtime1.from_hour);
+    p.putUChar("offtime1_from_minute", settings.offtime1.from_minute);
+    p.putUChar("offtime1_to_hour", settings.offtime1.to_hour);
+    p.putUChar("offtime1_to_minute", settings.offtime1.to_minute);
+    p.putUChar("offtime1_days", settings.offtime1.days);
+    // offtime 2
+    p.putUChar("offtime2_from_hour", settings.offtime2.from_hour);
+    p.putUChar("offtime2_from_minute", settings.offtime2.from_minute);
+    p.putUChar("offtime2_to_hour", settings.offtime2.to_hour);
+    p.putUChar("offtime2_to_minute", settings.offtime2.to_minute);
+    p.putUChar("offtime2_days", settings.offtime2.days);
+    // offtime 3
+    p.putUChar("offtime3_from_hour", settings.offtime3.from_hour);
+    p.putUChar("offtime3_from_minute", settings.offtime3.from_minute);
+    p.putUChar("offtime3_to_hour", settings.offtime3.to_hour);
+    p.putUChar("offtime3_to_minute", settings.offtime3.to_minute);
+    p.putUChar("offtime3_days", settings.offtime3.days);
+    // weather
+    p.putDouble("weather_latitude", settings.weather_latitude);
+    p.putDouble("weather_longitude", settings.weather_longitude);
+    // timezone
+    p.putString("timezone", settings.timezone);
+    // anniversary
+    p.putUChar("anniversary_day", settings.anniversary_day);
+    p.putUChar("anniversary_month", settings.anniversary_month);
 
-    // helper lambda to read an array of OffTime
-    auto replaceRead = [&](const char *key, std::vector<OffTime> &vec)
-    {
-        if (!root[key].is<JsonArray>())
-        {
-            return;
-        }
-        vec.clear();
-        for (JsonObject item : root[key].as<JsonArray>())
-        {
-            OffTime ot;
-            ot.from_hour = item["from_hour"] | 0;
-            ot.from_minute = item["from_minute"] | 0;
-            ot.to_hour = item["to_hour"] | 0;
-            ot.to_minute = item["to_minute"] | 0;
-            vec.push_back(ot);
-        }
-    };
-
-    replaceRead("off_time_everyday", off_time_everyday);
-    replaceRead("off_time_weekdays", off_time_weekdays);
-    replaceRead("off_time_weekends", off_time_weekends);
-
-    return true;
+    p.end();
 }
 
-void Config::toJson(JsonObject &root) const
+void clear_persistent_storage(void)
 {
-    // primitives
-    root["brightness_day"] = brightness_day;
-    root["brightness_night"] = brightness_night;
-    root["weather_latitude"] = weather_latitude;
-    root["weather_longitude"] = weather_longitude;
-    root["timezone"] = timezone;
-
-    // helper lambda to write an array
-    auto writeOff = [&](const char *key, const std::vector<OffTime> &vec)
-    {
-        JsonArray arr = root[key].to<JsonArray>();
-        for (auto &ot : vec)
-        {
-            JsonObject o = arr.add<JsonObject>();
-            o["from_hour"] = ot.from_hour;
-            o["from_minute"] = ot.from_minute;
-            o["to_hour"] = ot.to_hour;
-            o["to_minute"] = ot.to_minute;
-        }
-    };
-
-    writeOff("off_time_everyday", off_time_everyday);
-    writeOff("off_time_weekdays", off_time_weekdays);
-    writeOff("off_time_weekends", off_time_weekends);
+    Preferences p;
+    p.begin(PREF_NAME, false); // read-write mode
+    p.clear();                 // clear all keys
+    p.end();
 }
 
-void replyConfig(AsyncWebServerRequest *request)
+bool OffTime::isInside(const struct tm &time) const
 {
-    JsonDocument doc;
-    JsonObject root = doc.to<JsonObject>();
-    settings.toJson(root);
-    String payload;
-    serializeJson(doc, payload);
-    request->send(200, "application/to_json", payload);
-}
 
-void handleNewConfig(AsyncWebServerRequest *request)
-{
-    // get body
-    if (!request->hasArg("plain"))
-    {
-        request->send(400, "text/plain", "Invalid request: missing JSON body");
-        return;
-    }
-    String body = request->arg("plain");
+    if ((days & (1 << time.tm_wday)) == 0)
+        return false; // day is not in the range
 
-    // deserialize body
-    JsonDocument doc;
-    DeserializationError err = deserializeJson(doc, body);
-    if (err)
-    {
-        request->send(400, "application/to_json",
-                      String("{\"error\":\"Invalid JSON: ") + err.c_str() + "\"}");
-        return;
-    }
-
-    // parse settings
-    if (!settings.fromJson(doc.as<JsonObject>()))
-    {
-        request->send(400, "application/to_json",
-                      "{\"error\":\"Invalid settings\"}");
-        return;
-    }
-
-    // save
-    request->send(200, "application/to_json", "{\"success\":\"Settings saved\"}");
-}
-
-void setup_config_server(void)
-{
-    server.on("/config", HTTP_GET, replyConfig);
-    server.on("/config", HTTP_POST, handleNewConfig);
-    server.begin();
+    // check if the time is in the range
+    if (time.tm_hour < from_hour || time.tm_hour > to_hour)
+        return false; // time is not in the range
+    if (time.tm_hour == from_hour && time.tm_min < from_minute)
+        return false; // time is not in the range
+    if (time.tm_hour == to_hour && time.tm_min > to_minute)
+        return false; // time is not in the range
+    return true;      // time is in the range
 }
