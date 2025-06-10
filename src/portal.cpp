@@ -209,11 +209,8 @@ void handle_post_settings(AsyncWebServerRequest *req,
         return;
     }
     JsonObject obj = doc.as<JsonObject>();
-    if (!obj.containsKey("wifi_ssid") || !obj.containsKey("wifi_password"))
-    {
-        req->send(400, "application/json", R"({"error":"missing wifi_ssid or wifi_password"})");
-        return;
-    }
+
+    // TODO: validate required fields (e.g. types via obj[key].is<Type>())
 
     auto offtime_helper = [](JsonDocument &obj, OffTime &offtime, const String &prefix)
     {
