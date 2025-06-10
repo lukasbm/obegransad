@@ -17,7 +17,7 @@ void time_syncNTP()
     }
 }
 
-bool isNight(struct tm time)
+bool isNight(struct tm const &time)
 {
     if (time.tm_hour >= 22 || time.tm_hour < 6)
     {
@@ -26,36 +26,17 @@ bool isNight(struct tm time)
     return false; // day
 }
 
-static bool checkOffTimes(struct tm time, const std::vector<OffTime> &offTimes)
+inline bool shouldTurnOffSingle(struct tm &time, const OffTime &offtime)
 {
-    for (const auto &offTime : offTimes)
-    {
-        if ((time.tm_hour == offTime.from_hour && time.tm_min >= offTime.from_minute) ||
-            (time.tm_hour == offTime.to_hour && time.tm_min <= offTime.to_minute) ||
-            (time.tm_hour > offTime.from_hour && time.tm_hour < offTime.to_hour))
-        {
-            return true; // turn off
-        }
-    }
-    return false; // do not turn off
+    // TODO: check if the time is within the off time range
+    return true;
 }
 
-bool shouldTurnOff(struct tm time)
+bool shouldTurnOff(struct tm &time)
 {
-    // check if the time is in the off time range
-    if (checkOffTimes(time, settings.off_time_everyday))
-    {
-        return true;
-    }
-    if (checkOffTimes(time, settings.off_time_weekdays) && time.tm_wday != 0 && time.tm_wday != 6)
-    {
-        return true;
-    }
-    if (checkOffTimes(time, settings.off_time_weekends) && (time.tm_wday == 0 || time.tm_wday == 6))
-    {
-        return true;
-    }
-    return false; // do not turn off
+    return shouldTurnOffSingle(time, settings.offtime1) ||
+           shouldTurnOffSingle(time, settings.offtime2) ||
+           shouldTurnOffSingle(time, settings.offtime3);
 }
 
 struct tm time_fetch()
@@ -75,7 +56,7 @@ struct tm time_fetch()
 }
 
 // https://fcds.cs.put.poznan.pl/MyWeb/Praca/Ubiquitous/LunarPhases.pdf
-MoonPhase getMoonPhase(struct tm time)
+MoonPhase getMoonPhase(struct tm &time)
 {
     return FULL;
 }

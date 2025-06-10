@@ -1,38 +1,63 @@
-# obegransad
+# Obegransad
 
-IKEA obegränsad hack
+IKEA obegränsad hack.
 
-## TODO
+This repository contains the code for a much extended firmware over existing snippets and sketches.
 
-- [X] Brightness does not do anything.
-- [ ] Would be nice if i didn't have to wait on the weatherData. This would mean caching and refreshing it outside the scene, e.g. the Weather module or a new Data Access module that also takes care of other things. Alternatively the "conduct_checks" loop could update the weather data
-- [ ] Redesign the weather scene. Instead it should show the max temperature in bold (on the top), the min temperature (bottom left) and maybe an icon in the bottom right.
-    Alternatively have two weather scenes. One with the numbers and one with the icons.
-- [ ] Add more animations/screensaver style scenes.
-- [ ] Refactor scenes into one file each!
-- [ ] How to handle WiFi outages? Maybe need a general error screen that replaces weather and other wifi dependent stuff
-- [ ] also need to introduce error code in case some setup stuff goes wrong
-- [ ] make it also usable without WiFi. e.g. by pressing the button while in AP mode!
+## Features
 
-## Hardware
+- Full WiFI Captive portal for setup
+- Web Interface and API for configuration
+- Many screensavers (some replicated from the original unmodded obegransad)
+- Many scenes
+    - 3 Weather Scenes (with animations)
+    - Moon Phase scene
+    - 2 Clock scene (with animations)
+    - Anniversary Scene (with animations)
 
-### RTC Clock
+## Build
 
-The ESP32 has an RTC:
+Please see the original guide by [Digital Image](http://blog.digital-image.de/2023/05/31/x-clock/).
 
-- A low-frequency RTC timer that can wake the chip from light- or deep-sleep with microsecond precision.
-- An 8 KB SRAM block (RTC fast memory) for retaining data across deep-sleep cycles.
-- A calendar “wall-clock” when you sync via SNTP (persisted by the RTC timer across soft-resets and deep-sleeps, but not across full power-on resets).
+This repository only provides the code for a much much much extended firmware compared to the one described above.
+
+### Pin Connection
+
+Contrary to the guides ESP8266, this repo uses an (XIAO) ESP32 (C3) with 400kb SRAM and 4MB flash, as well as WiFi.
+This means we use the following pins:
+- LATCH =  D1
+- CLK = D2
+- DI = D3
+- OE = D4
+- Button = D7
+- And naturally 5V (VUSB) and GND.
 
 ## Usage
 
 ### Setup
 
-The screen will open a captive portal to request the WiFi credentials.
-Just connect to the `Obegransad` wifi device with your phone.
+On initial setup the device will open a captive portal to request the WiFi credentials.
+Just connect to the `Obegransad-Setup` wifi network with your phone.
 If the portal does not open automatically, enter the IP `192.168.4.1` in your browser.
+There is also a DNS server which redirects everything, so you can enter anything in your browser.
 
 ### Config
 
+Either use the web interface or the API (`http://192.168.4.1/api/settings`)
 Look at `example_config.json` for possible configs.
+
 The time zones are used as described here: <https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv>
+
+To bring back the captive portal hold the button for at least 5 seconds.
+
+You can also use the captive portal to fully wipe the settings from the NVS.
+
+### Scenes
+
+Pressing the button once switches to the next scene.
+
+As mentioned in the config there is also a "digital frame"-mode which periodically switches scenes.
+
+## Technical Information for Developers
+
+See [DEVELOPERS.md](DEVELOPERS.md).

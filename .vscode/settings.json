@@ -60,10 +60,14 @@
         "variant": "cpp"
     },
     "cSpell.words": [
+        "hotspot",
+        "IRAM",
         "ledc",
         "ndarray",
         "Obegransad",
         "Obengransad",
-        "packbits"
+        "offtimes",
+        "packbits",
+        "rssi"
     ]
 }
