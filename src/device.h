@@ -1,9 +1,9 @@
 #pragma once
 
+#include <Arduino.h>
 #include <WiFi.h>
 #include <esp_sleep.h>
 #include <string.h>
-#include <Arduino.h>
 #include <WiFiManager.h>
 #include <stdint.h>
 
@@ -14,6 +14,10 @@ enum DeviceError
     ERR_NONE = 0,
     ERR_WIFI,
     ERR_SLEEP,
+    ERR_LITTLE_FS,
+    ERR_PREFERENCES,
+    ERR_JSON,
+    ERR_UNKNOWN, // catch-all for unknown errors
 };
 
 DeviceError wifi_setup(void);

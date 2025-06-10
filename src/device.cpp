@@ -4,17 +4,17 @@
 
 WiFiManager wm;
 
-static const char *PORTAL_NAME = "Obegransad";
+static const char *PORTAL_NAME = "Obegransad-Setup"; // captive portal name
 
 // FIXME: do i really need the function?
 // handles the cases when connection is lost in AP/STA mode
 // the driver fires the event typically every 3-10 seconds when disconnected
-static void on_STA_disconnected(WiFiEvent_t event, WiFiEventInfo_t info)
+static void callback_STA_disconnected(WiFiEvent_t event, WiFiEventInfo_t info)
 {
     static uint8_t failCount = 0;
 
     // print reason
-    Serial.printf("Driver Wi-Fi lost event (on_STA_disconnected), reason %d … reconnecting\n", info.wifi_sta_disconnected.reason);
+    Serial.printf("Driver Wi-Fi lost event (callback_STA_disconnected), reason %d … reconnecting\n", info.wifi_sta_disconnected.reason);
 
     if (++failCount < 10)
     {
@@ -25,7 +25,7 @@ static void on_STA_disconnected(WiFiEvent_t event, WiFiEventInfo_t info)
     {
         Serial.println("Failed to reconnect, starting captive portal again…");
         failCount = 0;
-        display_wifi_setup_prompt();                // show the wifi logo
+        display_wifi_setup_prompt();       // show the wifi logo
         wm.startConfigPortal(PORTAL_NAME); // blocking until user fixes wifi.
     }
 }
@@ -121,7 +121,7 @@ DeviceError wifi_setup(void)
     }
 
     // FIXME: register callback for connection loss
-    // WiFi.onEvent(on_STA_disconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+    // WiFi.onEvent(callback_STA_disconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
     // WiFi.setAutoReconnect(true); // one automatic retry after disconnect
 
     // clean up after success
@@ -136,6 +136,7 @@ DeviceError wifi_setup(void)
     return ERR_NONE;
 }
 
+// Make sure to flush sockets (e.g. web server and http client) before entering light sleep.
 DeviceError enter_light_sleep(uint64_t seconds)
 {
     // flush serial output
@@ -173,8 +174,8 @@ DeviceError enter_light_sleep(uint64_t seconds)
         return ERR_SLEEP;
     }
 
-    // enter sleep returns ESP_OK on wakeup)
-    esp_err_t res = esp_light_sleep_start(); // returns ESP_OK on wakeup
+    // enter sleep (returns ESP_OK on wakeup)
+    esp_err_t res = esp_light_sleep_start();
     if (res != ESP_OK)
     {
         Serial.print("Failed to enter light sleep: ");
@@ -198,7 +199,7 @@ DeviceError enter_light_sleep(uint64_t seconds)
     // re-auth to wifi
     if (!WiFi.reconnect())
     {
-        // will call on_STA_disconnected if it fails
+        // will call callback_STA_disconnected if it fails
         Serial.println("Failed to reconnect to WiFi after sleep");
         return ERR_WIFI;
     }

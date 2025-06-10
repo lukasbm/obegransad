@@ -22,21 +22,3 @@ public:
     DeviceError start(void);
     void stop(void);
 };
-
-class Portal
-{
-public:
-    Portal();
-
-    void start(void);
-    void stop(void);
-    void tick(void);
-    bool isOpen(void) const;
-
-private:
-    bool open = false;     // true if the portal is open, false otherwise
-    SettingsServer server; // HTTP server for captive portal
-    DNSServer dns;         // DNS server for captive portal
-
-    std::vector<NetworkInfo> networks;
-};
