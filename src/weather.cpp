@@ -27,8 +27,8 @@ static void parseWeatherData(WeatherData &res, const JsonDocument &doc)
     auto daily = doc["daily"];
     for (int i = 0; i < FORECAST_DAYS; ++i)
     {
-        res.daily[i].sunrise = uint32_t(daily["sunrise"][i]);
-        res.daily[i].sunset = uint32_t(daily["sunset"][i]);
+        res.daily[i].sunrise = time_t(daily["sunrise"][i]);
+        res.daily[i].sunset = time_t(daily["sunset"][i]);
         res.daily[i].uvIndexMax = float(daily["uv_index_max"][i]);
         res.daily[i].temperatureMax = float(daily["temperature_2m_max"][i]);
         res.daily[i].temperatureMin = float(daily["temperature_2m_min"][i]);

@@ -40,7 +40,7 @@ enum WeatherCode : uint8_t
 
 struct WeatherData
 {
-    uint32_t requestTime; // time when the weather data was fetched, unix time
+    time_t requestTime; // time when the weather data was fetched, unix time
     // current weather
     float temperature;
     WeatherCode weatherCode = WEATHER_UNINITIALIZED; // default to uninitialized
@@ -48,8 +48,8 @@ struct WeatherData
     // daily weather
     struct
     {
-        uint32_t sunrise; // unixtime
-        uint32_t sunset;  // unixtime
+        time_t sunrise; // unix time
+        time_t sunset; // unix time 
         float uvIndexMax;
         float temperatureMax;
         float temperatureMin;

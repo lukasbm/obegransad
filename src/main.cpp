@@ -48,7 +48,7 @@ GameOfLifeScene gameOfLifeScene;
 
 // other components
 SettingsServer settingsServer;                // handles settings via web server
-static uint64_t nextSleepDuration = 0;        // next sleep duration in seconds, used to wake up the device from light sleep
+time_t nextSleepDuration = 0;                 // next sleep duration in seconds, used to wake up the device from light sleep
 RenderTimer timeSyncTimer(60 * 30 * 1000);    // 30 minute timer for NTP sync
 RenderTimer weatherSyncTimer(60 * 30 * 1000); // 30 minute timer for weather sync
 
@@ -218,6 +218,7 @@ void loop()
     // OFF HOURS
     if (shouldTurnOff(time))
     {
+        nextSleepDuration = calcTurnOffDuration(time);
         update_state(STATE_SLEEPING); // switch to sleeping state if it is time to turn off
         update_state(STATE_NORMAL);   // switch back to normal state, as everything during the sleep state is blocking
     }

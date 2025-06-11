@@ -7,7 +7,7 @@
 struct Settings
 {
     uint8_t brightness_day, brightness_night;
-    uint32_t off_hours; // bit mask of 24 bits, each bit represents an hour of the day (0-23)
+    uint32_t off_hours; // bit mask of 24 bits, each bit represents an hour of the day (0-23), LSB is 0:00, "MSB" is 23:00
     double weather_latitude, weather_longitude;
     String timezone;
     uint8_t anniversary_day, anniversary_month;
