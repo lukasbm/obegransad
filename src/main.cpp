@@ -115,7 +115,7 @@ static void update_state(State next)
     case STATE_NORMAL:
         settingsServer.start();
         // TODO: fetch time and weather as we now have wifi again!
-        sceneSwitcher.nextScene(); // display a scene
+        sceneSwitcher.skipTo(0); // display a scene
         captive_portal_stop();
         break;
 
@@ -128,6 +128,7 @@ static void update_state(State next)
     case STATE_NO_WIFI:
         settingsServer.stop();
         captive_portal_stop();
+        sceneSwitcher.skipTo(0); // display a scene
         break;
 
     case STATE_SLEEPING:
@@ -159,7 +160,7 @@ void setup()
     // only switch to first scene once we have state NORMAL or NO_WIFI, keep wifi logo as long as we are in SETUP or CAPTIVE_PORTAL state
 }
 
-// TODO: need to add some breaks so that we don't run stuff like ntp sync every loop
+// TODO: need to add some breaks so that we don't run stuff like ntp sync every loop (use RenderTimers from above!!)
 // TODO: generally need to re-think wifi reconnection logic.
 void loop()
 {
@@ -234,7 +235,6 @@ void buttonSingleClick()
     else if (state == STATE_CAPTIVE_PORTAL)
     {
         Serial.println("Button - Single click -> stop captive portal");
-        captive_portal_stop();
         update_state(STATE_NO_WIFI); // switch to no Wi-Fi state, as we cancelled the captive portal
     }
 }
