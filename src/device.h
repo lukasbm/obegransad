@@ -10,6 +10,7 @@
 void wifi_setup(void);
 void wifi_clear_credentials(void);
 bool wifi_check(void);
+bool wifi_is_portal_active();
 DeviceError enter_light_sleep(uint64_t seconds);
 
 void captive_portal_tick();

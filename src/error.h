@@ -11,5 +11,5 @@ enum DeviceError
     ERR_UNKNOWN, // catch-all for unknown errors
 };
 
-void display_wifi_setup_prompt(void);
+void display_wifi_logo(void);
 void display_device_error(DeviceError err);

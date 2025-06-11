@@ -9,7 +9,7 @@
 #include "led.h"
 #include "sprites/wifi.hpp"
 
-WiFiManager wm;
+static WiFiManager wm;
 
 static const char *PORTAL_NAME = "Obegransad-Setup"; // captive portal name
 
@@ -32,7 +32,7 @@ static void callback_STA_disconnected(WiFiEvent_t event, WiFiEventInfo_t info)
     {
         Serial.println("Failed to reconnect, starting captive portal again…");
         failCount = 0;
-        display_wifi_setup_prompt();       // show the wifi logo
+        display_wifi_logo();               // show the wifi logo
         wm.startConfigPortal(PORTAL_NAME); // blocking until user fixes wifi.
     }
 }
@@ -111,18 +111,27 @@ void captive_portal_stop()
     wm.stopConfigPortal();
 }
 
+// Sets up wifi and starts the captive portal if no credentials are stored
+// make sure this function is never called more than once!
 void wifi_setup(void)
 {
+    WiFi.mode(WIFI_STA); // set Wi-Fi mode to STA (station) mode initially
     // if WiFi connection not in flash, start captive portal
-    wm.setConfigPortalTimeout(600);
-    WiFi.setAutoConnect(true);         // enable auto-connect, a single connection attempt with last saved credentials on driver startup
-    WiFi.setAutoReconnect(true);       // enable auto-reconnect, will try to reconnect (exponential back-off) if connection is lost
+    wm.setConfigPortalTimeout(120);    // seconds to enter credentials, otherwise captive portal will stop
+    wm.setConnectTimeout(30);          // seconds to connect to Wi-Fi
     wm.setConfigPortalBlocking(false); // non-blocking, so we can handle button presses
-    WiFi.onEvent(callback_STA_disconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+    // WiFi.onEvent(callback_STA_disconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
     wm.setDarkMode(true);
 #if DEBUG
     wm.setDebugOutput(true);
 #endif
+    // Callback when AP (portal) comes up
+    wm.setAPCallback([](WiFiManager *w)
+                     { Serial.println(">>> Entered config portal"); });
+
+    // Callback when credentials are saved (Exit button)
+    wm.setSaveConfigCallback([]()
+                             { Serial.println(">>> Credentials saved; portal should stop soon"); });
 
     // make the captive portal actually appear on device
     if (WebServer *s = wm.server.get())
@@ -131,7 +140,20 @@ void wifi_setup(void)
     }
 
     // start the captive portal
-    wm.autoConnect(PORTAL_NAME);
+    bool alreadyConnected = wm.autoConnect(PORTAL_NAME);
+    if (alreadyConnected)
+    {
+        Serial.printf("✔ Connected to WiFi, IP=%s\n", WiFi.localIP().toString().c_str());
+    }
+    else
+    {
+        Serial.println("⚙ Config portal running in background");
+    }
+}
+
+bool wifi_is_portal_active()
+{
+    return wm.getConfigPortalActive(); // || portalActive;
 }
 
 // Make sure to flush sockets (e.g. web server and http client) before entering light sleep.

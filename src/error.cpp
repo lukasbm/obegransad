@@ -2,7 +2,7 @@
 #include "led.h"
 #include "sprites/wifi.hpp"
 
-void display_wifi_setup_prompt(void)
+void display_wifi_logo(void)
 {
     // display the wifi logo while connecting
     panel_clear();

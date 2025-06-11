@@ -127,7 +127,7 @@ static void update_state(State next)
     case STATE_CAPTIVE_PORTAL:
         Serial.println("State change to CAPTIVE_PORTAL");
         settingsServer.stop();
-        display_wifi_setup_prompt(); // show the Wi-Fi logo
+        display_wifi_logo(); // show the Wi-Fi logo
         captive_portal_start();
         break;
 
@@ -181,8 +181,15 @@ void loop()
     button.tick(); // always update the button
     if (state == STATE_CAPTIVE_PORTAL)
     {
-        // TODO: need to handle the case where the captive portal has timed out, so we can switch to no Wi-Fi state
-        captive_portal_tick();
+        if (!wifi_is_portal_active())
+        {
+            Serial.println("Captive portal is not active, switching to NO_WIFI state");
+            update_state(STATE_NO_WIFI); // if the captive portal is not active, switch to no Wi-Fi state
+        }
+        else
+        {
+            captive_portal_tick();
+        }
     }
     if (state == STATE_NO_WIFI || state == STATE_NORMAL)
     {
