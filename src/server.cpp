@@ -61,7 +61,8 @@ void handle_put_settings(AsyncWebServerRequest *req,
     auto off_hours_helper = [doc]() -> uint32_t
     {
         if (doc["off_hours"].isNull())
-            return gSettings.off_hours; // no off hours set
+        return gSettings.off_hours; // no off hours set
+        // off_hours is an array of booleans
         uint32_t off_hours = 0;
         for (int i = 0; i < 24; ++i)
         {

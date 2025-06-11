@@ -20,6 +20,8 @@
 #include "scenes/scene_weather.hpp"
 #include "scenes/switcher.hpp"
 #include "scenes/scene_concentric_circles.hpp"
+#include "scenes/fireworks.hpp"
+#include "scenes/game_of_life.hpp"
 
 // button definitions
 OneButton button;
@@ -40,9 +42,20 @@ WeatherForecastScene weatherForecastScene;
 WeatherMinMaxScene weatherMinMaxScene;
 WeatherScene weatherScene;
 ConcentricCircleScene concentricCircleScene;
+FireworksScene fireworksScene;
+GameOfLifeScene gameOfLifeScene;
 
 // other components
 SettingsServer settingsServer; // handles settings via web server
+
+enum State
+{
+    STATE_NORMAL = 0,     // normal operation, wifi connected, no captive portal, settings server on
+    STATE_CAPTIVE_PORTAL, // captive portal active, wifi disconnected
+    STATE_NO_WIFI,        // wifi disconnected, captive portal not active, settings server running but not accessible
+    STATE_SETUP           // settings server not running, captive portal not yet active
+};
+static State state = STATE_SETUP;
 
 /* ULTRA FAST panel refresh 500 Hz */
 static hw_timer_t *panelTimer = nullptr;
@@ -69,13 +82,13 @@ void stop_panel_timer()
 }
 
 // switcher
-constexpr size_t NUM_SCENES = 3; // number of scenes
+constexpr size_t NUM_SCENES = 4; // number of scenes
 SceneSwitcher<NUM_SCENES> sceneSwitcher(
     std::array<Scene *, NUM_SCENES>{
         &snakeScene,
         &clockSceneSecond,
         &concentricCircleScene,
-    });
+        &gameOfLifeScene});
 
 static void conduct_checks();
 
@@ -85,27 +98,25 @@ void setup()
     Serial.begin(115200);
     Serial.println("Starting setup...");
 
-    buttonSetup();
+    buttonSetup();               // set up the button
+    panel_init();                // initialize the LED panel
+    display_wifi_setup_prompt(); // show the Wi-Fi logo
+    wifi_setup();                // start captive portal if no Wi-Fi credentials are stored
 
-    panel_init();
-
-    display_wifi_setup_prompt(); // run in non-blocking mode!!!
-    DeviceError err = wifi_setup();
-
-    // NTP sync
-    time_setup();
-
-    // accept new configs
-    settingsServer.start();
-
-    Serial.println("Setup done!");
-
-    conduct_checks();
-
-    // Start with the first scene
-    sceneSwitcher.nextScene();
+    // only switch to first scene once we have state NORMAL or NO_WIFI, keep wifi logo as long as we are in SETUP or CAPTIVE_PORTAL state
 }
 
+//     // NTP sync
+//     time_setup();
+//     // accept new configs
+//     settingsServer.start();
+//     Serial.println("Setup done!");
+//     conduct_checks();
+//     // Start with the first scene
+//     sceneSwitcher.nextScene();
+// }
+
+// TODO: basically implement a state machine here (based on STATE)
 void loop()
 {
     static unsigned long lastChecks = millis();
@@ -120,6 +131,8 @@ void loop()
 
     // Update the current scene
     sceneSwitcher.tick();
+
+    captive_portal_tick(); // handle captive portal events
 
     // refresh the display
     panel_show();

@@ -93,6 +93,13 @@ static void add_captive_portal_spoof(WebServer *s)
         });
 }
 
+void captive_portal_tick()
+{
+    // this is called in the main loop to keep the captive portal alive
+    // it will handle button presses and other events
+    wm.process();
+}
+
 void wifi_setup(void)
 {
     // if WiFi connection not in flash, start captive portal

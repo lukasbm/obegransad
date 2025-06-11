@@ -4,6 +4,6 @@
 // TODO: fireworks animation sprite
 
 // a simple screensaver scene that displays fireworks
-class GameOfLifeScene : public Scene
+class FireworksScene : public Scene
 {
 };
