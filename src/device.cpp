@@ -37,28 +37,33 @@ static void callback_STA_disconnected(WiFiEvent_t event, WiFiEventInfo_t info)
     }
 }
 
-bool wifi_check(void)
-{
-    static unsigned long lastTry = 0;
+// bool wifi_check(void)
+// {
+//     static unsigned long lastTry = 0;
 
-    if (WiFi.status() != WL_CONNECTED)
-    {
-        if (millis() - lastTry > 30000)
-        {
-            lastTry = millis();
-            return WiFi.reconnect();
-        }
-        else
-        {
-            return false; // not connected, but not yet time to retry
-        }
-    }
-    else
-    {
-        // reset the timer when connected
-        lastTry = 0;
-        return true;
-    }
+//     if (WiFi.status() != WL_CONNECTED)
+//     {
+//         if (millis() - lastTry > 30000)
+//         {
+//             lastTry = millis();
+//             return WiFi.reconnect();
+//         }
+//         else
+//         {
+//             return false; // not connected, but not yet time to retry
+//         }
+//     }
+//     else
+//     {
+//         // reset the timer when connected
+//         lastTry = 0;
+//         return true;
+//     }
+// }
+
+bool wifi_check()
+{
+    return (WiFi.status() == WL_CONNECTED);
 }
 
 void wifi_clear_credentials(void)
@@ -88,11 +93,15 @@ static void add_captive_portal_spoof(WebServer *s)
         });
 }
 
-DeviceError wifi_setup(void)
+void wifi_setup(void)
 {
     // if WiFi connection not in flash, start captive portal
-    wm.setConfigPortalTimeout(600); // 10 minutes
-
+    wm.setConfigPortalTimeout(600);
+    WiFi.setAutoConnect(true);         // enable auto-connect, a single connection attempt with last saved credentials on driver startup
+    WiFi.setAutoReconnect(true);       // enable auto-reconnect, will try to reconnect (exponential back-off) if connection is lost
+    wm.setConfigPortalBlocking(false); // non-blocking, so we can handle button presses
+    WiFi.onEvent(callback_STA_disconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+    wm.setDarkMode(true);
 #if DEBUG
     wm.setDebugOutput(true);
 #endif
@@ -103,27 +112,8 @@ DeviceError wifi_setup(void)
         add_captive_portal_spoof(s);
     }
 
-    Serial.println("Trying to open captive portal...");
-    if (!wm.autoConnect(PORTAL_NAME))
-    {
-        Serial.println("Portal timed out or aborted!");
-        ESP.restart();
-    }
-
-    // FIXME: register callback for connection loss
-    // WiFi.onEvent(callback_STA_disconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
-    // WiFi.setAutoReconnect(true); // one automatic retry after disconnect
-
-    // clean up after success
-    Serial.println("Connected to WiFi!");
-    Serial.print("IP Address: ");
-    Serial.println(WiFi.localIP());
-    // migrate from AP to STA mode
-    delay(3000);                 // give phone time to finish
-    WiFi.softAPdisconnect(true); // drop the hotspot
-    WiFi.mode(WIFI_STA);         // switch to STA mode
-
-    return ERR_NONE;
+    // start the captive portal
+    wm.autoConnect(PORTAL_NAME);
 }
 
 // Make sure to flush sockets (e.g. web server and http client) before entering light sleep.
@@ -131,10 +121,6 @@ DeviceError enter_light_sleep(uint64_t seconds)
 {
     // flush serial output
     Serial.flush();
-
-    // flush sockets
-    // TODO: flush async web server sockets from config?
-    // TODO: maybe need to merge device and config module
 
     // stop wifi
     if (esp_wifi_stop() != ESP_OK)
