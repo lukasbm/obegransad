@@ -100,6 +100,17 @@ void captive_portal_tick()
     wm.process();
 }
 
+void captive_portal_start()
+{
+    wm.startConfigPortal(PORTAL_NAME);
+}
+
+void captive_portal_stop()
+{
+    // stop the captive portal
+    wm.stopConfigPortal();
+}
+
 void wifi_setup(void)
 {
     // if WiFi connection not in flash, start captive portal

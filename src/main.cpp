@@ -90,7 +90,42 @@ SceneSwitcher<NUM_SCENES> sceneSwitcher(
         &concentricCircleScene,
         &gameOfLifeScene});
 
-static void conduct_checks();
+// manages the state transitions
+// components to keep track of:
+// - captive portal
+// - settings server
+// - panel (either scene or wifi logo)
+static void update_state(State next)
+{
+    if (state == next)
+    {
+        return; // no change
+    }
+
+    Serial.printf("State change: %d -> %d\n", state, next);
+
+    switch (next)
+    {
+    case STATE_NORMAL:
+        settingsServer.start();
+        sceneSwitcher.nextScene(); // display a scene
+        captive_portal_stop();
+        break;
+
+    case STATE_CAPTIVE_PORTAL:
+        settingsServer.stop();
+        display_wifi_setup_prompt(); // show the Wi-Fi logo
+        captive_portal_start();
+        break;
+
+    case STATE_NO_WIFI:
+        settingsServer.stop();
+        captive_portal_stop();
+        break;
+    }
+
+    state = next;
+}
 
 void setup()
 {
@@ -98,33 +133,50 @@ void setup()
     Serial.begin(115200);
     Serial.println("Starting setup...");
 
-    buttonSetup();               // set up the button
-    panel_init();                // initialize the LED panel
-    display_wifi_setup_prompt(); // show the Wi-Fi logo
-    wifi_setup();                // start captive portal if no Wi-Fi credentials are stored
+    // state independent setup code
+    buttonSetup();       // set up the button
+    panel_init();        // initialize the LED panel
+    start_panel_timer(); //
+    wifi_setup();        // set up Wi-Fi, will start captive portal if no credentials are stored
+
+    update_state(STATE_CAPTIVE_PORTAL);
 
     // only switch to first scene once we have state NORMAL or NO_WIFI, keep wifi logo as long as we are in SETUP or CAPTIVE_PORTAL state
 }
 
-//     // NTP sync
-//     time_setup();
-//     // accept new configs
-//     settingsServer.start();
-//     Serial.println("Setup done!");
-//     conduct_checks();
-//     // Start with the first scene
-//     sceneSwitcher.nextScene();
-// }
-
-// TODO: basically implement a state machine here (based on STATE)
 void loop()
 {
+
+    Serial.println("Conducting checks...");
+    struct tm time = time_fetch();
+
+    // adjust brightness
+    gBright = isNight(time) ? gSettings.brightness_night : gSettings.brightness_day;
+
+    // also check if it is time to shut off!
+    // if (shouldTurnOff(time))
+    // {
+    //   enter_light_sleep() // TODO: make it also return the sleep duration
+    // }
+
+    // check wifi health
+    if (!wifi_check())
+    {
+        Serial.println("Wi-Fi is not connected, trying to reconnect …");
+    }
+    else
+    {
+        Serial.println("Wi-Fi is healthy.");
+    }
+
     static unsigned long lastChecks = millis();
     if (millis() - lastChecks > 10000) // check every 10 seconds
     {
         conduct_checks();
         lastChecks = millis();
     }
+
+    // switch states ,e.g. if Wi-Fi is not connected, switch to STATE_NO_WIFI
 
     // Update the button
     button.tick();
@@ -155,49 +207,31 @@ void buttonSetup()
 
 void buttonSingleClick()
 {
-    Serial.println("Button - Single click -> next scene");
-    sceneSwitcher.nextScene();
+    if (state == STATE_NORMAL)
+    {
+        Serial.println("Button - Single click -> next scene");
+        sceneSwitcher.nextScene();
+    }
+    else if (state == STATE_CAPTIVE_PORTAL)
+    {
+        Serial.println("Button - Single click -> stop captive portal");
+        captive_portal_stop();
+        update_state(STATE_NO_WIFI); // switch to no Wi-Fi state, as we cancelled the captive portal
+    }
 }
 
 void buttonLongPressStart()
 {
-    Serial.println("Button - Long press start");
     buttonLongPressTimer = millis();
 }
 
 void buttonLongPressStop()
 {
-    Serial.println("Button - Long press stop");
     int duration = millis() - buttonLongPressTimer;
     Serial.printf("Button long press duration: %d ms\n", duration);
     if (duration > 10000)
     {
         Serial.println("Button long press -> reset WiFi credentials");
         wifi_clear_credentials();
-    }
-}
-
-static void conduct_checks()
-{
-    Serial.println("Conducting checks...");
-    struct tm time = time_fetch();
-
-    // adjust brightness
-    gBright = isNight(time) ? gSettings.brightness_night : gSettings.brightness_day;
-
-    // also check if it is time to shut off!
-    // if (shouldTurnOff(time))
-    // {
-    //   enter_light_sleep() // TODO: make it also return the sleep duration
-    // }
-
-    // check wifi health
-    if (!wifi_check())
-    {
-        Serial.println("Wi-Fi is not connected, trying to reconnect …");
-    }
-    else
-    {
-        Serial.println("Wi-Fi is healthy.");
     }
 }
