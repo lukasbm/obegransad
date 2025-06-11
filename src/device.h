@@ -1,14 +1,11 @@
 #pragma once
 
-#include <Arduino.h>
-#include <WiFi.h>
-#include <esp_sleep.h>
-#include <string.h>
-#include <WiFiManager.h>
-#include <stdint.h>
 #include "error.h"
+#include <stdint.h>
 
 #define BUTTON_PIN 20 // D7 (GPIO 20)
+
+// right now the wifi manager uses 30% of flash storage, if we run out of space, use this instead: https://github.com/prampec/IotWebConf
 
 DeviceError wifi_setup(void);
 void wifi_clear_credentials(void);

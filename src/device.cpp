@@ -1,4 +1,11 @@
 #include "device.h"
+
+#include <Arduino.h>
+#include <string.h>
+#include <WiFiManager.h>
+#include <WiFi.h>
+#include <esp_sleep.h>
+
 #include "led.h"
 #include "sprites/wifi.hpp"
 
