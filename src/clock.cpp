@@ -8,7 +8,7 @@ void time_setup()
 
 void time_syncNTP()
 {
-    configTzTime(settings.timezone.c_str(), MY_NTP_SERVER);
+    configTzTime(gSettings.timezone.c_str(), MY_NTP_SERVER);
     struct tm temp;
     if (!getLocalTime(&temp, 2000))
     {
@@ -17,6 +17,7 @@ void time_syncNTP()
     }
 }
 
+// FIXME: ditch this function and use sunrise and sunset times from weather API (only use this if no wifi)
 bool isNight(struct tm const &time)
 {
     if (time.tm_hour >= 22 || time.tm_hour < 6)
@@ -26,17 +27,9 @@ bool isNight(struct tm const &time)
     return false; // day
 }
 
-inline bool shouldTurnOffSingle(struct tm &time, const OffTime &offtime)
-{
-    // TODO: check if the time is within the off time range
-    return true;
-}
-
 bool shouldTurnOff(struct tm &time)
 {
-    return shouldTurnOffSingle(time, settings.offtime1) ||
-           shouldTurnOffSingle(time, settings.offtime2) ||
-           shouldTurnOffSingle(time, settings.offtime3);
+    return true; // TODO: implement the logic to check if the current time is in the off hours
 }
 
 struct tm time_fetch()

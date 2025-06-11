@@ -170,7 +170,7 @@ static void conduct_checks()
     struct tm time = time_fetch();
 
     // adjust brightness
-    gBright = isNight(time) ? settings.brightness_night : settings.brightness_day;
+    gBright = isNight(time) ? gSettings.brightness_night : gSettings.brightness_day;
 
     // also check if it is time to shut off!
     // if (shouldTurnOff(time))

@@ -63,7 +63,7 @@ public:
     {
         Serial.println("Weather scene activated");
         // initial data
-        weatherData = fetchWeather(settings.weather_latitude, settings.weather_longitude);
+        weatherData = fetchWeather(gSettings.weather_latitude, gSettings.weather_longitude);
         weatherData.print();
         drawWeatherData();
     }
@@ -79,7 +79,7 @@ public:
         unsigned long now = millis();
         if (now - lastFetch > weatherUpdateInterval * 1000)
         {
-            weatherData = fetchWeather(settings.weather_latitude, settings.weather_longitude);
+            weatherData = fetchWeather(gSettings.weather_latitude, gSettings.weather_longitude);
             weatherData.print();
             lastFetch = now;
         }

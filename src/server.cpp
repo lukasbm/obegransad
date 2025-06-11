@@ -7,34 +7,14 @@ static void handle_get_settings(AsyncWebServerRequest *request)
     JsonDocument doc;
     // same names as in Settings struct and preferences (NVS)
 
-    auto offtime_helper = [](JsonDocument &obj, const OffTime &offtime, const String &prefix)
-    {
-        obj[prefix + "from_hour"] = offtime.from_hour;
-        obj[prefix + "from_minute"] = offtime.from_minute;
-        obj[prefix + "to_hour"] = offtime.to_hour;
-        obj[prefix + "to_minute"] = offtime.to_minute;
-        // spread bitmask
-        obj[prefix + "sunday"] = bool(offtime.sunday);
-        obj[prefix + "monday"] = bool(offtime.monday);
-        obj[prefix + "tuesday"] = bool(offtime.tuesday);
-        obj[prefix + "wednesday"] = bool(offtime.wednesday);
-        obj[prefix + "thursday"] = bool(offtime.thursday);
-        obj[prefix + "friday"] = bool(offtime.friday);
-        obj[prefix + "saturday"] = bool(offtime.saturday);
-    };
-
-    doc["wifi_ssid"] = settings.ssid;
-    doc["wifi_password"] = settings.password;
-    doc["brightness_day"] = settings.brightness_day;
-    doc["brightness_night"] = settings.brightness_night;
-    offtime_helper(doc, settings.offtime1, "offtime1_");
-    offtime_helper(doc, settings.offtime2, "offtime2_");
-    offtime_helper(doc, settings.offtime3, "offtime3_");
-    doc["weather_latitude"] = settings.weather_latitude;
-    doc["weather_longitude"] = settings.weather_longitude;
-    doc["timezone"] = settings.timezone;
-    doc["anniversary_day"] = settings.anniversary_day;
-    doc["anniversary_month"] = settings.anniversary_month;
+    doc["brightness_day"] = gSettings.brightness_day;
+    doc["brightness_night"] = gSettings.brightness_night;
+    // offtime_helper(doc, gSettings.offtime3, "offtime3_");
+    doc["weather_latitude"] = gSettings.weather_latitude;
+    doc["weather_longitude"] = gSettings.weather_longitude;
+    doc["timezone"] = gSettings.timezone;
+    doc["anniversary_day"] = gSettings.anniversary_day;
+    doc["anniversary_month"] = gSettings.anniversary_month;
     // serialize the document to JSON
     serializeJson(doc, out);
     request->send(200, "application/json", out);
@@ -77,41 +57,20 @@ void handle_post_settings(AsyncWebServerRequest *req,
     }
     JsonObject obj = doc.as<JsonObject>();
 
-    // TODO: validate required fields (e.g. types via obj[key].is<Type>())
-
-    auto offtime_helper = [](JsonDocument &obj, OffTime &offtime, const String &prefix)
-    {
-        // obj[prefix + "from_hour"] = offtime.from_hour;
-        offtime.from_hour = obj[prefix + "_from_hour"] | offtime.from_hour;
-        offtime.from_minute = obj[prefix + "_from_minute"] | offtime.from_minute;
-        offtime.to_hour = obj[prefix + "_to_hour"] | offtime.to_hour;
-        offtime.to_minute = obj[prefix + "_to_minute"] | offtime.to_minute;
-        offtime.sunday = obj[prefix + "_sunday"] | offtime.sunday;
-        offtime.monday = obj[prefix + "_monday"] | offtime.monday;
-        offtime.tuesday = obj[prefix + "_tuesday"] | offtime.tuesday;
-        offtime.wednesday = obj[prefix + "_wednesday"] | offtime.wednesday;
-        offtime.thursday = obj[prefix + "_thursday"] | offtime.thursday;
-        offtime.friday = obj[prefix + "_friday"] | offtime.friday;
-        offtime.saturday = obj[prefix + "_saturday"] | offtime.saturday;
-        return offtime;
-    };
+    // parse .... = valid
 
     // merge only what’s present
-    settings.brightness_day = doc["brightness_day"] | settings.brightness_day;
-    settings.brightness_night = doc["brightness_night"] | settings.brightness_night;
-    settings.ssid = doc["wifi_ssid"] | settings.ssid;
-    settings.password = doc["wifi_password"] | settings.password;
-    settings.weather_latitude = doc["weather_latitude"] | settings.weather_latitude;
-    settings.weather_longitude = doc["weather_longitude"] | settings.weather_longitude;
-    settings.timezone = doc["timezone"] | settings.timezone;
-    settings.anniversary_day = doc["anniversary_day"] | settings.anniversary_day;
-    settings.anniversary_month = doc["anniversary_month"] | settings.anniversary_month;
-    settings.offtime1 = offtime_helper(doc, settings.offtime1, "offtime1");
-    settings.offtime2 = offtime_helper(doc, settings.offtime2, "offtime2");
-    settings.offtime3 = offtime_helper(doc, settings.offtime3, "offtime3");
+    gSettings.brightness_day = doc["brightness_day"] | gSettings.brightness_day;
+    gSettings.brightness_night = doc["brightness_night"] | gSettings.brightness_night;
+    gSettings.weather_latitude = doc["weather_latitude"] | gSettings.weather_latitude;
+    gSettings.weather_longitude = doc["weather_longitude"] | gSettings.weather_longitude;
+    gSettings.timezone = doc["timezone"] | gSettings.timezone;
+    gSettings.anniversary_day = doc["anniversary_day"] | gSettings.anniversary_day;
+    gSettings.anniversary_month = doc["anniversary_month"] | gSettings.anniversary_month;
+    // gSettings.offtime1 = offtime_helper(doc, gSettings.offtime1, "offtime1");
 
     // save settings to persistent storage
-    write_to_persistent_storage(settings);
+    write_to_persistent_storage(gSettings);
 
     // respond
     req->send(200, "application/json", R"({"ok":true})");

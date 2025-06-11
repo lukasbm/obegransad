@@ -1,54 +1,39 @@
 #pragma once
 
 #include <Arduino.h>
-
-// if from is like 22:00 and to is like 06:00, it will run until the next day, but it needs to be part of "days"
-struct OffTime
-{
-    uint8_t from_hour;
-    uint8_t from_minute;
-    uint8_t to_hour;
-    uint8_t to_minute;
-    union
-    {
-        uint8_t days; // LSB is Sunday, LSB<<1 is Monday, LSB<<2 is Tuesday, etc.
-        struct
-        {
-            uint8_t sunday : 1;
-            uint8_t monday : 1;
-            uint8_t tuesday : 1;
-            uint8_t wednesday : 1;
-            uint8_t thursday : 1;
-            uint8_t friday : 1;
-            uint8_t saturday : 1;
-            uint8_t reserved : 1; // reserved for future use
-        };
-    };
-
-    // isInside is true if the time is inside the off time range
-    bool isInside(const struct tm &time) const;
-};
+#include <ArduinoJson.h>
+#include <optional>
+#include <atomic>
+#include <Preferences.h>
 
 // trying to use the names consistent between this struct, json and preferences (NVS)
 struct Settings
 {
-    bool initial_setup_done; // true if the initial setup has been done, false otherwise. If false, then the captive portal open on every boot.
-    String ssid;
-    String password;
-    uint8_t brightness_day;
-    uint8_t brightness_night;
-    OffTime offtime1;
-    OffTime offtime2;
-    OffTime offtime3;
-    double weather_latitude;
-    double weather_longitude;
+    uint8_t brightness_day, brightness_night;
+    uint32_t off_hours; // bit mask of 24 bits, each bit represents an hour of the day (0-23)
+    double weather_latitude, weather_longitude;
     String timezone;
-    uint8_t anniversary_day;
-    uint8_t anniversary_month;
+    uint8_t anniversary_day, anniversary_month;
+
+    // central validation
+    bool valid() const
+    {
+        auto geoOk = [](double la, double lo)
+        {
+            return la >= -90 && la <= 90 && lo >= -180 && lo <= 180;
+        };
+
+        // skipping timezone validation for now, as it is a string and can be anything
+        return geoOk(weather_latitude, weather_longitude) &&
+               anniversary_day >= 1 && anniversary_day <= 31 &&
+               anniversary_month >= 1 && anniversary_month <= 12;
+    }
 };
 
-void write_to_persistent_storage(Settings &settings);
-void read_from_persistent_storage(const Settings *settings);
+// persistent storage functions
+void write_to_persistent_storage(const Settings &settings);
+void read_from_persistent_storage(Settings *settings);
 void clear_persistent_storage(void);
 
-extern Settings settings; // global settings structure
+// global immutable settings
+extern Settings gSettings; // global settings structure
