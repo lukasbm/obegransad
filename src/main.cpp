@@ -115,6 +115,7 @@ static void update_state(State next)
     switch (next)
     {
     case STATE_NORMAL:
+        Serial.println("State change to NORMAL");
         settingsServer.start();
         // fetch time and weather as we now have wifi (again)!
         timeSyncTimer.reset();    // reset the timer so that we sync immediately
@@ -124,18 +125,21 @@ static void update_state(State next)
         break;
 
     case STATE_CAPTIVE_PORTAL:
+        Serial.println("State change to CAPTIVE_PORTAL");
         settingsServer.stop();
         display_wifi_setup_prompt(); // show the Wi-Fi logo
         captive_portal_start();
         break;
 
     case STATE_NO_WIFI:
+        Serial.println("State change to NO_WIFI");
         settingsServer.stop();
         captive_portal_stop();
         sceneSwitcher.skipTo(0); // display a scene
         break;
 
     case STATE_SLEEPING:
+        Serial.println("State change to SLEEPING");
         settingsServer.stop();
         captive_portal_stop();
         stop_panel_timer();                   // stop the panel timer
@@ -154,6 +158,7 @@ void setup()
     Serial.println("Starting setup...");
 
     // state independent setup code
+    gSettings = read_from_persistent_storage();
     buttonSetup();       // set up the button
     panel_init();        // initialize the LED panel
     start_panel_timer(); //
@@ -161,17 +166,22 @@ void setup()
 
     update_state(STATE_CAPTIVE_PORTAL);
 
+    Serial.println("Setup complete, entering main loop...");
+
     // only switch to first scene once we have state NORMAL or NO_WIFI, keep wifi logo as long as we are in SETUP or CAPTIVE_PORTAL state
 }
 
 void loop()
 {
     struct tm time = time_get();
+    Serial.print("Current State: ");
+    Serial.println(state);
 
     // TICKS
     button.tick(); // always update the button
     if (state == STATE_CAPTIVE_PORTAL)
     {
+        // TODO: need to handle the case where the captive portal has timed out, so we can switch to no Wi-Fi state
         captive_portal_tick();
     }
     if (state == STATE_NO_WIFI || state == STATE_NORMAL)

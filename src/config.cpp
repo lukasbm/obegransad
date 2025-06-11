@@ -2,7 +2,7 @@
 
 static const char *PREF_NAME = "app"; // preferences namespace
 
-Settings gSettings = read_from_persistent_storage();
+Settings gSettings; // global settings object, initialized with default values
 
 // implicitly sets default values.
 Settings read_from_persistent_storage()
