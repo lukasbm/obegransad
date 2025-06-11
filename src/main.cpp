@@ -22,6 +22,7 @@
 #include "scenes/scene_concentric_circles.hpp"
 #include "scenes/fireworks.hpp"
 #include "scenes/game_of_life.hpp"
+#include "scenes/helper.hpp"
 
 // button definitions
 OneButton button;
@@ -48,14 +49,8 @@ GameOfLifeScene gameOfLifeScene;
 // other components
 SettingsServer settingsServer; // handles settings via web server
 
-enum State
-{
-    STATE_NORMAL = 0,     // normal operation, wifi connected, no captive portal, settings server on
-    STATE_CAPTIVE_PORTAL, // captive portal active, wifi disconnected
-    STATE_NO_WIFI,        // wifi disconnected, captive portal not active, settings server running but not accessible
-    STATE_SETUP           // settings server not running, captive portal not yet active
-};
-static State state = STATE_SETUP;
+RenderTimer timeSyncTimer(60 * 30 * 1000);    // 30 minute timer for NTP sync
+RenderTimer weatherSyncTimer(60 * 30 * 1000); // 30 minute timer for weather sync
 
 /* ULTRA FAST panel refresh 500 Hz */
 static hw_timer_t *panelTimer = nullptr;
@@ -90,11 +85,22 @@ SceneSwitcher<NUM_SCENES> sceneSwitcher(
         &concentricCircleScene,
         &gameOfLifeScene});
 
+enum State
+{
+    STATE_NORMAL = 0,     // normal operation, wifi connected, no captive portal, settings server on
+    STATE_CAPTIVE_PORTAL, // captive portal active, wifi disconnected
+    STATE_NO_WIFI,        // wifi disconnected, captive portal not active, settings server running but not accessible
+    STATE_SETUP,          // settings server not running, captive portal not yet active
+    STATE_SLEEPING        // device is in light sleep mode, waiting for button press or timer wakeup
+};
+static State state = STATE_SETUP;
+
 // manages the state transitions
 // components to keep track of:
 // - captive portal
 // - settings server
 // - panel (either scene or wifi logo)
+// ? stuff related to sleep?
 static void update_state(State next)
 {
     if (state == next)
@@ -108,6 +114,7 @@ static void update_state(State next)
     {
     case STATE_NORMAL:
         settingsServer.start();
+        // TODO: fetch time and weather as we now have wifi again!
         sceneSwitcher.nextScene(); // display a scene
         captive_portal_stop();
         break;
@@ -121,6 +128,14 @@ static void update_state(State next)
     case STATE_NO_WIFI:
         settingsServer.stop();
         captive_portal_stop();
+        break;
+
+    case STATE_SLEEPING:
+        settingsServer.stop();
+        captive_portal_stop();
+        stop_panel_timer();         // stop the panel timer
+        panel_clear();              // clear the panel
+        enter_light_sleep(60 * 60); // enter light sleep for 1 hour // FIXME: make this configurable
         break;
     }
 
@@ -144,50 +159,54 @@ void setup()
     // only switch to first scene once we have state NORMAL or NO_WIFI, keep wifi logo as long as we are in SETUP or CAPTIVE_PORTAL state
 }
 
+// TODO: need to add some breaks so that we don't run stuff like ntp sync every loop
+// TODO: generally need to re-think wifi reconnection logic.
 void loop()
 {
+    // TICKS
+    button.tick(); // always update the button
+    if (state == STATE_CAPTIVE_PORTAL)
+    {
+        captive_portal_tick();
+    }
+    if (state == STATE_NO_WIFI || state == STATE_NORMAL)
+    {
+        sceneSwitcher.tick();
+    }
 
-    Serial.println("Conducting checks...");
+    // WIFI
+    if (state != STATE_CAPTIVE_PORTAL)
+    {
+        if (wifi_check())
+        {
+            update_state(STATE_NORMAL); // if we are in captive portal state and Wi-Fi is connected, switch to normal state
+        }
+        else
+        {
+            update_state(STATE_NO_WIFI); // if we are in normal state and Wi-Fi is not connected, switch to no Wi-Fi state
+        }
+    }
+
+    // OFF HOURS
     struct tm time = time_fetch();
-
-    // adjust brightness
-    gBright = isNight(time) ? gSettings.brightness_night : gSettings.brightness_day;
-
-    // also check if it is time to shut off!
-    // if (shouldTurnOff(time))
-    // {
-    //   enter_light_sleep() // TODO: make it also return the sleep duration
-    // }
-
-    // check wifi health
-    if (!wifi_check())
+    if (shouldTurnOff(time))
     {
-        Serial.println("Wi-Fi is not connected, trying to reconnect …");
-    }
-    else
-    {
-        Serial.println("Wi-Fi is healthy.");
+        update_state(STATE_SLEEPING); // switch to sleeping state if it is time to turn off
     }
 
-    static unsigned long lastChecks = millis();
-    if (millis() - lastChecks > 10000) // check every 10 seconds
+    // BRIGHTNESS
+    // TODO: panel_setBrightness()
+
+    // WEATHER
+    // FIXME: central updates
+
+    // TIME
+    if (state == STATE_NORMAL)
     {
-        conduct_checks();
-        lastChecks = millis();
+        time_syncNTP();
     }
 
-    // switch states ,e.g. if Wi-Fi is not connected, switch to STATE_NO_WIFI
-
-    // Update the button
-    button.tick();
-
-    // Update the current scene
-    sceneSwitcher.tick();
-
-    captive_portal_tick(); // handle captive portal events
-
-    // refresh the display
-    panel_show();
+    delay(10); // small delay to avoid busy loop and give scheduler a chance to run
 }
 
 ///// button stuff
