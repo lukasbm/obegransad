@@ -7,7 +7,9 @@
 #include <ArduinoJson.h>
 #include <Preferences.h>
 #include <vector>
-#include "device.h"
+#include "error.h"
+
+// make sure to NOT include device here as the Wifi manager dependency breaks this server.
 
 static const char *PORTAL_NAME = "Obegransad-Setup"; // captive portal name (SSID)
 static const IPAddress PORTAL_IP(192, 168, 4, 1);    // captive portal IP address

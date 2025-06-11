@@ -7,6 +7,7 @@
 #include "led.h"
 #include "sprites/wifi.hpp"
 #include "clock.h"
+#include "server.h"
 #include "scenes/scene_anniversary.hpp"
 #include "scenes/scene_brightness.hpp"
 #include "scenes/scene_clock_second_ring.hpp"
@@ -39,6 +40,9 @@ WeatherForecastScene weatherForecastScene;
 WeatherMinMaxScene weatherMinMaxScene;
 WeatherScene weatherScene;
 ConcentricCircleScene concentricCircleScene;
+
+// other components
+SettingsServer settingsServer; // handles settings via web server
 
 /* ULTRA FAST panel refresh 500 Hz */
 static hw_timer_t *panelTimer = nullptr;
@@ -92,7 +96,7 @@ void setup()
     time_setup();
 
     // accept new configs
-    setup_config_server();  // FIXME:!!!
+    settingsServer.start();
 
     Serial.println("Setup done!");
 

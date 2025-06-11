@@ -6,24 +6,11 @@
 #include <string.h>
 #include <WiFiManager.h>
 #include <stdint.h>
+#include "error.h"
 
 #define BUTTON_PIN 20 // D7 (GPIO 20)
-
-enum DeviceError
-{
-    ERR_NONE = 0,
-    ERR_WIFI,
-    ERR_SLEEP,
-    ERR_LITTLE_FS,
-    ERR_PREFERENCES,
-    ERR_JSON,
-    ERR_UNKNOWN, // catch-all for unknown errors
-};
 
 DeviceError wifi_setup(void);
 void wifi_clear_credentials(void);
 bool wifi_check(void);
 DeviceError enter_light_sleep(uint64_t seconds);
-
-void display_wifi_setup_prompt(void);
-void display_device_error(DeviceError err);

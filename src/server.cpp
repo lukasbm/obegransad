@@ -1,27 +1,5 @@
 #include "server.h"
-#include "device.h"
 #include "config.h"
-
-static void handle_get_networks(AsyncWebServerRequest *request)
-{
-    String out;
-    JsonDocument doc;
-    JsonArray networksArray = doc.to<JsonArray>();
-    // get wifi networks from last scan
-    std::vector<NetworkInfo> networks = wifi_nearby_networks(); // FIXME: use instance var of portal
-    for (const auto &network : networks)
-    {
-        JsonObject net = networksArray.add<JsonObject>();
-        net["ssid"] = network.ssid;
-        net["rssi"] = network.rssi;
-        net["encryptionType"] = network.encryptionType;
-        net["channel"] = network.channel;
-        net["quality"] = network.quality;
-    }
-    // serialize the array to JSON
-    serializeJson(networksArray, out);
-    request->send(200, "application/json", out);
-}
 
 static void handle_get_settings(AsyncWebServerRequest *request)
 {
@@ -180,7 +158,6 @@ DeviceError SettingsServer::start()
 
     // handle API requests
     server.on("/api/settings", HTTP_GET, handle_get_settings);
-    server.on("/api/networks", HTTP_GET, handle_get_networks);
     server.on("/api/settings", HTTP_DELETE, handle_delete_settings);
     server.on("/api/settings", HTTP_POST, [](AsyncWebServerRequest *req) {}, nullptr, handle_post_settings);
 
