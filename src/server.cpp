@@ -61,7 +61,7 @@ void handle_put_settings(AsyncWebServerRequest *req,
     auto off_hours_helper = [doc]() -> uint32_t
     {
         if (doc["off_hours"].isNull())
-        return gSettings.off_hours; // no off hours set
+            return gSettings.off_hours; // no off hours set
         // off_hours is an array of booleans
         uint32_t off_hours = 0;
         for (int i = 0; i < 24; ++i)
@@ -96,6 +96,34 @@ void handle_put_settings(AsyncWebServerRequest *req,
 
     // update global settings
     gSettings = parsed;
+
+    // respond
+    req->send(200, "application/json", R"({"ok":true})");
+}
+
+void handle_post_scenes(AsyncWebServerRequest *req)
+{
+    // handle scene updates
+    String body;
+    if (req->hasParam("body", true))
+    {
+        body = req->getParam("body", true)->value();
+    }
+    else
+    {
+        req->send(400, "application/json", R"({"error":"no body"})");
+        return;
+    }
+
+    JsonDocument doc;
+    if (deserializeJson(doc, body))
+    {
+        req->send(400, "application/json", R"({"error":"bad json"})");
+        return;
+    }
+
+    // FIXME: update scenes
+    // sceneSwitcher.updateScenes(doc);
 
     // respond
     req->send(200, "application/json", R"({"ok":true})");
@@ -146,6 +174,7 @@ DeviceError SettingsServer::start()
     server.on("/api/settings", HTTP_GET, handle_get_settings);
     server.on("/api/settings", HTTP_DELETE, handle_delete_settings);
     server.on("/api/settings", HTTP_PUT, [](AsyncWebServerRequest *req) {}, nullptr, handle_put_settings);
+    // server.on("/api/scenes", HTTP_POST, handle_post_scenes); // handle scene updates
 
     // serve everything statically from LittleFS
     // empty path means portal

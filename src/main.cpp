@@ -8,29 +8,21 @@
 #include "sprites/wifi.hpp"
 #include "clock.h"
 #include "server.h"
+#include "scenes/helper.hpp"
+#include "scenes/switcher.hpp"
+
 #include "scenes/scene_anniversary.hpp"
 #include "scenes/scene_brightness.hpp"
 #include "scenes/scene_clock_second_ring.hpp"
 #include "scenes/scene_clock.hpp"
 #include "scenes/scene_empty.hpp"
 #include "scenes/scene_snake.hpp"
-#include "scenes/scene_test.hpp"
 #include "scenes/scene_weather_forecast.hpp"
 #include "scenes/scene_weather_minmax.hpp"
 #include "scenes/scene_weather.hpp"
-#include "scenes/switcher.hpp"
 #include "scenes/scene_concentric_circles.hpp"
 #include "scenes/fireworks.hpp"
 #include "scenes/game_of_life.hpp"
-#include "scenes/helper.hpp"
-
-// button definitions
-OneButton button;
-void buttonSetup();
-void buttonSingleClick();
-void buttonLongPressStart();
-void buttonLongPressStop();
-int buttonLongPressTimer = 0;
 
 // all scenes live here, in RAM
 AnniversaryScene anniversaryScene;
@@ -51,6 +43,14 @@ SettingsServer settingsServer;                // handles settings via web server
 time_t nextSleepDuration = 0;                 // next sleep duration in seconds, used to wake up the device from light sleep
 RenderTimer timeSyncTimer(60 * 30 * 1000);    // 30 minute timer for NTP sync
 RenderTimer weatherSyncTimer(60 * 30 * 1000); // 30 minute timer for weather sync
+
+// button definitions
+OneButton button;
+void buttonSetup();
+void buttonSingleClick();
+void buttonLongPressStart();
+void buttonLongPressStop();
+int buttonLongPressTimer = 0;
 
 /* ULTRA FAST panel refresh 500 Hz */
 static hw_timer_t *panelTimer = nullptr;
@@ -164,7 +164,6 @@ void setup()
     // only switch to first scene once we have state NORMAL or NO_WIFI, keep wifi logo as long as we are in SETUP or CAPTIVE_PORTAL state
 }
 
-// TODO: use the render timers!!!!
 void loop()
 {
     struct tm time = time_get();
@@ -194,9 +193,15 @@ void loop()
     }
 
     // WEATHER
-    if (state == STATE_NORMAL)
+    if (state == STATE_NORMAL && weatherSyncTimer.check())
     {
         weather_fetch();
+    }
+
+    // TIME
+    if (state == STATE_NORMAL && timeSyncTimer.check())
+    {
+        time_syncNTP();
     }
 
     // BRIGHTNESS
@@ -207,12 +212,6 @@ void loop()
     else
     {
         panel_setBrightness(gSettings.brightness_day);
-    }
-
-    // TIME
-    if (state == STATE_NORMAL)
-    {
-        time_syncNTP();
     }
 
     // OFF HOURS
