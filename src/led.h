@@ -17,6 +17,9 @@ EN	Output‑enable / blank	Global: either all LED outputs drive, or none do
 #define P_DI D3    // serial data into SCT2024 SDI
 #define P_OE D4    // OE/ (active‑low output enable)
 
+#define ROWS 16 // number of rows
+#define COLS 16 // number of columns
+
 enum Brightness : uint8_t
 {
     BRIGHTNESS_OFF = 0,
