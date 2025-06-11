@@ -1,9 +1,6 @@
 #pragma once
 
 #include <Arduino.h>
-#include <ArduinoJson.h>
-#include <optional>
-#include <atomic>
 #include <Preferences.h>
 
 // trying to use the names consistent between this struct, json and preferences (NVS)
@@ -32,8 +29,7 @@ struct Settings
 
 // persistent storage functions
 void write_to_persistent_storage(const Settings &settings);
-void read_from_persistent_storage(Settings *settings);
+Settings read_from_persistent_storage();
 void clear_persistent_storage(void);
 
-// global immutable settings
-extern Settings gSettings; // global settings structure
+extern Settings gSettings;

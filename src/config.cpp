@@ -1,14 +1,16 @@
 #include "config.h"
 
-Settings gSettings = Settings();
-
 static const char *PREF_NAME = "app"; // preferences namespace
 
+Settings gSettings = read_from_persistent_storage();
+
 // implicitly sets default values.
-void read_from_persistent_storage(Settings &settings)
+Settings read_from_persistent_storage()
 {
     Preferences p;
     p.begin(PREF_NAME, true); // read-only mode
+
+    Settings settings;
     // panel
     settings.brightness_day = p.getUChar("brightness_day", 200);
     settings.brightness_night = p.getUChar("brightness_night", 50);
@@ -24,6 +26,8 @@ void read_from_persistent_storage(Settings &settings)
     settings.anniversary_month = p.getUChar("anniversary_month", 1);
 
     p.end();
+
+    return settings;
 }
 
 void write_to_persistent_storage(const Settings &settings)

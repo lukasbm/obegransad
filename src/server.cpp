@@ -5,16 +5,24 @@ static void handle_get_settings(AsyncWebServerRequest *request)
 {
     String out;
     JsonDocument doc;
-    // same names as in Settings struct and preferences (NVS)
 
+    // turn off_hours into an array of booleans
+    JsonArray off_hours_array = doc["off_hours"].to<JsonArray>();
+    for (int i = 0; i < 24; ++i)
+    {
+        off_hours_array.add((gSettings.off_hours & (1 << i)) != 0); // true if the bit is set
+    }
+
+    // same names as in Settings struct and preferences (NVS)
     doc["brightness_day"] = gSettings.brightness_day;
     doc["brightness_night"] = gSettings.brightness_night;
-    // offtime_helper(doc, gSettings.offtime3, "offtime3_");
+    doc["off_hours"] = off_hours_array; // use the array we just created
     doc["weather_latitude"] = gSettings.weather_latitude;
     doc["weather_longitude"] = gSettings.weather_longitude;
     doc["timezone"] = gSettings.timezone;
     doc["anniversary_day"] = gSettings.anniversary_day;
     doc["anniversary_month"] = gSettings.anniversary_month;
+
     // serialize the document to JSON
     serializeJson(doc, out);
     request->send(200, "application/json", out);
@@ -29,48 +37,64 @@ static void handle_delete_settings(AsyncWebServerRequest *request)
     ESP.restart();
 }
 
-// chunked POST handler for settings
-void handle_post_settings(AsyncWebServerRequest *req,
-                          uint8_t *data, size_t len,
-                          size_t index, size_t total)
+// chunked handler for settings update
+void handle_put_settings(AsyncWebServerRequest *req,
+                         uint8_t *data, size_t len,
+                         size_t index, size_t total)
 {
+    // chunking
     static String body;
     if (index == 0)
         body = ""; // first chunk
     body += String((char *)data, len);
-
     if (index + len != total)
         return;
+    // done, process regularly
 
-    // last chunk now
     JsonDocument doc;
-    if (deserializeJson(doc, body) != DeserializationError::Ok)
+    if (deserializeJson(doc, body))
     {
         req->send(400, "application/json", R"({"error":"bad json"})");
-    }
-
-    // TODO: validate settings
-    if (!doc.is<JsonObject>())
-    {
-        req->send(400, "application/json", R"({"error":"not an object"})");
         return;
     }
-    JsonObject obj = doc.as<JsonObject>();
 
-    // parse .... = valid
+    auto off_hours_helper = [doc]() -> uint32_t
+    {
+        if (doc["off_hours"].isNull())
+            return gSettings.off_hours; // no off hours set
+        uint32_t off_hours = 0;
+        for (int i = 0; i < 24; ++i)
+        {
+            if (doc["off_hours"][i].is<bool>() && doc["off_hours"][i].as<bool>())
+            {
+                off_hours |= (1 << i); // set the bit for this hour
+            }
+        }
+        return off_hours;
+    };
 
-    // merge only what’s present
-    gSettings.brightness_day = doc["brightness_day"] | gSettings.brightness_day;
-    gSettings.brightness_night = doc["brightness_night"] | gSettings.brightness_night;
-    gSettings.weather_latitude = doc["weather_latitude"] | gSettings.weather_latitude;
-    gSettings.weather_longitude = doc["weather_longitude"] | gSettings.weather_longitude;
-    gSettings.timezone = doc["timezone"] | gSettings.timezone;
-    gSettings.anniversary_day = doc["anniversary_day"] | gSettings.anniversary_day;
-    gSettings.anniversary_month = doc["anniversary_month"] | gSettings.anniversary_month;
-    // gSettings.offtime1 = offtime_helper(doc, gSettings.offtime1, "offtime1");
+    // parse settings
+    Settings parsed{
+        .brightness_day = uint8_t(doc["brightness_day"] | gSettings.brightness_day),
+        .brightness_night = uint8_t(doc["brightness_night"] | gSettings.brightness_night),
+        .off_hours = off_hours_helper(),
+        .weather_latitude = double(doc["weather_latitude"] | gSettings.weather_latitude),
+        .weather_longitude = double(doc["weather_longitude"] | gSettings.weather_longitude),
+        .timezone = String(doc["timezone"] | gSettings.timezone),
+        .anniversary_day = uint8_t(doc["anniversary_day"] | gSettings.anniversary_day),
+        .anniversary_month = uint8_t(doc["anniversary_month"] | gSettings.anniversary_month)};
+
+    if (!parsed.valid())
+    {
+        req->send(400, "application/json", R"({"error":"invalid settings"})");
+        return;
+    }
 
     // save settings to persistent storage
-    write_to_persistent_storage(gSettings);
+    write_to_persistent_storage(parsed);
+
+    // update global settings
+    gSettings = parsed;
 
     // respond
     req->send(200, "application/json", R"({"ok":true})");
@@ -78,13 +102,15 @@ void handle_post_settings(AsyncWebServerRequest *req,
 
 DeviceError SettingsServer::start()
 {
-    // FIXME: protect against multiple starts
-    // if (server. isRunning())
-    // {
-    //     Serial.println("[PORTAL] Server already running");
-    //     return ERR_NONE;
-    // }
-    // Serial.println("[PORTAL] Starting settings server...");
+    // protect against multiple start
+    static bool started = false;
+    if (started)
+    {
+        Serial.println("[PORTAL] Server already started");
+        return ERR_NONE; // already started
+    }
+    started = true;
+    Serial.println("[PORTAL] Starting server...");
 
     // initialize LittleFS
     if (!LittleFS.begin())
@@ -118,7 +144,7 @@ DeviceError SettingsServer::start()
     // handle API requests
     server.on("/api/settings", HTTP_GET, handle_get_settings);
     server.on("/api/settings", HTTP_DELETE, handle_delete_settings);
-    server.on("/api/settings", HTTP_POST, [](AsyncWebServerRequest *req) {}, nullptr, handle_post_settings);
+    server.on("/api/settings", HTTP_PUT, [](AsyncWebServerRequest *req) {}, nullptr, handle_put_settings);
 
     // serve everything statically from LittleFS
     // empty path means portal
