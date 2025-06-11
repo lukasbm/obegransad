@@ -47,9 +47,8 @@ FireworksScene fireworksScene;
 GameOfLifeScene gameOfLifeScene;
 
 // other components
-SettingsServer settingsServer;         // handles settings via web server
-static uint64_t nextSleepDuration = 0; // next sleep duration in seconds, used to wake up the device from light sleep
-
+SettingsServer settingsServer;                // handles settings via web server
+static uint64_t nextSleepDuration = 0;        // next sleep duration in seconds, used to wake up the device from light sleep
 RenderTimer timeSyncTimer(60 * 30 * 1000);    // 30 minute timer for NTP sync
 RenderTimer weatherSyncTimer(60 * 30 * 1000); // 30 minute timer for weather sync
 
@@ -78,21 +77,23 @@ void stop_panel_timer()
 }
 
 // switcher
-constexpr size_t NUM_SCENES = 4; // number of scenes
+constexpr size_t NUM_SCENES = 5; // number of scenes
 SceneSwitcher<NUM_SCENES> sceneSwitcher(
     std::array<Scene *, NUM_SCENES>{
         &snakeScene,
         &clockSceneSecond,
         &concentricCircleScene,
-        &gameOfLifeScene});
+        &gameOfLifeScene,
+        &anniversaryScene});
 
+// state model
 enum State
 {
     STATE_NORMAL = 0,     // normal operation, wifi connected, no captive portal, settings server on
     STATE_CAPTIVE_PORTAL, // captive portal active, wifi disconnected
     STATE_NO_WIFI,        // wifi disconnected, captive portal not active, settings server running but not accessible
     STATE_SETUP,          // settings server not running, captive portal not yet active
-    STATE_SLEEPING        // device is in light sleep mode, waiting for button press or timer wakeup
+    STATE_SLEEPING        // device is in light sleep mode, waiting for button press or timer wakeup (wifi off, but the sleep call is blocking anyway)
 };
 static State state = STATE_SETUP;
 
@@ -115,8 +116,10 @@ static void update_state(State next)
     {
     case STATE_NORMAL:
         settingsServer.start();
-        // TODO: fetch time and weather as we now have wifi again!
-        sceneSwitcher.skipTo(0); // display a scene
+        // fetch time and weather as we now have wifi (again)!
+        timeSyncTimer.reset();    // reset the timer so that we sync immediately
+        weatherSyncTimer.reset(); // reset the timer so that we fetch weather immediately
+        sceneSwitcher.skipTo(0);  // display a scene
         captive_portal_stop();
         break;
 
@@ -161,10 +164,11 @@ void setup()
     // only switch to first scene once we have state NORMAL or NO_WIFI, keep wifi logo as long as we are in SETUP or CAPTIVE_PORTAL state
 }
 
-// TODO: need to add some breaks so that we don't run stuff like ntp sync every loop (use RenderTimers from above!!)
-// TODO: generally need to re-think wifi reconnection logic.
+// TODO: use the render timers!!!!
 void loop()
 {
+    struct tm time = time_get();
+
     // TICKS
     button.tick(); // always update the button
     if (state == STATE_CAPTIVE_PORTAL)
@@ -189,21 +193,14 @@ void loop()
         }
     }
 
-    // OFF HOURS
-    struct tm time = time_get();
-    if (shouldTurnOff(time))
-    {
-        update_state(STATE_SLEEPING); // switch to sleeping state if it is time to turn off
-    }
-
     // WEATHER
     if (state == STATE_NORMAL)
     {
-        // TODO: update weather!!
+        weather_fetch();
     }
 
     // BRIGHTNESS
-    if (time_isNight(time)) // FIXME: use weather info
+    if (weather_get().weatherCode == WEATHER_UNINITIALIZED ? weather_get().isDay : time_isNight(time))
     {
         panel_setBrightness(gSettings.brightness_night);
     }
@@ -218,7 +215,14 @@ void loop()
         time_syncNTP();
     }
 
-    delay(10); // small delay to avoid busy loop and give scheduler a chance to run
+    // OFF HOURS
+    if (shouldTurnOff(time))
+    {
+        update_state(STATE_SLEEPING); // switch to sleeping state if it is time to turn off
+        update_state(STATE_NORMAL);   // switch back to normal state, as everything during the sleep state is blocking
+    }
+
+    delay(100); // small delay to avoid busy loop and give scheduler a chance to run
 }
 
 ///// button stuff

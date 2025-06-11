@@ -7,36 +7,35 @@ constexpr uint8_t FORECAST_DAYS = 7; // number of days to forecast, used in weat
 // from: https://open-meteo.com/en/docs#weather_variable_documentation
 enum WeatherCode : uint8_t
 {
-    CLEAR = 0,                            // sprite: clear sky
-    PARTLY_CLOUDY = 1,                    // sprite: cloud sprite
-    CLOUDY = 2,                           // sprite: cloud sprite
-    OVERCAST = 3,                         // sprite: cloud sprite
-    FOG = 45,                             // sprite: cloud sprite
-    RIME_FOG = 48,                        // sprite: cloud sprite
-    LIGHT_DRIZZLE = 51,                   // sprite: raining
-    MODERATE_DRIZZLE = 53,                // sprite: raining
-    HEAVY_DRIZZLE = 55,                   // sprite: raining
-    LIGHT_FREEZING_DRIZZLE = 56,          // sprite: raining
-    DENSE_FREEZING_DRIZZLE = 57,          // sprite: raining
-    SLIGHT_RAIN = 61,                     // sprite: raining
-    MODERATE_RAIN = 63,                   // sprite: raining
-    HEAVY_RAIN = 65,                      // sprite: raining
-    LIGHT_FREEZING_RAIN = 66,             // sprite: raining
-    HEAVY_FREEZING_RAIN = 67,             // sprite: raining
-    SLIGHT_SNOW_FALL = 71,                // sprite: snow
-    MODERATE_SNOW_FALL = 73,              // sprite: snow
-    HEAVY_SNOW_FALL = 75,                 // sprite: snow
-    SNOW_GRAINS = 77,                     // sprite: snow
-    SLIGHT_RAIN_SHOWER = 80,              // sprite: raining
-    MODERATE_RAIN_SHOWER = 81,            // sprite: raining
-    VIOLENT_RAIN_SHOWER = 82,             // sprite: raining
-    SLIGHT_SNOW_SHOWER = 85,              // sprite: snow
-    HEAVY_SNOW_SHOWER = 86,               // sprite: snow
-    SLIGHT_OR_MODERATE_THUNDERSTORM = 95, // sprite: lightning bolts
-    THUNDERSTORM_WITH_LIGHT_HAIL = 96,    // sprite: lightning bolts
-    THUNDERSTORM_WITH_HEAVY_HAIL = 99,    // sprite: lightning bolts
-    UNKNOWN = 100,                        // custom placeholder for unknown weather codes
-    UNINITIALIZED = 255                   // custom placeholder for uninitialized weather codes
+    WEATHER_CLEAR = 0,                            // sprite: clear sky
+    WEATHER_PARTLY_CLOUDY = 1,                    // sprite: cloud sprite
+    WEATHER_CLOUDY = 2,                           // sprite: cloud sprite
+    WEATHER_OVERCAST = 3,                         // sprite: cloud sprite
+    WEATHER_FOG = 45,                             // sprite: cloud sprite
+    WEATHER_RIME_FOG = 48,                        // sprite: cloud sprite
+    WEATHER_LIGHT_DRIZZLE = 51,                   // sprite: raining
+    WEATHER_MODERATE_DRIZZLE = 53,                // sprite: raining
+    WEATHER_HEAVY_DRIZZLE = 55,                   // sprite: raining
+    WEATHER_LIGHT_FREEZING_DRIZZLE = 56,          // sprite: raining
+    WEATHER_DENSE_FREEZING_DRIZZLE = 57,          // sprite: raining
+    WEATHER_SLIGHT_RAIN = 61,                     // sprite: raining
+    WEATHER_MODERATE_RAIN = 63,                   // sprite: raining
+    WEATHER_HEAVY_RAIN = 65,                      // sprite: raining
+    WEATHER_LIGHT_FREEZING_RAIN = 66,             // sprite: raining
+    WEATHER_HEAVY_FREEZING_RAIN = 67,             // sprite: raining
+    WEATHER_SLIGHT_SNOW_FALL = 71,                // sprite: snow
+    WEATHER_MODERATE_SNOW_FALL = 73,              // sprite: snow
+    WEATHER_HEAVY_SNOW_FALL = 75,                 // sprite: snow
+    WEATHER_SNOW_GRAINS = 77,                     // sprite: snow
+    WEATHER_SLIGHT_RAIN_SHOWER = 80,              // sprite: raining
+    WEATHER_MODERATE_RAIN_SHOWER = 81,            // sprite: raining
+    WEATHER_VIOLENT_RAIN_SHOWER = 82,             // sprite: raining
+    WEATHER_SLIGHT_SNOW_SHOWER = 85,              // sprite: snow
+    WEATHER_HEAVY_SNOW_SHOWER = 86,               // sprite: snow
+    WEATHER_SLIGHT_OR_MODERATE_THUNDERSTORM = 95, // sprite: lightning bolts
+    WEATHER_THUNDERSTORM_WITH_LIGHT_HAIL = 96,    // sprite: lightning bolts
+    WEATHER_THUNDERSTORM_WITH_HEAVY_HAIL = 99,    // sprite: lightning bolts
+    WEATHER_UNINITIALIZED = 255                   // custom placeholder for uninitialized weather codes
 };
 
 struct WeatherData
@@ -44,7 +43,7 @@ struct WeatherData
     uint32_t requestTime; // time when the weather data was fetched, unix time
     // current weather
     float temperature;
-    WeatherCode weatherCode = UNINITIALIZED; // default to uninitialized
+    WeatherCode weatherCode = WEATHER_UNINITIALIZED; // default to uninitialized
     bool isDay;
     // daily weather
     struct
@@ -72,5 +71,5 @@ struct WeatherData
     }
 };
 
-WeatherData weather_fetch(float lat, float lon);
+void weather_fetch();
 const WeatherData &weather_get();

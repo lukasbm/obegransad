@@ -46,6 +46,11 @@ struct RenderTimer
         return false; // interval has not passed
     }
 
+    void reset()
+    {
+        last = millis(); // reset the timer to the current time so that the next check will be true immediately
+    }
+
 private:
     uint32_t interval; // interval in milliseconds
     uint32_t last;     // last time the timer was checked

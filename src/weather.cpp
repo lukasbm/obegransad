@@ -3,14 +3,14 @@
 #include "weather.h"
 #include "config.h"
 
+static WeatherData cachedWeatherData;
+
 const WeatherData &weather_get()
 {
-    static WeatherData cachedWeatherData;
-
-    if (cachedWeatherData.weatherCode == UNINITIALIZED)
+    if (cachedWeatherData.weatherCode == WEATHER_UNINITIALIZED)
     {
         // Fetch weather data only if it has not been fetched yet
-        cachedWeatherData = weather_fetch(gSettings.weather_latitude, gSettings.weather_longitude);
+        weather_fetch();
         Serial.println("Weather data fetched from API:");
         cachedWeatherData.print();
     }
@@ -37,15 +37,15 @@ static void parseWeatherData(WeatherData &res, const JsonDocument &doc)
     }
 }
 
-struct WeatherData weather_fetch(float lat, float lon)
+void weather_fetch()
 {
     WeatherData res; // invalid data by default
 
     // 1) Build request URL
     // Example URL: https://api.open-meteo.com/v1/forecast?latitude=49.4542&longitude=11.0775&daily=sunrise,sunset,uv_index_max,temperature_2m_max,temperature_2m_min,weather_code,temperature_2m_mean&current=temperature_2m,weather_code,is_day&timezone=auto&timeformat=unixtime
     String url = String("https://api.open-meteo.com/v1/forecast") +
-                 "?latitude=" + String(lat) +
-                 "&longitude=" + String(lon) +
+                 "?latitude=" + String(gSettings.weather_latitude) +
+                 "&longitude=" + String(gSettings.weather_longitude) +
                  "&daily=sunrise,sunset,uv_index_max,temperature_2m_max,temperature_2m_min,weather_code,temperature_2m_mean" +
                  "&current=temperature_2m,weather_code,is_day" +
                  "&timezone=auto" +
@@ -81,5 +81,5 @@ struct WeatherData weather_fetch(float lat, float lon)
     }
     http.end();
 
-    return res;
+    cachedWeatherData = res; // cache the result
 }
