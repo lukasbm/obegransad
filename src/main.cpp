@@ -47,7 +47,8 @@ FireworksScene fireworksScene;
 GameOfLifeScene gameOfLifeScene;
 
 // other components
-SettingsServer settingsServer; // handles settings via web server
+SettingsServer settingsServer;         // handles settings via web server
+static uint64_t nextSleepDuration = 0; // next sleep duration in seconds, used to wake up the device from light sleep
 
 RenderTimer timeSyncTimer(60 * 30 * 1000);    // 30 minute timer for NTP sync
 RenderTimer weatherSyncTimer(60 * 30 * 1000); // 30 minute timer for weather sync
@@ -134,9 +135,9 @@ static void update_state(State next)
     case STATE_SLEEPING:
         settingsServer.stop();
         captive_portal_stop();
-        stop_panel_timer();         // stop the panel timer
-        panel_clear();              // clear the panel
-        enter_light_sleep(60 * 60); // enter light sleep for 1 hour // FIXME: make this configurable
+        stop_panel_timer();                   // stop the panel timer
+        panel_clear();                        // clear the panel
+        enter_light_sleep(nextSleepDuration); // enter light sleep
         break;
     }
 
@@ -172,7 +173,7 @@ void loop()
     }
     if (state == STATE_NO_WIFI || state == STATE_NORMAL)
     {
-        sceneSwitcher.tick();
+        sceneSwitcher.tick(); // progress the current scene
     }
 
     // WIFI
@@ -189,17 +190,27 @@ void loop()
     }
 
     // OFF HOURS
-    struct tm time = time_fetch();
+    struct tm time = time_get();
     if (shouldTurnOff(time))
     {
         update_state(STATE_SLEEPING); // switch to sleeping state if it is time to turn off
     }
 
-    // BRIGHTNESS
-    // TODO: panel_setBrightness()
-
     // WEATHER
-    // FIXME: central updates
+    if (state == STATE_NORMAL)
+    {
+        // TODO: update weather!!
+    }
+
+    // BRIGHTNESS
+    if (time_isNight(time)) // FIXME: use weather info
+    {
+        panel_setBrightness(gSettings.brightness_night);
+    }
+    else
+    {
+        panel_setBrightness(gSettings.brightness_day);
+    }
 
     // TIME
     if (state == STATE_NORMAL)

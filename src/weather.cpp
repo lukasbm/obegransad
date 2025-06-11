@@ -1,21 +1,56 @@
 #include <HTTPClient.h>
 
 #include "weather.h"
+#include "config.h"
 
-struct WeatherData fetchWeather(float lat, float lon)
+const WeatherData &weather_get()
 {
-    WeatherData res;
+    static WeatherData cachedWeatherData;
+
+    if (cachedWeatherData.weatherCode == UNINITIALIZED)
+    {
+        // Fetch weather data only if it has not been fetched yet
+        cachedWeatherData = weather_fetch(gSettings.weather_latitude, gSettings.weather_longitude);
+        Serial.println("Weather data fetched from API:");
+        cachedWeatherData.print();
+    }
+    return cachedWeatherData;
+}
+
+static void parseWeatherData(WeatherData &res, const JsonDocument &doc)
+{
+    auto current = doc["current"];
+    res.temperature = float(current["temperature_2m"]);
+    res.weatherCode = WeatherCode(current["weather_code"]);
+    res.isDay = bool(current["is_day"]);
+
+    auto daily = doc["daily"];
+    for (int i = 0; i < FORECAST_DAYS; ++i)
+    {
+        res.daily[i].sunrise = uint32_t(daily["sunrise"][i]);
+        res.daily[i].sunset = uint32_t(daily["sunset"][i]);
+        res.daily[i].uvIndexMax = float(daily["uv_index_max"][i]);
+        res.daily[i].temperatureMax = float(daily["temperature_2m_max"][i]);
+        res.daily[i].temperatureMin = float(daily["temperature_2m_min"][i]);
+        res.daily[i].temperatureMean = float(daily["temperature_2m_mean"][i]);
+        res.daily[i].weatherCode = WeatherCode(daily["weather_code"][i]);
+    }
+}
+
+struct WeatherData weather_fetch(float lat, float lon)
+{
+    WeatherData res; // invalid data by default
 
     // 1) Build request URL
-    // BETTER example url (with weather codes, needed for icons!): https://api.open-meteo.com/v1/forecast?latitude=49.4542&longitude=11.0775&daily=uv_index_max&hourly=temperature_2m&current=precipitation,rain,showers,snowfall,temperature_2m,weather_code,cloud_cover&timezone=auto&forecast_days=1
+    // Example URL: https://api.open-meteo.com/v1/forecast?latitude=49.4542&longitude=11.0775&daily=sunrise,sunset,uv_index_max,temperature_2m_max,temperature_2m_min,weather_code,temperature_2m_mean&current=temperature_2m,weather_code,is_day&timezone=auto&timeformat=unixtime
     String url = String("https://api.open-meteo.com/v1/forecast") +
                  "?latitude=" + String(lat) +
                  "&longitude=" + String(lon) +
-                 "&daily=uv_index_max" +
-                 //  "&hourly=uv_index,temperature_2m" +
-                 "&current=temperature_2m,rain,precipitation,showers,snowfall,weather_code,cloud_cover" +
+                 "&daily=sunrise,sunset,uv_index_max,temperature_2m_max,temperature_2m_min,weather_code,temperature_2m_mean" +
+                 "&current=temperature_2m,weather_code,is_day" +
                  "&timezone=auto" +
-                 "&forecast_days=1";
+                 "&timeformat=unixtime" +
+                 "&forecast_days=" + String(FORECAST_DAYS);
 
     HTTPClient http;
     http.begin(url); // HTTPS by default
@@ -47,18 +82,4 @@ struct WeatherData fetchWeather(float lat, float lon)
     http.end();
 
     return res;
-}
-
-static void parseWeatherData(WeatherData &res, const JsonDocument &doc)
-{
-    JsonObjectConst current = doc["current"];
-    res.precipitation = current["precipitation"];
-    res.rain = current["rain"];
-    res.showers = current["showers"];
-    res.snowfall = current["snowfall"];
-    res.temperature = current["temperature_2m"];
-    res.weatherCode = (WeatherCode)current["weather_code"];
-
-    JsonObjectConst daily = doc["daily"];
-    res.maxUvIndex = daily["uv_index_max"][0];
 }

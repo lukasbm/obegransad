@@ -4,16 +4,14 @@
 
 #define MY_NTP_SERVER "pool.ntp.org"
 
-void time_setup();
-
 void time_syncNTP();
 
-bool isNight(struct tm const &time);
+bool time_isNight(struct tm const &time);
 
 bool shouldTurnOff(struct tm const &time);
 
-// gets local time and updates if needed
-struct tm time_fetch();
+// gets local time (from RTC) and updates if needed
+struct tm time_get();
 
 enum MoonPhase : uint8_t
 {

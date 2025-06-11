@@ -1,15 +1,11 @@
 #include "clock.h"
 #include "config.h"
 
-void time_setup()
-{
-    time_syncNTP();
-}
-
 void time_syncNTP()
 {
     configTzTime(gSettings.timezone.c_str(), MY_NTP_SERVER);
     struct tm temp;
+    // check if we can get the local time
     if (!getLocalTime(&temp, 2000))
     {
         Serial.println("Failed to obtain time");
@@ -17,8 +13,8 @@ void time_syncNTP()
     }
 }
 
-// FIXME: ditch this function and use sunrise and sunset times from weather API (only use this if no wifi)
-bool isNight(struct tm const &time)
+// common night time hours, only used if no wifi is present
+bool time_isNight(struct tm const &time)
 {
     if (time.tm_hour >= 22 || time.tm_hour < 6)
     {
@@ -27,29 +23,20 @@ bool isNight(struct tm const &time)
     return false; // day
 }
 
-bool shouldTurnOff(struct tm &time)
+bool shouldTurnOff(struct tm const &time)
 {
-    return true; // TODO: implement the logic to check if the current time is in the off hours
+    return gSettings.off_hours & (1 << time.tm_hour);
 }
 
-struct tm time_fetch()
+struct tm time_get()
 {
-    static time_t lastFetch = 0;
-    static time_t now = 0;
-    time(&now);                          // get the current time
-    if (difftime(now, lastFetch) > 3600) // if more than an hour has passed
-    {
-        time_syncNTP();
-        lastFetch = now; // update the last fetch time
-    }
-    // fetch the time again.
     struct tm timeinfo;
-    getLocalTime(&timeinfo, 2000);
+    getLocalTime(&timeinfo, 200);
     return timeinfo;
 }
 
 // https://fcds.cs.put.poznan.pl/MyWeb/Praca/Ubiquitous/LunarPhases.pdf
 MoonPhase getMoonPhase(struct tm &time)
 {
-    return FULL;
+    return FULL; // TODO: implement this properly for moon calendar scene?
 }
