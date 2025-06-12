@@ -183,8 +183,8 @@ void loop()
     {
         if (!wifi_is_portal_active())
         {
-            Serial.println("Captive portal is not active, switching to NO_WIFI state");
-            update_state(STATE_NO_WIFI); // if the captive portal is not active, switch to no Wi-Fi state
+            Serial.println("Captive portal is not active, switching to one of the other states");
+            update_state(wifi_check() ? STATE_NORMAL : STATE_NO_WIFI); // if the captive portal is not active, switch to no Wi-Fi state
         }
         else
         {

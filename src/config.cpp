@@ -8,7 +8,7 @@ Settings gSettings; // global settings object, initialized with default values
 Settings read_from_persistent_storage()
 {
     Preferences p;
-    p.begin(PREF_NAME, true); // read-only mode
+    p.begin(PREF_NAME, false); // always open in read-write mode, so that non-existing repositories can be created
 
     Settings settings;
     // panel

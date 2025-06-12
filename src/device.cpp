@@ -115,13 +115,13 @@ void captive_portal_stop()
 // make sure this function is never called more than once!
 void wifi_setup(void)
 {
-    WiFi.mode(WIFI_STA); // set Wi-Fi mode to STA (station) mode initially
-    // if WiFi connection not in flash, start captive portal
-    wm.setConfigPortalTimeout(120);    // seconds to enter credentials, otherwise captive portal will stop
-    wm.setConnectTimeout(30);          // seconds to connect to Wi-Fi
-    wm.setConfigPortalBlocking(false); // non-blocking, so we can handle button presses
+    wm.setConfigPortalBlocking(false); // has to be the first statement, otherwise it will not work
+    wm.setWiFiAutoReconnect(true);
+    wm.setConfigPortalTimeout(120); // seconds to enter credentials, otherwise captive portal will stop
+    wm.setConnectTimeout(30);       // seconds to connect to Wi-Fi
     // WiFi.onEvent(callback_STA_disconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
     wm.setDarkMode(true);
+
 #if DEBUG
     wm.setDebugOutput(true);
 #endif
@@ -140,7 +140,12 @@ void wifi_setup(void)
     }
 
     // start the captive portal
+    Serial.println("Starting Wi-Fi manager (captive portal) ...");
     bool alreadyConnected = wm.autoConnect(PORTAL_NAME);
+    
+    // Give some time for the connection attempt to complete in non-blocking mode
+    delay(100);
+    
     if (alreadyConnected)
     {
         Serial.printf("✔ Connected to WiFi, IP=%s\n", WiFi.localIP().toString().c_str());
