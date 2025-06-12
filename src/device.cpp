@@ -91,6 +91,16 @@ static void add_captive_portal_spoof(WebServer *s)
         {
             s->send(200, "text/html", "<!doctype html>");
         });
+        
+    // Additional endpoints for better captive portal detection
+    s->on("/fwlink", HTTP_ANY, [s]() {
+        s->sendHeader("Location", "/");
+        s->send(302, "text/plain", "");
+    });
+    
+    s->on("/connecttest.txt", HTTP_ANY, [s]() {
+        s->send(200, "text/plain", "Microsoft Connect Test");
+    });
 }
 
 void captive_portal_tick()
@@ -141,17 +151,40 @@ void wifi_setup(void)
 
     // start the captive portal
     Serial.println("Starting Wi-Fi manager (captive portal) ...");
-    bool alreadyConnected = wm.autoConnect(PORTAL_NAME);
     
-    // Give some time for the connection attempt to complete in non-blocking mode
-    delay(100);
-    
-    if (alreadyConnected)
+    // Use startConfigPortal instead of autoConnect for true non-blocking behavior
+    if (WiFi.status() == WL_CONNECTED) 
     {
-        Serial.printf("✔ Connected to WiFi, IP=%s\n", WiFi.localIP().toString().c_str());
+        Serial.printf("✔ Already connected to WiFi, IP=%s\n", WiFi.localIP().toString().c_str());
     }
-    else
+    else if (wm.getWiFiIsSaved()) 
     {
+        // Try to connect to saved network first
+        Serial.println("Attempting to connect to saved network...");
+        WiFi.begin();
+        
+        // Wait a short time for connection
+        unsigned long startTime = millis();
+        while (WiFi.status() != WL_CONNECTED && millis() - startTime < 10000) {
+            delay(100);
+        }
+        
+        if (WiFi.status() == WL_CONNECTED) 
+        {
+            Serial.printf("✔ Connected to saved WiFi, IP=%s\n", WiFi.localIP().toString().c_str());
+        }
+        else 
+        {
+            Serial.println("Failed to connect to saved network, starting config portal...");
+            wm.startConfigPortal(PORTAL_NAME);
+            Serial.println("⚙ Config portal running in background");
+        }
+    }
+    else 
+    {
+        // No saved credentials, start config portal immediately
+        Serial.println("No saved credentials, starting config portal...");
+        wm.startConfigPortal(PORTAL_NAME);
         Serial.println("⚙ Config portal running in background");
     }
 }
