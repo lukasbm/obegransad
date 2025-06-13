@@ -11,6 +11,7 @@ struct Settings
     double weather_latitude, weather_longitude;
     String timezone;
     uint8_t anniversary_day, anniversary_month;
+    // TODO: game_of_life initial state
 
     // central validation
     bool valid() const

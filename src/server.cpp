@@ -159,22 +159,11 @@ DeviceError SettingsServer::start()
         }
     }
 
-    // captive portal URLs
-    server.on("/generate_204", HTTP_ANY, [](AsyncWebServerRequest *request) { // Android
-        request->redirect("/");                                               // redirect to portal
-    });
-    server.on("/hotspot-detect.html", HTTP_ANY, [](AsyncWebServerRequest *request) { // iOS
-        request->send(200, "text/html", "<!doctype html>");
-    });
-    server.on("/static/hotspot.txt", HTTP_ANY, [](AsyncWebServerRequest *request) { // Samsung, Fedora
-        request->redirect("/");                                                     // redirect to portal
-    });
-
     // handle API requests
     server.on("/api/settings", HTTP_GET, handle_get_settings);
     server.on("/api/settings", HTTP_DELETE, handle_delete_settings);
     server.on("/api/settings", HTTP_PUT, [](AsyncWebServerRequest *req) {}, nullptr, handle_put_settings);
-    // server.on("/api/scenes", HTTP_POST, handle_post_scenes); // handle scene updates
+    server.on("/api/scenes", HTTP_POST, handle_post_scenes); // handle scene updates
 
     // serve everything statically from LittleFS
     // empty path means portal

@@ -70,7 +70,7 @@ public:
     {
         Serial.println("Fireworks Scene activated");
         panel_clear();
-        memset(buffer, 0, sizeof(buffer));
+        memset(buffer, 0, sizeof(buffer));  // FIXME: get initial state from settings
         memset(back_buffer, 0, sizeof(back_buffer));
     }
 
