@@ -10,6 +10,8 @@
 #include "sprites/wifi.hpp"
 
 static WiFiManager wm;
+static unsigned long wifi_connect_start_time = 0;
+static bool wifi_connection_attempted = false;
 
 static const char *PORTAL_NAME = "Obegransad-Setup"; // captive portal name
 
@@ -162,23 +164,11 @@ void wifi_setup(void)
         // Try to connect to saved network first
         Serial.println("Attempting to connect to saved network...");
         WiFi.begin();
-        
-        // Wait a short time for connection
-        unsigned long startTime = millis();
-        while (WiFi.status() != WL_CONNECTED && millis() - startTime < 10000) {
-            delay(100);
-        }
-        
-        if (WiFi.status() == WL_CONNECTED) 
-        {
-            Serial.printf("✔ Connected to saved WiFi, IP=%s\n", WiFi.localIP().toString().c_str());
-        }
-        else 
-        {
-            Serial.println("Failed to connect to saved network, starting config portal...");
-            wm.startConfigPortal(PORTAL_NAME);
-            Serial.println("⚙ Config portal running in background");
-        }
+        Serial.println("⚙ Connection attempt started, will timeout and start portal if needed");
+        wifi_connect_start_time = millis(); // Record the start time
+        wifi_connection_attempted = true;  // Set the flag
+        // Note: The portal will be started automatically by WiFiManager if connection fails
+        // after the timeout period set by setConnectTimeout()
     }
     else 
     {
@@ -192,6 +182,29 @@ void wifi_setup(void)
 bool wifi_is_portal_active()
 {
     return wm.getConfigPortalActive(); // || portalActive;
+}
+
+// Call this in your main loop to handle WiFi timeout non-blocking
+void wifi_handle_timeout()
+{
+    // If we started a connection attempt but aren't connected yet
+    if (wifi_connection_attempted && WiFi.status() != WL_CONNECTED) 
+    {
+        // Check if timeout has passed (30 seconds as set by setConnectTimeout)
+        if (millis() - wifi_connect_start_time > 30000) 
+        {
+            Serial.println("WiFi connection timeout, starting config portal...");
+            wm.startConfigPortal(PORTAL_NAME);
+            Serial.println("⚙ Config portal running in background");
+            wifi_connection_attempted = false; // Reset flag
+        }
+    }
+    // If we successfully connected, reset the flag
+    else if (wifi_connection_attempted && WiFi.status() == WL_CONNECTED) 
+    {
+        Serial.printf("✔ Connected to saved WiFi, IP=%s\n", WiFi.localIP().toString().c_str());
+        wifi_connection_attempted = false; // Reset flag
+    }
 }
 
 // Make sure to flush sockets (e.g. web server and http client) before entering light sleep.

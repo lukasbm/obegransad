@@ -16,3 +16,4 @@ DeviceError enter_light_sleep(uint64_t seconds);
 void captive_portal_tick();
 void captive_portal_start();
 void captive_portal_stop();
+void wifi_handle_timeout(); // Call in main loop to handle WiFi timeout non-blocking
