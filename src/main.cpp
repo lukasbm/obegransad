@@ -157,27 +157,29 @@ void setup()
     Serial.begin(115200);
     Serial.println("Starting setup...");
 
+    WiFi.mode(WIFI_STA); // set Wi-Fi mode to station (initially, otherwise will be STA+AP)
+
     // state independent setup code
-    gSettings = read_from_persistent_storage();
-    buttonSetup();          // set up the button
-    panel_init();           // initialize the LED panel
-    start_panel_timer();    //
     captive_portal_setup(); // set up Wi-Fi, will start captive portal if no credentials are stored
+    gSettings = read_from_persistent_storage();
+    buttonSetup(); // set up the button
+    panel_init();  // initialize the LED panel
     Serial.println("Setup done, checking Wi-Fi...");
 
     if (wifi_setup())
     {
         // already connected
         Serial.println("Wi-Fi connected");
-        update_state(STATE_NORMAL);
+        // update_state(STATE_NORMAL);
     }
     else
     {
         // not connected, start captive portal
         Serial.println("Wi-Fi not connected, starting captive portal");
-        update_state(STATE_CAPTIVE_PORTAL);
+        // update_state(STATE_CAPTIVE_PORTAL);
     }
 
+    start_panel_timer(); // have to start it late.
     Serial.println("Setup complete, entering main loop...");
 
     // only switch to first scene once we have state NORMAL or NO_WIFI, keep wifi logo as long as we are in SETUP or CAPTIVE_PORTAL state
@@ -185,6 +187,9 @@ void setup()
 
 void loop()
 {
+    captive_portal_tick(); // FIXME:remove
+    return;                // FIXME: remove
+
     struct tm time = time_get();
     Serial.print("Current State: ");
     Serial.println(state);
