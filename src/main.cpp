@@ -117,6 +117,7 @@ static void update_state(State next)
     case STATE_NORMAL:
         Serial.println("State change to NORMAL");
         captive_portal_stop();
+        start_panel_timer();
         settingsServer.start();
         timeSyncTimer.reset();    // reset the timer so that we sync immediately
         weatherSyncTimer.reset(); // reset the timer so that we fetch weather immediately
@@ -126,12 +127,14 @@ static void update_state(State next)
     case STATE_CAPTIVE_PORTAL:
         Serial.println("State change to CAPTIVE_PORTAL");
         settingsServer.stop();
+        stop_panel_timer();
         display_wifi_logo(); // show the Wi-Fi logo
         captive_portal_start();
         break;
 
     case STATE_NO_WIFI:
         Serial.println("State change to NO_WIFI");
+        start_panel_timer();
         settingsServer.stop();
         captive_portal_stop();
         sceneSwitcher.skipTo(0); // display a scene
@@ -169,16 +172,15 @@ void setup()
     {
         // already connected
         Serial.println("Wi-Fi connected");
-        // update_state(STATE_NORMAL);
+        update_state(STATE_NORMAL);
     }
     else
     {
         // not connected, start captive portal
         Serial.println("Wi-Fi not connected, starting captive portal");
-        // update_state(STATE_CAPTIVE_PORTAL);
+        update_state(STATE_CAPTIVE_PORTAL);
     }
 
-    // start_panel_timer(); // have to start it late. // FIXME: for some reason this breaks the captive portal?????
     Serial.println("Setup complete, entering main loop...");
 
     // only switch to first scene once we have state NORMAL or NO_WIFI, keep wifi logo as long as we are in SETUP or CAPTIVE_PORTAL state
@@ -186,8 +188,10 @@ void setup()
 
 void loop()
 {
-    captive_portal_tick(); // FIXME:remove
-    return;                // FIXME: remove
+    captive_portal_tick();          // FIXME:remove
+    delay(100);                     // FIXME: remove
+    Serial.println("Loop started"); // FIXME: remove
+    return;                         // FIXME: remove
 
     struct tm time = time_get();
     Serial.print("Current State: ");
