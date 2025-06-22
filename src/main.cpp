@@ -188,17 +188,10 @@ void setup()
 
 void loop()
 {
-    captive_portal_tick();          // FIXME:remove
-    delay(100);                     // FIXME: remove
-    Serial.println("Loop started"); // FIXME: remove
-    return;                         // FIXME: remove
-
     struct tm time = time_get();
-    Serial.print("Current State: ");
-    Serial.println(state);
 
-    // TICKS
-    button.tick(); // always update the button
+    // BUTTON
+    button.tick(); // always tick the button
 
     // CAPTIVE PORTAL
     if (state == STATE_CAPTIVE_PORTAL)
@@ -206,11 +199,11 @@ void loop()
         if (!captive_portal_active())
         {
             Serial.println("Captive portal is not active, switching to one of the other states");
-            update_state(wifi_check() ? STATE_NORMAL : STATE_NO_WIFI); // if the captive portal is not active, switch to no Wi-Fi state
+            update_state(wifi_check() ? STATE_NORMAL : STATE_NO_WIFI); // if the captive portal is not active, switch to one of the normal states
         }
         else
         {
-            captive_portal_tick();
+            captive_portal_tick(); // handle captive portal events
         }
     }
     if (state == STATE_NO_WIFI || state == STATE_NORMAL)
@@ -243,8 +236,8 @@ void loop()
         time_syncNTP();
     }
 
-    // BRIGHTNESS
-    if (weather_get().weatherCode == WEATHER_UNINITIALIZED ? weather_get().isDay : time_isNight(time))
+    // BRIGHTNESS (TODO: ease in and out around the threshold)
+    if (state == STATE_NORMAL ? weather_get().isDay : time_isNight(time))
     {
         panel_setBrightness(gSettings.brightness_night);
     }

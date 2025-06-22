@@ -69,6 +69,11 @@ struct WeatherData
                           daily[i].weatherCode);
         }
     }
+
+    bool uninitialized() const
+    {
+        return weatherCode == WEATHER_UNINITIALIZED;
+    }
 };
 
 void weather_fetch();

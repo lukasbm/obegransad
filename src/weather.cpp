@@ -7,7 +7,7 @@ static WeatherData cachedWeatherData;
 
 const WeatherData &weather_get()
 {
-    if (cachedWeatherData.weatherCode == WEATHER_UNINITIALIZED)
+    if (cachedWeatherData.uninitialized())
     {
         // Fetch weather data only if it has not been fetched yet
         weather_fetch();

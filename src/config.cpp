@@ -12,8 +12,8 @@ Settings read_from_persistent_storage()
 
     Settings settings;
     // panel
-    settings.brightness_day = p.getUChar("brightness_day", 200);
-    settings.brightness_night = p.getUChar("brightness_night", 50);
+    settings.brightness_day = p.getUChar("brightness_day", 180);
+    settings.brightness_night = p.getUChar("brightness_night", 10);
     // offtime
     settings.off_hours = p.getUInt("off_hours", 0x00000000); // default: no off hours (all bits are 0)
     // weather

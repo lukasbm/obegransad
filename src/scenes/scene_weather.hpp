@@ -70,7 +70,7 @@ public:
 
         if (timer.check())
         {
-            drawWeatherData(weather_get());
+            // FIXME: drawWeatherData(weather_get());
         }
     }
 };
