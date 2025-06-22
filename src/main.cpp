@@ -159,12 +159,21 @@ void setup()
 
     // state independent setup code
     gSettings = read_from_persistent_storage();
-    buttonSetup();       // set up the button
-    panel_init();        // initialize the LED panel
-    start_panel_timer(); //
-    wifi_setup();        // set up Wi-Fi, will start captive portal if no credentials are stored
+    buttonSetup();          // set up the button
+    panel_init();           // initialize the LED panel
+    start_panel_timer();    //
+    captive_portal_setup(); // set up Wi-Fi, will start captive portal if no credentials are stored
 
-    update_state(STATE_CAPTIVE_PORTAL);
+    if (wifi_setup())
+    {
+        // already connected
+        update_state(STATE_NORMAL);
+    }
+    else
+    {
+        // not connected, start captive portal
+        update_state(STATE_CAPTIVE_PORTAL);
+    }
 
     Serial.println("Setup complete, entering main loop...");
 
@@ -179,9 +188,11 @@ void loop()
 
     // TICKS
     button.tick(); // always update the button
+
+    // CAPTIVE PORTAL
     if (state == STATE_CAPTIVE_PORTAL)
     {
-        if (!wifi_is_portal_active())
+        if (!captive_portal_active())
         {
             Serial.println("Captive portal is not active, switching to one of the other states");
             update_state(wifi_check() ? STATE_NORMAL : STATE_NO_WIFI); // if the captive portal is not active, switch to no Wi-Fi state
@@ -239,7 +250,7 @@ void loop()
         update_state(STATE_NORMAL);   // switch back to normal state, as everything during the sleep state is blocking
     }
 
-    delay(100); // small delay to avoid busy loop and give scheduler a chance to run
+    delay(20); // small delay to avoid busy loop and give scheduler a chance to run
 }
 
 ///// button stuff

@@ -10,12 +10,9 @@
 #include "sprites/wifi.hpp"
 
 static WiFiManager wm;
-static unsigned long wifi_connect_start_time = 0;
-static bool wifi_connection_attempted = false;
 
 static const char *PORTAL_NAME = "Obegransad-Setup"; // captive portal name
 
-// FIXME: do i really need the function?
 // handles the cases when connection is lost in AP/STA mode
 // the driver fires the event typically every 3-10 seconds when disconnected
 static void callback_STA_disconnected(WiFiEvent_t event, WiFiEventInfo_t info)
@@ -39,30 +36,6 @@ static void callback_STA_disconnected(WiFiEvent_t event, WiFiEventInfo_t info)
     }
 }
 
-// bool wifi_check(void)
-// {
-//     static unsigned long lastTry = 0;
-
-//     if (WiFi.status() != WL_CONNECTED)
-//     {
-//         if (millis() - lastTry > 30000)
-//         {
-//             lastTry = millis();
-//             return WiFi.reconnect();
-//         }
-//         else
-//         {
-//             return false; // not connected, but not yet time to retry
-//         }
-//     }
-//     else
-//     {
-//         // reset the timer when connected
-//         lastTry = 0;
-//         return true;
-//     }
-// }
-
 bool wifi_check()
 {
     return (WiFi.status() == WL_CONNECTED);
@@ -72,6 +45,14 @@ void wifi_clear_credentials(void)
 {
     // clear stored credentials
     wm.resetSettings();
+}
+
+// need to call captive portal setup first
+bool wifi_setup(void)
+{
+    WiFi.onEvent(callback_STA_disconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+
+    return wm.autoConnect(PORTAL_NAME);
 }
 
 // add some endpoints to trick android and IOS into showing the captive portal
@@ -93,16 +74,15 @@ static void add_captive_portal_spoof(WebServer *s)
         {
             s->send(200, "text/html", "<!doctype html>");
         });
-        
+
     // Additional endpoints for better captive portal detection
-    s->on("/fwlink", HTTP_ANY, [s]() {
+    s->on("/fwlink", HTTP_ANY, [s]()
+          {
         s->sendHeader("Location", "/");
-        s->send(302, "text/plain", "");
-    });
-    
-    s->on("/connecttest.txt", HTTP_ANY, [s]() {
-        s->send(200, "text/plain", "Microsoft Connect Test");
-    });
+        s->send(302, "text/plain", ""); });
+
+    s->on("/connecttest.txt", HTTP_ANY, [s]()
+          { s->send(200, "text/plain", "Microsoft Connect Test"); });
 }
 
 void captive_portal_tick()
@@ -125,15 +105,13 @@ void captive_portal_stop()
 
 // Sets up wifi and starts the captive portal if no credentials are stored
 // make sure this function is never called more than once!
-void wifi_setup(void)
+void captive_portal_setup(void)
 {
     wm.setConfigPortalBlocking(false); // has to be the first statement, otherwise it will not work
     wm.setWiFiAutoReconnect(true);
     wm.setConfigPortalTimeout(120); // seconds to enter credentials, otherwise captive portal will stop
     wm.setConnectTimeout(30);       // seconds to connect to Wi-Fi
-    // WiFi.onEvent(callback_STA_disconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
     wm.setDarkMode(true);
-
 #if DEBUG
     wm.setDebugOutput(true);
 #endif
@@ -150,61 +128,11 @@ void wifi_setup(void)
     {
         add_captive_portal_spoof(s);
     }
-
-    // start the captive portal
-    Serial.println("Starting Wi-Fi manager (captive portal) ...");
-    
-    // Use startConfigPortal instead of autoConnect for true non-blocking behavior
-    if (WiFi.status() == WL_CONNECTED) 
-    {
-        Serial.printf("✔ Already connected to WiFi, IP=%s\n", WiFi.localIP().toString().c_str());
-    }
-    else if (wm.getWiFiIsSaved()) 
-    {
-        // Try to connect to saved network first
-        Serial.println("Attempting to connect to saved network...");
-        WiFi.begin();
-        Serial.println("⚙ Connection attempt started, will timeout and start portal if needed");
-        wifi_connect_start_time = millis(); // Record the start time
-        wifi_connection_attempted = true;  // Set the flag
-        // Note: The portal will be started automatically by WiFiManager if connection fails
-        // after the timeout period set by setConnectTimeout()
-    }
-    else 
-    {
-        // No saved credentials, start config portal immediately
-        Serial.println("No saved credentials, starting config portal...");
-        wm.startConfigPortal(PORTAL_NAME);
-        Serial.println("⚙ Config portal running in background");
-    }
 }
 
-bool wifi_is_portal_active()
+bool captive_portal_active()
 {
     return wm.getConfigPortalActive(); // || portalActive;
-}
-
-// Call this in your main loop to handle WiFi timeout non-blocking
-void wifi_handle_timeout()
-{
-    // If we started a connection attempt but aren't connected yet
-    if (wifi_connection_attempted && WiFi.status() != WL_CONNECTED) 
-    {
-        // Check if timeout has passed (30 seconds as set by setConnectTimeout)
-        if (millis() - wifi_connect_start_time > 30000) 
-        {
-            Serial.println("WiFi connection timeout, starting config portal...");
-            wm.startConfigPortal(PORTAL_NAME);
-            Serial.println("⚙ Config portal running in background");
-            wifi_connection_attempted = false; // Reset flag
-        }
-    }
-    // If we successfully connected, reset the flag
-    else if (wifi_connection_attempted && WiFi.status() == WL_CONNECTED) 
-    {
-        Serial.printf("✔ Connected to saved WiFi, IP=%s\n", WiFi.localIP().toString().c_str());
-        wifi_connection_attempted = false; // Reset flag
-    }
 }
 
 // Make sure to flush sockets (e.g. web server and http client) before entering light sleep.
