@@ -107,21 +107,20 @@ static void update_state(State next)
 {
     if (state == next)
     {
+        Serial.println("State unchanged");
         return; // no change
     }
 
-    Serial.printf("State change: %d -> %d\n", state, next);
-
+    // we don't have to consider what the last state was if all the functions we use below are idempotent
     switch (next)
     {
     case STATE_NORMAL:
         Serial.println("State change to NORMAL");
+        captive_portal_stop();
         settingsServer.start();
-        // fetch time and weather as we now have wifi (again)!
         timeSyncTimer.reset();    // reset the timer so that we sync immediately
         weatherSyncTimer.reset(); // reset the timer so that we fetch weather immediately
         sceneSwitcher.skipTo(0);  // display a scene
-        captive_portal_stop();
         break;
 
     case STATE_CAPTIVE_PORTAL:
@@ -157,7 +156,7 @@ void setup()
     Serial.begin(115200);
     Serial.println("Starting setup...");
 
-    WiFi.mode(WIFI_STA); // set Wi-Fi mode to station (initially, otherwise will be STA+AP)
+    WiFi.mode(WIFI_STA); // set Wi-Fi mode to station (initially, otherwise will be STA+AP) // has to be here at the beginning, otherwise it blocks?
 
     // state independent setup code
     captive_portal_setup(); // set up Wi-Fi, will start captive portal if no credentials are stored
@@ -179,7 +178,7 @@ void setup()
         // update_state(STATE_CAPTIVE_PORTAL);
     }
 
-    start_panel_timer(); // have to start it late.
+    // start_panel_timer(); // have to start it late. // FIXME: for some reason this breaks the captive portal?????
     Serial.println("Setup complete, entering main loop...");
 
     // only switch to first scene once we have state NORMAL or NO_WIFI, keep wifi logo as long as we are in SETUP or CAPTIVE_PORTAL state
