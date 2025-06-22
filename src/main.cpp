@@ -163,15 +163,18 @@ void setup()
     panel_init();           // initialize the LED panel
     start_panel_timer();    //
     captive_portal_setup(); // set up Wi-Fi, will start captive portal if no credentials are stored
+    Serial.println("Setup done, checking Wi-Fi...");
 
     if (wifi_setup())
     {
         // already connected
+        Serial.println("Wi-Fi connected");
         update_state(STATE_NORMAL);
     }
     else
     {
         // not connected, start captive portal
+        Serial.println("Wi-Fi not connected, starting captive portal");
         update_state(STATE_CAPTIVE_PORTAL);
     }
 

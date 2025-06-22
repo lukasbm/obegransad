@@ -94,6 +94,12 @@ void captive_portal_tick()
 
 void captive_portal_start()
 {
+    // These lines are needed to properly create the AP in non-blocking mode
+    WiFi.mode(WIFI_AP_STA); // Set WiFi to AP+STA mode
+
+    // Need to disconnect first to ensure clean AP setup
+    WiFi.disconnect();
+
     wm.startConfigPortal(PORTAL_NAME);
 }
 
@@ -101,6 +107,9 @@ void captive_portal_stop()
 {
     // stop the captive portal
     wm.stopConfigPortal();
+
+    // Return to station mode for normal operation
+    WiFi.mode(WIFI_STA);
 }
 
 // Sets up wifi and starts the captive portal if no credentials are stored
