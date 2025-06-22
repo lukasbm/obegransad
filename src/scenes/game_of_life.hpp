@@ -70,8 +70,16 @@ public:
     {
         Serial.println("Fireworks Scene activated");
         panel_clear();
-        memset(buffer, 0, sizeof(buffer));  // FIXME: get initial state from settings
+        memset(buffer, 0, sizeof(buffer));
         memset(back_buffer, 0, sizeof(back_buffer));
+        // initialize a random pattern // TODO: also allow user to set initial pattern (website)
+        for (uint8_t y = 0; y < 16; ++y)
+        {
+            for (uint8_t x = 0; x < 16; ++x)
+            {
+                buffer[y][x] = random(2); // Randomly set cells to alive or dead
+            }
+        }
     }
 
     void update() override
