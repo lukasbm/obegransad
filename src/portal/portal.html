@@ -722,7 +722,7 @@
     </dialog>
 
     <script>
-        const SETTINGS_ENDPOINT = "/api/settings"; // "/settings.json";
+        const SETTINGS_ENDPOINT = "/api/settings"; // "/gSettings.json";
         const NETWORK_ENDPOINT = "/api/networks"; // "/networks.json";
 
         // pre populate the fields with current settings
@@ -817,7 +817,7 @@
             Number()
 
             fetch(SETTINGS_ENDPOINT, {
-                method: 'POST',
+                method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(obj) // send everything
             }).then(res => {

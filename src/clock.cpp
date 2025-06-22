@@ -1,15 +1,11 @@
 #include "clock.h"
 #include "config.h"
 
-void time_setup()
-{
-    time_syncNTP();
-}
-
 void time_syncNTP()
 {
-    configTzTime(settings.timezone.c_str(), MY_NTP_SERVER);
+    configTzTime(gSettings.timezone.c_str(), MY_NTP_SERVER);
     struct tm temp;
+    // check if we can get the local time
     if (!getLocalTime(&temp, 2000))
     {
         Serial.println("Failed to obtain time");
@@ -17,7 +13,8 @@ void time_syncNTP()
     }
 }
 
-bool isNight(struct tm const &time)
+// common night time hours, only used if no wifi is present
+bool time_isNight(struct tm const &time)
 {
     if (time.tm_hour >= 22 || time.tm_hour < 6)
     {
@@ -26,37 +23,38 @@ bool isNight(struct tm const &time)
     return false; // day
 }
 
-inline bool shouldTurnOffSingle(struct tm &time, const OffTime &offtime)
+bool shouldTurnOff(struct tm const &time)
 {
-    // TODO: check if the time is within the off time range
-    return true;
+    return gSettings.off_hours & (1 << time.tm_hour);
 }
 
-bool shouldTurnOff(struct tm &time)
+time_t calcTurnOffDuration(struct tm time)
 {
-    return shouldTurnOffSingle(time, settings.offtime1) ||
-           shouldTurnOffSingle(time, settings.offtime2) ||
-           shouldTurnOffSingle(time, settings.offtime3);
-}
-
-struct tm time_fetch()
-{
-    static time_t lastFetch = 0;
-    static time_t now = 0;
-    time(&now);                          // get the current time
-    if (difftime(now, lastFetch) > 3600) // if more than an hour has passed
+    // calculate number of hours until the next on hour
+    uint8_t i = time.tm_hour;
+    while (i < 24 && !(gSettings.off_hours & (1 << i)))
     {
-        time_syncNTP();
-        lastFetch = now; // update the last fetch time
+        i++;
     }
-    // fetch the time again.
+    time_t offDuration = (time.tm_hour - i) * 3600; // number of seconds in the off window
+    // duplicate time and round it down to the nearest hour
+    struct tm roundedTime = time;
+    roundedTime.tm_min = 0;
+    roundedTime.tm_sec = 0;
+    // calc diff
+    time_t overhead = difftime(mktime(&time), mktime(&roundedTime));
+    return offDuration - overhead; // return the number of seconds until the next on hour
+}
+
+struct tm time_get()
+{
     struct tm timeinfo;
-    getLocalTime(&timeinfo, 2000);
+    getLocalTime(&timeinfo, 200);
     return timeinfo;
 }
 
 // https://fcds.cs.put.poznan.pl/MyWeb/Praca/Ubiquitous/LunarPhases.pdf
 MoonPhase getMoonPhase(struct tm &time)
 {
-    return FULL;
+    return FULL; // TODO: implement this properly for moon calendar scene?
 }

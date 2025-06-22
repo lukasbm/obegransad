@@ -42,7 +42,7 @@ public:
     void activate() override
     {
         Serial.println("Heart scene activated");
-        drawHeart(settings.anniversary_day, settings.anniversary_month);
+        drawHeart(gSettings.anniversary_day, gSettings.anniversary_month);
     }
 
     void update() override
@@ -52,7 +52,7 @@ public:
         // update animation (4 times a second - 4 FPS)
         if (millis() - lastDraw > 250)
         {
-            drawHeart(settings.anniversary_day, settings.anniversary_month);
+            drawHeart(gSettings.anniversary_day, gSettings.anniversary_month);
             lastDraw = millis();
         }
     }

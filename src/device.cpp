@@ -1,15 +1,26 @@
 #include "device.h"
+
+#include <Arduino.h>
+#include <string.h>
+#include <WiFiManager.h>
+#include <WiFi.h>
+#include <esp_sleep.h>
+
 #include "led.h"
 #include "sprites/wifi.hpp"
 
+static WiFiManager wm;
+
+static const char *PORTAL_NAME = "Obegransad-Setup"; // captive portal name
+
 // handles the cases when connection is lost in AP/STA mode
 // the driver fires the event typically every 3-10 seconds when disconnected
-static void callback_sta_disconnected(WiFiEvent_t event, WiFiEventInfo_t info)
+static void callback_STA_disconnected(WiFiEvent_t event, WiFiEventInfo_t info)
 {
     static uint8_t failCount = 0;
 
     // print reason
-    Serial.printf("Driver Wi-Fi lost event (callback_sta_disconnected), reason %d … reconnecting\n", info.wifi_sta_disconnected.reason);
+    Serial.printf("Driver Wi-Fi lost event (callback_STA_disconnected), reason %d … reconnecting\n", info.wifi_sta_disconnected.reason);
 
     if (++failCount < 10)
     {
@@ -20,49 +31,116 @@ static void callback_sta_disconnected(WiFiEvent_t event, WiFiEventInfo_t info)
     {
         Serial.println("Failed to reconnect, starting captive portal again…");
         failCount = 0;
-        display_wifi_symbol(); // show the wifi logo
-        // wifiManager.startConfigPortal(PORTAL_NAME); // blocking until user fixes wifi.
+        display_wifi_logo();               // show the wifi logo
+        wm.startConfigPortal(PORTAL_NAME); // blocking until user fixes wifi.
     }
 }
 
-void display_wifi_symbol(void)
+bool wifi_check()
 {
-    // display the wifi logo while connecting
-    panel_clear();
-    panel_drawSprite(3, 5, wifi_sprite.data, wifi_sprite.width, wifi_sprite.height);
-    panel_show();
-    panel_hold();
+    return (WiFi.status() == WL_CONNECTED);
 }
 
-void display_device_error(DeviceError err)
+void wifi_clear_credentials(void)
 {
-    panel_clear();
-    // TODO: draw error icons!!!
-    panel_show();
-    panel_hold();
+    // clear stored credentials
+    wm.resetSettings();
 }
 
-bool wifi_check(void)
+// need to call captive portal setup first
+bool wifi_setup(void)
 {
-    return WiFi.status() == WL_CONNECTED; // check if Wi-Fi is connected
+    WiFi.onEvent(callback_STA_disconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+    return wm.autoConnect(PORTAL_NAME);
 }
 
-void wifi_setup(void)
+// add some endpoints to trick android and IOS into showing the captive portal
+// this is needed to make the captive portal appear on the device
+static void add_captive_portal_spoof(WebServer *s)
 {
-    WiFi.mode(WIFI_STA);         // set Wi-Fi mode to STA (Station)
-    WiFi.setAutoConnect(true);   // enable auto-connect, a single connection attempt with last saved credentials on driver startup
-    WiFi.setAutoReconnect(true); // enable auto-reconnect, will try to reconnect (exponential back-off) if connection is lost
-    WiFi.setHostname("Obegransad");
-    WiFi.onEvent(callback_sta_disconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+    s->on(
+        "/generate_204",
+        HTTP_ANY,
+        [s]()
+        {
+      s->sendHeader("Location", "/");
+      s->send(302, "text/plain", ""); });
 
-    //     // clean up after success
-    //     Serial.println("Connected to WiFi!");
-    //     Serial.print("IP Address: ");
-    //     Serial.println(WiFi.localIP());
-    //     // migrate from AP to STA mode
-    //     delay(3000);                 // give phone time to finish
-    //     WiFi.softAPdisconnect(true); // drop the hotspot
-    //     WiFi.mode(WIFI_STA);         // switch to STA mod
+    s->on(
+        "/hotspot-detect.html",
+        HTTP_ANY,
+        [s]()
+        {
+            s->send(200, "text/html", "<!doctype html>");
+        });
+
+    // Additional endpoints for better captive portal detection
+    s->on("/fwlink", HTTP_ANY, [s]()
+          {
+        s->sendHeader("Location", "/");
+        s->send(302, "text/plain", ""); });
+
+    s->on("/connecttest.txt", HTTP_ANY, [s]()
+          { s->send(200, "text/plain", "Microsoft Connect Test"); });
+}
+
+void captive_portal_tick()
+{
+    // this is called in the main loop to keep the captive portal alive
+    // it will handle button presses and other events
+    wm.process();
+}
+
+void captive_portal_start()
+{
+    // These lines are needed to properly create the AP in non-blocking mode
+    WiFi.mode(WIFI_AP_STA); // Set WiFi to AP+STA mode
+
+    // Need to disconnect first to ensure clean AP setup
+    WiFi.disconnect();
+
+    wm.startConfigPortal(PORTAL_NAME);
+}
+
+void captive_portal_stop()
+{
+    // stop the captive portal
+    wm.stopConfigPortal();
+
+    // Return to station mode for normal operation
+    WiFi.mode(WIFI_STA);
+}
+
+// Sets up wifi and starts the captive portal if no credentials are stored
+// make sure this function is never called more than once!
+void captive_portal_setup(void)
+{
+    wm.setConfigPortalBlocking(false); // has to be the first statement, otherwise it will not work
+    wm.setWiFiAutoReconnect(true);
+    wm.setConfigPortalTimeout(120); // Don't timeout
+    wm.setConnectTimeout(30);     // seconds to connect to Wi-Fi
+    wm.setDarkMode(true);
+#if DEBUG
+    wm.setDebugOutput(true);
+#endif
+    // Callback when AP (portal) comes up
+    wm.setAPCallback([](WiFiManager *w)
+                     { Serial.println(">>> Entered config portal"); });
+
+    // Callback when credentials are saved (Exit button)
+    wm.setSaveConfigCallback([]()
+                             { Serial.println(">>> Credentials saved; portal should stop soon"); });
+
+    // make the captive portal actually appear on device
+    if (WebServer *s = wm.server.get())
+    {
+        add_captive_portal_spoof(s);
+    }
+}
+
+bool captive_portal_active()
+{
+    return wm.getConfigPortalActive(); // || portalActive;
 }
 
 // Make sure to flush sockets (e.g. web server and http client) before entering light sleep.
@@ -124,111 +202,10 @@ DeviceError enter_light_sleep(uint64_t seconds)
     // re-auth to wifi
     if (!WiFi.reconnect())
     {
-        // will call callback_sta_disconnected if it fails
+        // will call callback_STA_disconnected if it fails
         Serial.println("Failed to reconnect to WiFi after sleep");
         return ERR_WIFI;
     }
 
     return ERR_NONE;
-}
-
-std::vector<NetworkInfo> wifi_nearby_networks(void)
-{
-    Serial.println("Scanning for nearby Wi-Fi networks...");
-
-    // start scan
-    if (WiFi.scanNetworks(true, true) < 0)
-    {
-        Serial.println("Failed to start Wi-Fi scan");
-        return std::vector<NetworkInfo>(); // return empty vector on failure
-    }
-
-    // wait for scan to complete
-    while (WiFi.scanComplete() == WIFI_SCAN_RUNNING)
-    {
-        delay(100);
-    }
-
-    // print results
-    int numNetworks = WiFi.scanComplete();
-    Serial.printf("Found %d networks:\n", numNetworks);
-
-    std::vector<NetworkInfo> sortedNetworks; // vector to hold sorted networks
-    sortedNetworks.clear();                  // clear the sorted networks list
-    for (int i = 0; i < numNetworks; ++i)
-    {
-        // create a network info object
-        NetworkInfo netInfo;
-        netInfo.ssid = WiFi.SSID(i);
-        netInfo.rssi = WiFi.RSSI(i);
-        netInfo.quality = wifi_rssi_quality(netInfo.rssi); // calculate quality
-        netInfo.encryptionType = WiFi.encryptionType(i);
-        netInfo.channel = WiFi.channel(i);
-        // add to the sorted list
-        sortedNetworks.push_back(netInfo);
-    }
-
-    // reset scan results
-    WiFi.scanDelete();
-
-    return sortedNetworks; // return the sorted networks
-}
-
-uint8_t wifi_rssi_quality(int rssi)
-{
-    int quality = 0;
-    if (rssi <= -100)
-    {
-        quality = 0;
-    }
-    else if (rssi >= -50)
-    {
-        quality = 100;
-    }
-    else
-    {
-        quality = 2 * (rssi + 100);
-    }
-    return quality;
-}
-
-bool wifi_connect(const String &ssid, const String &password, unsigned int timeout_ms)
-{
-    WiFi.mode(WIFI_STA); // ensure we are in STA mode
-    WiFi.begin(ssid.c_str(), password.c_str());
-
-    unsigned long startTime = millis();
-    while (WiFi.status() != WL_CONNECTED && millis() - startTime < timeout_ms)
-        delay(500);
-    Serial.println("\nConnected to Wi-Fi!");
-    Serial.print("IP Address: ");
-    Serial.println(WiFi.localIP());
-    return WiFi.status() == WL_CONNECTED; // return true if connected
-}
-
-void wifi_disconnect()
-{
-    Serial.println("Disconnecting from Wi-Fi...");
-    WiFi.disconnect();
-    Serial.println("Disconnected from Wi-Fi");
-}
-void wifi_reconnect()
-{
-    Serial.println("Reconnecting to Wi-Fi...");
-    if (WiFi.status() != WL_CONNECTED)
-    {
-        WiFi.reconnect();
-        unsigned long startTime = millis();
-        while (WiFi.status() != WL_CONNECTED)
-        {
-            if (millis() - startTime > 10000) // timeout after 10 seconds
-            {
-                Serial.println("Failed to reconnect to Wi-Fi");
-                return;
-            }
-            delay(500);
-            Serial.print(".");
-        }
-        Serial.println("\nReconnected to Wi-Fi!");
-    }
 }

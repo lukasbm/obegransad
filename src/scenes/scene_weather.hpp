@@ -6,14 +6,14 @@
 #include "sprites/thin_glyphs.hpp"
 #include "sprites/cloud.hpp"
 #include "sprites/rain.hpp"
+#include "scenes/helper.hpp"
 
 class WeatherScene : public Scene
 {
 private:
-    struct WeatherData weatherData;
     struct RainAnimation animation_rain;
 
-    void drawWeatherData()
+    void drawWeatherData(const WeatherData &weatherData)
     {
         panel_clear();
 
@@ -62,32 +62,15 @@ public:
     void activate() override
     {
         Serial.println("Weather scene activated");
-        // initial data
-        weatherData = fetchWeather(settings.weather_latitude, settings.weather_longitude);
-        weatherData.print();
-        drawWeatherData();
     }
 
-    // TODO: move fetching to weather module!
     void update() override
     {
-        static unsigned long lastFetch = millis();
-        static unsigned long lastDraw = 0;
+        static RenderTimer timer(200); // 200 ms timer for animations
 
-        const int weatherUpdateInterval = 600; // 10 minutes
-
-        unsigned long now = millis();
-        if (now - lastFetch > weatherUpdateInterval * 1000)
+        if (timer.check())
         {
-            weatherData = fetchWeather(settings.weather_latitude, settings.weather_longitude);
-            weatherData.print();
-            lastFetch = now;
-        }
-        // have to draw all the time (every second) because of animations
-        if (now - lastDraw > 200)
-        {
-            lastDraw = now;
-            drawWeatherData();
+            // FIXME: drawWeatherData(weather_get());
         }
     }
 };

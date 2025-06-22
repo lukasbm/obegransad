@@ -74,10 +74,11 @@ void panel_fill(uint8_t col)
     interrupts();
 }
 
-void panel_drawSprite(uint8_t tlX, uint8_t tlY, const uint8_t *data, uint8_t width, uint8_t height)
+void panel_drawSprite(int8_t tlX, int8_t tlY, const uint8_t *data, uint8_t width, uint8_t height)
 {
     uint8_t *p = const_cast<uint8_t *>(data);
     uint8_t i = 0;
+    // move over entire sprite (2 bits per pixel)
     for (uint8_t y = 0; y < height; y++)
     {
         for (uint8_t x = 0; x < width; x++)
@@ -89,9 +90,13 @@ void panel_drawSprite(uint8_t tlX, uint8_t tlY, const uint8_t *data, uint8_t wid
                 i = 0;
             }
             // get the pixel value (2 bits per pixel) - they are big endian.
-            uint8_t pixel = (*p >> (6 - i * 2)) & mask;
-            // draw it
-            panel_setPixel(tlY + y, tlX + x, colorMap[pixel]);
+            // draw it (if not out of bounds)
+            if ((tlX + x >= 0) && (tlX + x < 16) && (tlY + y >= 0) && (tlY + y < 16))
+            {
+                // set pixel in the panel buffer
+                uint8_t pixel = (*p >> (6 - i * 2)) & mask;
+                panel_setPixel(tlY + y, tlX + x, colorMap[pixel]);
+            }
             i++;
         }
     }

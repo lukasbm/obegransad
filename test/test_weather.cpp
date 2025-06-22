@@ -13,7 +13,7 @@ void tearDown(void)
 
 void test_weather_important_fields_present()
 {
-    WeatherData data = fetchWeather(49.4542, 11.0775); // Nürnberg.
+    WeatherData data = weather_fetch(49.4542, 11.0775); // Nürnberg.
 
     TEST_ASSERT_GREATER_THAN(-30, data.temperature);
 }

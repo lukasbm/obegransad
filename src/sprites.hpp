@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include "led.h"
 
 // NOTE: sprite are always stacked on top of each other (y-axis)
 

@@ -1,6 +1,5 @@
 #include <Arduino.h>
 #include <OneButton.h>
-#include <esp_timer.h>
 
 #include "weather.h"
 #include "device.h"
@@ -8,30 +7,22 @@
 #include "led.h"
 #include "sprites/wifi.hpp"
 #include "clock.h"
-#include "portal.h"
+#include "server.h"
+#include "scenes/helper.hpp"
+#include "scenes/switcher.hpp"
+
 #include "scenes/scene_anniversary.hpp"
 #include "scenes/scene_brightness.hpp"
 #include "scenes/scene_clock_second_ring.hpp"
 #include "scenes/scene_clock.hpp"
 #include "scenes/scene_empty.hpp"
 #include "scenes/scene_snake.hpp"
-#include "scenes/scene_test.hpp"
 #include "scenes/scene_weather_forecast.hpp"
 #include "scenes/scene_weather_minmax.hpp"
 #include "scenes/scene_weather.hpp"
-#include "scenes/switcher.hpp"
 #include "scenes/scene_concentric_circles.hpp"
-
-// captive portal
-Portal captivePortal;
-
-// button definitions
-OneButton button;
-void button_setup();
-void buttonSingleClick();
-void buttonLongPressStart();
-void buttonLongPressStop();
-int buttonLongPressTimer = 0;
+#include "scenes/fireworks.hpp"
+#include "scenes/game_of_life.hpp"
 
 // all scenes live here, in RAM
 AnniversaryScene anniversaryScene;
@@ -44,20 +35,24 @@ WeatherForecastScene weatherForecastScene;
 WeatherMinMaxScene weatherMinMaxScene;
 WeatherScene weatherScene;
 ConcentricCircleScene concentricCircleScene;
+FireworksScene fireworksScene;
+GameOfLifeScene gameOfLifeScene;
 
-// switcher
-constexpr size_t NUM_SCENES = 3; // number of scenes
-SceneSwitcher<NUM_SCENES> sceneSwitcher(
-    std::array<Scene *, NUM_SCENES>{
-        &snakeScene,
-        &clockSceneSecond,
-        &concentricCircleScene,
-    });
+// other components
+SettingsServer settingsServer;                // handles settings via web server
+time_t nextSleepDuration = 0;                 // next sleep duration in seconds, used to wake up the device from light sleep
+RenderTimer timeSyncTimer(60 * 30 * 1000);    // 30 minute timer for NTP sync
+RenderTimer weatherSyncTimer(60 * 30 * 1000); // 30 minute timer for weather sync
 
-static void conduct_checks();
+// button definitions
+OneButton button;
+void buttonSetup();
+void buttonSingleClick();
+void buttonLongPressStart();
+void buttonLongPressStop();
+int buttonLongPressTimer = 0;
 
 /* ULTRA FAST panel refresh 500 Hz */
-// TODO: move this part to device.h in case portal.cpp needs it?
 static hw_timer_t *panelTimer = nullptr;
 void IRAM_ATTR panel_isr(void)
 {
@@ -76,129 +71,195 @@ void stop_panel_timer()
     {
         // timerDetachInterrupt(panelTimer);
         // timerEnd(panelTimer);
-
         timerAlarmDisable(panelTimer);
         panelTimer = nullptr;
     }
 }
 
-////////////////
-//////// ARDUINO
-////////////////
+// switcher
+constexpr size_t NUM_SCENES = 5; // number of scenes
+SceneSwitcher<NUM_SCENES> sceneSwitcher(
+    std::array<Scene *, NUM_SCENES>{
+        &snakeScene,
+        &clockSceneSecond,
+        &concentricCircleScene,
+        &gameOfLifeScene,
+        &anniversaryScene});
+
+// state model
+enum State
+{
+    STATE_NORMAL = 0,     // normal operation, wifi connected, no captive portal, settings server on
+    STATE_CAPTIVE_PORTAL, // captive portal active, wifi disconnected
+    STATE_NO_WIFI,        // wifi disconnected, captive portal not active, settings server running but not accessible
+    STATE_SETUP,          // settings server not running, captive portal not yet active
+    STATE_SLEEPING        // device is in light sleep mode, waiting for button press or timer wakeup (wifi off, but the sleep call is blocking anyway)
+};
+static State state = STATE_SETUP;
+
+// manages the state transitions
+// components to keep track of:
+// - captive portal
+// - settings server
+// - panel (either scene or wifi logo)
+// ? stuff related to sleep?
+static void update_state(State next)
+{
+    if (state == next)
+    {
+        Serial.println("State unchanged");
+        return; // no change
+    }
+
+    // we don't have to consider what the last state was if all the functions we use below are idempotent
+    switch (next)
+    {
+    case STATE_NORMAL:
+        Serial.println("State change to NORMAL");
+        captive_portal_stop();
+        start_panel_timer();
+        settingsServer.start();
+        timeSyncTimer.reset();    // reset the timer so that we sync immediately
+        weatherSyncTimer.reset(); // reset the timer so that we fetch weather immediately
+        sceneSwitcher.skipTo(0);  // display a scene
+        break;
+
+    case STATE_CAPTIVE_PORTAL:
+        Serial.println("State change to CAPTIVE_PORTAL");
+        settingsServer.stop();
+        stop_panel_timer();
+        display_wifi_logo(); // show the Wi-Fi logo
+        captive_portal_start();
+        break;
+
+    case STATE_NO_WIFI:
+        Serial.println("State change to NO_WIFI");
+        start_panel_timer();
+        settingsServer.stop();
+        captive_portal_stop();
+        sceneSwitcher.skipTo(0); // display a scene
+        break;
+
+    case STATE_SLEEPING:
+        Serial.println("State change to SLEEPING");
+        settingsServer.stop();
+        captive_portal_stop();
+        stop_panel_timer();                   // stop the panel timer
+        panel_clear();                        // clear the panel
+        enter_light_sleep(nextSleepDuration); // enter light sleep
+        break;
+    }
+
+    state = next;
+}
 
 void setup()
 {
-    delay(3000);          // wait for serial monitor to connect, otherwise monitor serial will not work
-    Serial.begin(115200); // FIXME: broken again!
+    delay(3000); // wait for serial monitor to connect, otherwise monitor serial will not work
+    Serial.begin(115200);
     Serial.println("Starting setup...");
 
-    button_setup();
-    panel_init();
-    // start_panel_timer();
+    WiFi.mode(WIFI_STA); // set Wi-Fi mode to station (initially, otherwise will be STA+AP) // has to be here at the beginning, otherwise it blocks?
 
-    display_wifi_symbol();
+    // state independent setup code
+    captive_portal_setup(); // set up Wi-Fi, will start captive portal if no credentials are stored
+    gSettings = read_from_persistent_storage();
+    buttonSetup(); // set up the button
+    panel_init();  // initialize the LED panel
+    Serial.println("Setup done, checking Wi-Fi...");
 
-    // stop_panel_timer();
-    captivePortal.start();
-    // start_panel_timer();
+    if (wifi_setup())
+    {
+        // already connected
+        Serial.println("Wi-Fi connected");
+        update_state(STATE_NORMAL);
+    }
+    else
+    {
+        // not connected, start captive portal
+        Serial.println("Wi-Fi not connected, starting captive portal");
+        update_state(STATE_CAPTIVE_PORTAL);
+    }
 
-    // if (!settings.initial_setup_done)
-    // {
-    //     Serial.println("Initial setup not done, starting captive portal...");
-    //     captivePortal.start();
-    // }
-    // else
-    // {
-    //     Serial.println("Initial setup done, starting normally.");
-    //     wifi_connect(settings.ssid, settings.password); // connect to Wi-Fi
-    //     time_syncNTP();                                 // sync time with NTP server
-    //     conduct_checks();                               // perform initial checks
-    // }
+    Serial.println("Setup complete, entering main loop...");
 
-    // // Start with the first scene
-    // sceneSwitcher.nextScene();
+    // only switch to first scene once we have state NORMAL or NO_WIFI, keep wifi logo as long as we are in SETUP or CAPTIVE_PORTAL state
 }
 
 void loop()
 {
-    captivePortal.tick(); // process captive portal requests
-    delay(10);
-    return;
+    struct tm time = time_get();
 
-    static uint32_t lastSceneTick = 0;
-    static uint32_t lastWeatherTick = 0;
-    static uint32_t lastNTPTick = 0;
-    static uint32_t lastCheck = 0;
+    // BUTTON
+    button.tick(); // always tick the button
 
-    auto now = millis();
-
-    auto hasWiFi = wifi_check();
-
-    if (now - lastCheck > 10000) // check every 10 seconds
+    // CAPTIVE PORTAL
+    if (state == STATE_CAPTIVE_PORTAL)
     {
-        conduct_checks();
-        lastCheck = millis();
+        if (!captive_portal_active())
+        {
+            Serial.println("Captive portal is not active, switching to one of the other states");
+            update_state(wifi_check() ? STATE_NORMAL : STATE_NO_WIFI); // if the captive portal is not active, switch to one of the normal states
+        }
+        else
+        {
+            captive_portal_tick(); // handle captive portal events
+        }
+    }
+    if (state == STATE_NO_WIFI || state == STATE_NORMAL)
+    {
+        sceneSwitcher.tick(); // progress the current scene
     }
 
-    if (now - lastWeatherTick > 600000 && hasWiFi) // check weather every 10 minutes
+    // WIFI
+    if (state != STATE_CAPTIVE_PORTAL)
     {
-        Serial.println("Checking weather...");
-        // FIXME: weather_update();  // update global weather data
-        lastWeatherTick = millis();
+        if (wifi_check())
+        {
+            update_state(STATE_NORMAL); // if we are in captive portal state and Wi-Fi is connected, switch to normal state
+        }
+        else
+        {
+            update_state(STATE_NO_WIFI); // if we are in normal state and Wi-Fi is not connected, switch to no Wi-Fi state
+        }
     }
 
-    // FIXME: not needed now, fetch_time takes care of it
-    // if (now - lastNTPTick > 3600000 && hasWiFi) // sync time every hour
-    // {
-    //     Serial.println("Syncing time with NTP...");
-    //     time_syncNTP();
-    //     lastNTPTick = millis();
-    // }
-
-    if (now - lastSceneTick > 100) // update scene every 100 ms (10FPS)
+    // WEATHER
+    if (state == STATE_NORMAL && weatherSyncTimer.check())
     {
-        lastSceneTick = millis();
+        weather_fetch();
     }
 
-    // Update the button
-    button.tick();
-
-    // Update the current scene
-    sceneSwitcher.tick();
-
-    delay(10); // yield to other (low prio) tasks
-}
-
-static void conduct_checks()
-{
-    Serial.println("Conducting checks...");
-    struct tm time = time_fetch();
-
-    // adjust brightness
-    uint8_t brightness = isNight(time) ? settings.brightness_night : settings.brightness_day;
-    Serial.printf("Setting brightness to %d\n", brightness);
-    panel_setBrightness(brightness);
-
-    // also check if it is time to shut off!
-    // if (shouldTurnOff(time))
-    // {
-    //   enter_light_sleep() // TODO: make it also return the sleep duration
-    // }
-
-    // check wifi health
-    if (!wifi_check())
+    // TIME
+    if (state == STATE_NORMAL && timeSyncTimer.check())
     {
-        Serial.println("Wi-Fi is not connected, trying to reconnect …");
+        time_syncNTP();
+    }
+
+    // BRIGHTNESS (TODO: ease in and out around the threshold)
+    if (state == STATE_NORMAL ? weather_get().isDay : time_isNight(time))
+    {
+        panel_setBrightness(gSettings.brightness_night);
     }
     else
     {
-        Serial.println("Wi-Fi is healthy.");
+        panel_setBrightness(gSettings.brightness_day);
     }
+
+    // OFF HOURS
+    if (shouldTurnOff(time))
+    {
+        nextSleepDuration = calcTurnOffDuration(time);
+        update_state(STATE_SLEEPING); // switch to sleeping state if it is time to turn off
+        update_state(STATE_NORMAL);   // switch back to normal state, as everything during the sleep state is blocking
+    }
+
+    delay(20); // small delay to avoid busy loop and give scheduler a chance to run
 }
 
 ///// button stuff
 
-void button_setup()
+void buttonSetup()
 {
     pinMode(BUTTON_PIN, INPUT_PULLUP); // set the button pin as input with pull-up resistor
     button.setup(
@@ -213,24 +274,30 @@ void button_setup()
 
 void buttonSingleClick()
 {
-    Serial.println("Button - Single click -> next scene");
-    sceneSwitcher.nextScene();
+    if (state == STATE_NORMAL)
+    {
+        Serial.println("Button - Single click -> next scene");
+        sceneSwitcher.nextScene();
+    }
+    else if (state == STATE_CAPTIVE_PORTAL)
+    {
+        Serial.println("Button - Single click -> stop captive portal");
+        update_state(STATE_NO_WIFI); // switch to no Wi-Fi state, as we cancelled the captive portal
+    }
 }
 
 void buttonLongPressStart()
 {
-    Serial.println("Button - Long press start");
     buttonLongPressTimer = millis();
 }
 
 void buttonLongPressStop()
 {
-    Serial.println("Button - Long press stop");
     int duration = millis() - buttonLongPressTimer;
     Serial.printf("Button long press duration: %d ms\n", duration);
-    if (duration > 5000)
+    if (duration > 10000)
     {
-        Serial.println("Button long press -> open captive portal");
-        captivePortal.start();
+        Serial.println("Button long press -> reset WiFi credentials");
+        wifi_clear_credentials();
     }
 }

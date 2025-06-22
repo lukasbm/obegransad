@@ -17,6 +17,9 @@ EN	Output‑enable / blank	Global: either all LED outputs drive, or none do
 #define P_DI D3    // serial data into SCT2024 SDI
 #define P_OE D4    // OE/ (active‑low output enable)
 
+#define ROWS 16 // number of rows
+#define COLS 16 // number of columns
+
 enum Brightness : uint8_t
 {
     BRIGHTNESS_OFF = 0,
@@ -86,7 +89,8 @@ static const Brightness colorMap[4] = {
     BRIGHTNESS_4};
 
 // draws a sprite starting at the top left corner (tlX, tlY)
-void panel_drawSprite(uint8_t tlX, uint8_t tlY, const uint8_t *data, uint8_t width, uint8_t height);
+// It is also possible to draw sprites that are larger than the panel or (partially) out of bounds, but they will be clipped.
+void panel_drawSprite(int8_t tlX, int8_t tlY, const uint8_t *data, uint8_t width, uint8_t height);
 
 inline void panel_setBrightness(uint8_t brightness)
 {

@@ -28,3 +28,30 @@ void ring_coord(uint8_t pos, uint8_t &x, uint8_t &y)
         y = 60 - pos;
     }
 }
+
+// A simple timer that can be used to check if a certain interval has passed
+struct RenderTimer
+{
+    // interval in milliseconds
+    RenderTimer(uint32_t interval) : interval(interval), last(0) {}
+
+    bool check()
+    {
+        static uint32_t now = millis();
+        if (now - last >= interval)
+        {
+            last = now;
+            return true; // interval has passed
+        }
+        return false; // interval has not passed
+    }
+
+    void reset()
+    {
+        last = millis(); // reset the timer to the current time so that the next check will be true immediately
+    }
+
+private:
+    uint32_t interval; // interval in milliseconds
+    uint32_t last;     // last time the timer was checked
+};
