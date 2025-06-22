@@ -282,7 +282,14 @@ void buttonSingleClick()
     else if (state == STATE_CAPTIVE_PORTAL)
     {
         Serial.println("Button - Single click -> stop captive portal");
-        update_state(STATE_NO_WIFI); // switch to no Wi-Fi state, as we cancelled the captive portal
+        if (wifi_check())
+        {
+            update_state(STATE_NORMAL); // if Wi-Fi is connected, switch to normal state
+        }
+        else
+        {
+            update_state(STATE_NO_WIFI); // switch to no Wi-Fi state, as we cancelled the captive portal
+        }
     }
 }
 
