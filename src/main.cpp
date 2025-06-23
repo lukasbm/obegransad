@@ -62,7 +62,7 @@ void buttonLongPressStart();
 void buttonLongPressStop();
 int buttonLongPressTimer = 0;
 
-/* ULTRA FAST panel refresh 500 Hz */
+/* fast panel refresh */
 static hw_timer_t *panelTimer = nullptr;
 void IRAM_ATTR panel_isr(void)
 {
@@ -72,7 +72,7 @@ void start_panel_timer()
 {
     panelTimer = timerBegin(0, 80, true); // 1 µs tick (80 MHz / 80 = 1 MHz)
     timerAttachInterrupt(panelTimer, &panel_isr, true);
-    timerAlarmWrite(panelTimer, 2000, true); // 2 ms
+    timerAlarmWrite(panelTimer, 10000, true); // 10 ms -> 100 Hz refresh rate
     timerAlarmEnable(panelTimer);
 }
 void stop_panel_timer()
@@ -107,7 +107,6 @@ static void update_state(State next)
 {
     if (state == next)
     {
-        Serial.println("State unchanged");
         return; // no change
     }
 
