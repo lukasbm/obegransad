@@ -44,6 +44,16 @@ time_t nextSleepDuration = 0;                 // next sleep duration in seconds,
 RenderTimer timeSyncTimer(60 * 30 * 1000);    // 30 minute timer for NTP sync
 RenderTimer weatherSyncTimer(60 * 30 * 1000); // 30 minute timer for weather sync
 
+// switcher
+constexpr size_t NUM_SCENES = 5; // number of scenes
+SceneSwitcher<NUM_SCENES> sceneSwitcher(
+    std::array<Scene *, NUM_SCENES>{
+        &snakeScene,
+        &clockSceneSecond,
+        &concentricCircleScene,
+        &gameOfLifeScene,
+        &anniversaryScene});
+
 // button definitions
 OneButton button;
 void buttonSetup();
@@ -75,16 +85,6 @@ void stop_panel_timer()
         panelTimer = nullptr;
     }
 }
-
-// switcher
-constexpr size_t NUM_SCENES = 5; // number of scenes
-SceneSwitcher<NUM_SCENES> sceneSwitcher(
-    std::array<Scene *, NUM_SCENES>{
-        &snakeScene,
-        &clockSceneSecond,
-        &concentricCircleScene,
-        &gameOfLifeScene,
-        &anniversaryScene});
 
 // state model
 enum State
@@ -196,7 +196,7 @@ void loop()
     // CAPTIVE PORTAL
     if (state == STATE_CAPTIVE_PORTAL)
     {
-        if (!captive_portal_active())
+        if (!captive_portal_active() && !wifi_check()) // if the captive portal is not active and Wi-Fi is not connected
         {
             Serial.println("Captive portal is not active, switching to one of the other states");
             update_state(wifi_check() ? STATE_NORMAL : STATE_NO_WIFI); // if the captive portal is not active, switch to one of the normal states

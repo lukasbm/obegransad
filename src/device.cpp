@@ -118,7 +118,7 @@ void captive_portal_setup(void)
     wm.setConfigPortalBlocking(false); // has to be the first statement, otherwise it will not work
     wm.setWiFiAutoReconnect(true);
     wm.setConfigPortalTimeout(120); // Don't timeout
-    wm.setConnectTimeout(30);     // seconds to connect to Wi-Fi
+    wm.setConnectTimeout(30);       // seconds to connect to Wi-Fi
     wm.setDarkMode(true);
 #if DEBUG
     wm.setDebugOutput(true);
