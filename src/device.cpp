@@ -45,6 +45,7 @@ void wifi_clear_credentials(void)
 {
     // clear stored credentials
     wm.resetSettings();
+    ESP.restart(); // restart the device to apply changes
 }
 
 // need to call captive portal setup first
