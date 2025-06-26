@@ -2,31 +2,37 @@
 
 #include <Arduino.h>
 
-// I dont know which microcontroller the OBEGRÄNSAD uses,
-// but it might be one of the classics:
-// MBI5024/5034, STP16, TPIC6B595
-
 /*
-DI	Serial data in	1 bit at a time, no concept of “brightness”
-CLK	Shift‑register clock	Just marches data along
-CLA	Latch / strobe	Copies the 256 bits into the output on/off latches
-EN	Output‑enable / blank	Global: either all LED outputs drive, or none do
+The panel works as follows:
+- Init SPI DMA (~0.5 us)
+- Use SPI DMA to transfer bit plane (~10 us)
+- Latch pulse (< 0.1 us)
+- Start RMT output for timed OE hold (< 0.5 us)
 */
-#define P_LATCH D1 // LA/ (active‑low latch)
-#define P_CLK D2   // shift clock
-#define P_DI D3    // serial data into SCT2024 SDI
+
+#define P_LATCH D1 // LA/ (active‑low latch); STCP LATCH
+#define P_CLK D2   // shift clock; SPI-SCK
+#define P_DI D3    // serial data into SCT2024 SDI; SPI-MOSI
 #define P_OE D4    // OE/ (active‑low output enable)
+
+#define SPI_HZ 23000000         // 20 MHz -> 50 ns per Bit (the SCT2024 can handle up to 25 MHz)
+#define BIT_COUNT (ROWS * COLS) // bits per plane
+#define FRAME_TIME_US 2500      // 2.5 ms per frame -> 400 Hz refresh rate
+
+// manually set the additive timing windows for the 3 planes (should appear linear in brightness to the eye)
+#define PLANE0_ON_US 32  // 10 %
+#define PLANE1_ON_US 80  // 25 %
+#define PLANE2_ON_US 320 // 100 %
 
 #define ROWS 16 // number of rows
 #define COLS 16 // number of columns
 
-enum Brightness : uint8_t
+enum Brightness
 {
-    BRIGHTNESS_OFF = 0,
-    BRIGHTNESS_1 = 1,
-    BRIGHTNESS_2 = 15,
-    BRIGHTNESS_3 = 64,
-    BRIGHTNESS_4 = 255
+    BRIGHTNESS_OFF,
+    BRIGHTNESS_1,
+    BRIGHTNESS_2,
+    BRIGHTNESS_3,
 };
 
 // timing: BASE_US × (2^8 − 1) == full frame duration
@@ -52,8 +58,7 @@ static const int lut[16][16] = {
     {231, 230, 229, 228, 227, 226, 225, 224, 247, 246, 245, 244, 243, 242, 241, 240},
     {232, 233, 234, 235, 236, 237, 238, 239, 248, 249, 250, 251, 252, 253, 254, 255}};
 
-static uint8_t panel_buf[16 * 16]; // grayscale graphics buffer
-extern uint8_t gBright;            // global brightness (0-255)
+extern uint8_t gBright; // global brightness (0-255) (only scaling)
 
 // forward declarations
 void panel_setPixel(int8_t row, int8_t col, uint8_t brightness);
@@ -62,6 +67,9 @@ void panel_setPixel(int8_t row, int8_t col, uint8_t brightness);
 // call this once before doing a long blocking task, this keeps the panel on.
 // after wards just call panel_show() to refresh the panel
 void panel_hold();
+
+void panel_timer_start();
+void panel_timer_stop();
 
 // refreshes the panel (with PWM)
 // needed for animations and individual pixel brightness
@@ -79,24 +87,15 @@ inline void panel_clear()
     panel_fill(0);
 }
 
-// we have a 2 bit color depth
-static const uint8_t mask = 0b11;
-
-static const Brightness colorMap[4] = {
-    BRIGHTNESS_OFF,
-    BRIGHTNESS_1,
-    BRIGHTNESS_2,
-    BRIGHTNESS_4};
-
 // draws a sprite starting at the top left corner (tlX, tlY)
 // It is also possible to draw sprites that are larger than the panel or (partially) out of bounds, but they will be clipped.
 void panel_drawSprite(int8_t tlX, int8_t tlY, const uint8_t *data, uint8_t width, uint8_t height);
 
-inline void panel_setBrightness(uint8_t brightness)
-{
-    if (brightness > 255)
-    {
-        brightness = 255; // clamp to max brightness
-    }
-    gBright = brightness;
-}
+// we have a 2 bit color depth
+static const uint8_t mask = 0b11;
+// FIXME: remove?
+static const Brightness colorMap[4] = {
+    BRIGHTNESS_OFF,
+    BRIGHTNESS_1,
+    BRIGHTNESS_2,
+    BRIGHTNESS_3};

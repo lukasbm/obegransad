@@ -62,30 +62,6 @@ void buttonLongPressStart();
 void buttonLongPressStop();
 int buttonLongPressTimer = 0;
 
-/* fast panel refresh */
-static hw_timer_t *panelTimer = nullptr;
-void IRAM_ATTR panel_isr(void)
-{
-    panel_show();
-}
-void start_panel_timer()
-{
-    panelTimer = timerBegin(0, 80, true); // 1 µs tick (80 MHz / 80 = 1 MHz)
-    timerAttachInterrupt(panelTimer, &panel_isr, true);
-    timerAlarmWrite(panelTimer, 10000, true); // 10 ms -> 100 Hz refresh rate
-    timerAlarmEnable(panelTimer);
-}
-void stop_panel_timer()
-{
-    if (panelTimer)
-    {
-        // timerDetachInterrupt(panelTimer);
-        // timerEnd(panelTimer);
-        timerAlarmDisable(panelTimer);
-        panelTimer = nullptr;
-    }
-}
-
 // state model
 enum State
 {
