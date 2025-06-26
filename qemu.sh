@@ -17,10 +17,10 @@ pio run -e "${ENV}"
 
 # 2. locate the binaries produced by PlatformIO
 BOOT="${BUILD_DIR}/bootloader.bin"
-PART="${BUILD_DIR}/partition-table.bin"
+PART="${BUILD_DIR}/partitions.bin"
 APP="${BUILD_DIR}/firmware.bin"
-OTA="${BUILD_DIR}/ota_data_initial.bin" # may be missing on very old cores
-BOOT_APP0="${BUILD_DIR}/boot_app0.bin"  # needed for OTA layouts; exists in current cores
+# OTA="${BUILD_DIR}/ota_data_initial.bin" # may be missing on very old cores
+# BOOT_APP0="${BUILD_DIR}/boot_app0.bin"  # needed for OTA layouts; exists in current cores
 
 # 3. sanity-check
 for f in "$BOOT" "$PART" "$APP"; do
