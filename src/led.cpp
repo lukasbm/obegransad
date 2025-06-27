@@ -10,7 +10,12 @@ constexpr static uint8_t GRAY_LEVELS = 3; // number of grayscale values (besides
 
 static spi_device_handle_t spi;
 static rmt_item32_t plane_item[GRAY_LEVELS];
-static const uint8_t *bitplane_data[GRAY_LEVELS]; // Zeiger auf 3 vorberechnete 32-Byte-Puffer
+
+// planes
+DRAM_ATTR static uint8_t plane0[32];
+DRAM_ATTR static uint8_t plane1[32];
+DRAM_ATTR static uint8_t plane2[32];
+static const uint8_t *planes[3] = {plane0, plane1, plane2};
 static volatile uint8_t current_plane = 0;
 
 static void rmt_init()
@@ -19,7 +24,7 @@ static void rmt_init()
         .rmt_mode = RMT_MODE_TX,
         .channel = RMT_CHANNEL_0,
         .gpio_num = (gpio_num_t)P_OE,
-        .clk_div = 80, // 1 MHz Auflösung => 1 µs per Tick
+        .clk_div = 80, // 1 MHz resolution => 1 µs per Tick
         .mem_block_num = 1,
         .tx_config{
             .loop_en = false,
@@ -60,13 +65,13 @@ static void spi_init()
 }
 
 // high performance latch pulse
-IRAM_ATTR inline void latch_pulse()
+IRAM_ATTR static inline void latch_pulse()
 {
     REG_WRITE(GPIO_OUT_W1TS_REG, 1u << P_LATCH); // LAT = 1
     REG_WRITE(GPIO_OUT_W1TC_REG, 1u << P_LATCH); // LAT = 0
 }
 
-void IRAM_ATTR refresh_isr()
+static void IRAM_ATTR refresh_isr()
 {
     const uint8_t plane = current_plane;
 
@@ -119,7 +124,7 @@ void panel_timer_start()
 }
 
 void panel_timer_stop()
-{ 
+{
 }
 
 void panel_drawSprite(int8_t tlX, int8_t tlY, const uint8_t *data, uint8_t width, uint8_t height)
