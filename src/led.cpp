@@ -1,30 +1,26 @@
 #include "led.h"
 
 #include <driver/spi_master.h>
-#include <esp32-hal-rmt.h>
-#include <soc/rmt_struct.h>
-#include <soc/rmt_reg.h>
+#include <driver/rmt.h>
 
 uint8_t gBright = 100; // global brightness (0-255)
+
+// handles
+static volatile uint8_t planeIdx = 0;
+static spi_device_handle_t spi;
+static hw_timer_t *panelTimer = nullptr;
+
+// image buffers
 DRAM_ATTR static uint8_t plane0[32];
 DRAM_ATTR static uint8_t plane1[32];
 DRAM_ATTR static uint8_t plane2[32];
-static const uint8_t *planes[3] = {plane0, plane1, plane2};
-static volatile uint8_t planeIdx = 0;
-static spi_device_handle_t spi;
-static spi_transaction_t trans[3]; // 3 prepared transactions
-static hw_timer_t *panelTimer = nullptr;
-static rmt_obj_t *rmtOE;
+constexpr const uint8_t *planes[3] = {plane0, plane1, plane2};
 
-// Quick RMT starter
-static IRAM_ATTR inline void rmt_oe_start(uint32_t on_us)
-{
-    RMTMEM.chan[0].data32[0].duration0 = on_us;
-    RMTMEM.chan[0].data32[0].level0 = 0; // OE aktiv LOW
-    RMTMEM.chan[0].data32[0].duration1 = FRAME_US - on_us;
-    RMTMEM.chan[0].data32[0].level1 = 1;
-    RMT.channel[0].conf1.tx_start = 1;
-}
+// RMT items (OE active low, 1 µs pulse)
+DRAM_ATTR static rmt_item32_t rmt_plane0 = {PLANE0_ON_US, 0, FRAME_US - PLANE0_ON_US, 1};
+DRAM_ATTR static rmt_item32_t rmt_plane1 = {PLANE1_ON_US, 0, FRAME_US - PLANE1_ON_US, 1};
+DRAM_ATTR static rmt_item32_t rmt_plane2 = {PLANE2_ON_US, 0, FRAME_US - PLANE2_ON_US, 1};
+constexpr rmt_item32_t *rmt_planes[3] = {&rmt_plane0, &rmt_plane1, &rmt_plane2};
 
 // high performance latch pulse
 static IRAM_ATTR inline void latch_pulse()
@@ -33,62 +29,71 @@ static IRAM_ATTR inline void latch_pulse()
     REG_WRITE(GPIO_OUT_W1TC_REG, 1u << P_LATCH); // LAT = 0
 }
 
-static inline void IRAM_ATTR oePulse(uint32_t on)
-{
-    rmt_item32_t it{on, 0, FRAME_US - on, 1}; // OE aktiv LOW
-    rmtWrite(rmtOE, &it, 1, false);
-}
-
-// SPI transfer complete callback --> Latch + OE Window
+/* ----------- SPI-Callback: Latch + OE ----------------------- */
 static void IRAM_ATTR spi_done_cb(spi_transaction_t *t)
 {
-    if (planeIdx == 0)
-        oePulse(PLANE0_ON_US);
-    else if (planeIdx == 1)
-        oePulse(PLANE1_ON_US);
-    else
-        oePulse(PLANE2_ON_US);
     latch_pulse();
+    /* OE-window (1 Item) – ISR-safe */
+    rmt_write_items(RMT_CHANNEL_0, rmt_planes[(uint32_t)t->user], 1, false);
 }
 
-// HW-Timer ISR callback
+/* ----------- Timer-ISR (300 Hz) ----------------------------- */
 void IRAM_ATTR panel_isr()
 {
-    /* NUR ISR-safe-Funktion!  queue_trans _ISR sperrt keine Mutexe */
     static spi_transaction_t trans{};
-    trans.length = 256;
+    trans.length = 256; // 256 Bit
     trans.tx_buffer = planes[planeIdx];
-    trans.user = nullptr;
-    spi_device_queue_trans_ISR(spi, &trans, nullptr);
+    trans.user = reinterpret_cast<void *>(planeIdx);
 
-    planeIdx = (planeIdx + 1) % 3;
+    /* ISR-tauglich: 0 Ticks timeout  */
+    if (spi_device_queue_trans(spi, &trans, 0) == ESP_OK)
+    {
+        planeIdx = (planeIdx + 1) % 3;
+    }
 }
 
+/* ----------- Initialisierung -------------------------------- */
 static void init_spi()
 {
-    spi_bus_config_t bus{.mosi_io_num = P_DI,
-                         .miso_io_num = -1,
-                         .sclk_io_num = P_CLK,
-                         .max_transfer_sz = 32};
-    spi_bus_initialize(SPI2_HOST, &bus, SPI_DMA_CH_AUTO);
+    spi_bus_initialize(SPI2_HOST,
+                       &(spi_bus_config_t){
+                           .mosi_io_num = P_DI,
+                           .miso_io_num = -1,
+                           .sclk_io_num = P_CLK,
+                           .max_transfer_sz = 32},
+                       SPI_DMA_CH_AUTO);
 
-    spi_device_interface_config_t dev{
-        .clock_speed_hz = SPI_HZ,
-        .mode = 0,
-        .spics_io_num = -1,
-        .queue_size = 2,
-        .post_cb = spi_done_cb};
-    spi_bus_add_device(SPI2_HOST, &dev, &spi);
+    spi_bus_add_device(SPI2_HOST,
+                       &(spi_device_interface_config_t){
+                           .clock_speed_hz = SPI_HZ,
+                           .mode = 0,
+                           .spics_io_num = -1,
+                           .queue_size = 3,
+                           .post_cb = spi_done_cb},
+                       &spi);
 }
 
 static void init_rmt()
 {
-    rmtOE = rmtInit(P_OE, false, RMT_CHANNEL_0, 80); // 1-µs-Ticks
+    rmt_config_t cfg = {
+        .rmt_mode = RMT_MODE_TX,
+        .channel = RMT_CHANNEL_0,
+        .gpio_num = (gpio_num_t)P_OE,
+        .clk_div = 80, // 1 µs Tick
+        .mem_block_num = 1,
+        .tx_config = {
+            .loop_en = false,
+            .carrier_en = false,
+            .idle_output_en = true,
+            .idle_level = RMT_IDLE_LEVEL_HIGH // LEDs standard OFF
+        }};
+    rmt_config(&cfg);
+    rmt_driver_install(cfg.channel, 0, 0); // keine RX-Puffer
 }
 
 static void init_timer()
 {
-    panelTimer = timerBegin(0, 80, true); // 1us tick
+    panelTimer = timerBegin(0, 80, true); // 1 µs Auflösung
     timerAttachInterrupt(panelTimer, &panel_isr, true);
     timerAlarmWrite(panelTimer, FRAME_TIME_US, true);
     timerAlarmEnable(panelTimer);
@@ -97,17 +102,23 @@ static void init_timer()
 void panel_init()
 {
     pinMode(P_LATCH, OUTPUT); // LA/ (active‑low latch); STCP LATCH
-    init_rmt();
     init_spi();
+    init_rmt();
     init_timer();
 }
 
+// TODO: ab hier
+
 void panel_show()
 {
+    /* Demo-Bildinhalt generieren */
+    static uint8_t c = 0;
+    memset(plane0, c, sizeof plane0);
+    memset(plane1, c ^ 85, sizeof plane1);
+    memset(plane2, c ^ 170, sizeof plane2);
+    c++;
     // refresh_isr();
 }
-
-// TODO: ab hier
 
 void panel_timer_start()
 {
@@ -138,24 +149,9 @@ void panel_drawSprite(int8_t tlX, int8_t tlY, const uint8_t *data, uint8_t width
             {
                 // set pixel in the panel buffer
                 uint8_t pixel = (*p >> (6 - i * 2)) & mask;
-                panel_setPixel(tlY + y, tlX + x, colorMap[pixel]);
+                // panel_setPixel(tlY + y, tlX + x, colorMap[pixel]);
             }
             i++;
         }
     }
-}
-
-void panel_print(void)
-{
-    Serial.println("Panel buffer:");
-    for (int i = 0; i < 256; i++)
-    {
-        if (i % 16 == 0)
-        {
-            Serial.println();
-        }
-        Serial.print(panel_buf[i], HEX);
-        Serial.print(" ");
-    }
-    Serial.println();
 }

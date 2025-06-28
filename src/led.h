@@ -76,9 +76,6 @@ void panel_timer_stop();
 // needed for animations and individual pixel brightness
 void panel_show();
 
-// prints the buffer to the serial monitor
-void panel_print(void);
-
 void panel_init();
 
 void panel_fill(uint8_t col);
