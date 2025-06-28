@@ -22,7 +22,7 @@ private:
             ring_coord((i + 8) % 60 , x, y);  // start at 8 to have the second hand at the center top
             if (i == second)
             {
-                panel_setPixel(y, x, BRIGHTNESS_4); // bright for second hand
+                panel_setPixel(y, x, BRIGHTNESS_3); // bright for second hand
             }
             else
             {

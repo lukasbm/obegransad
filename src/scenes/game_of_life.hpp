@@ -55,7 +55,7 @@ private:
             {
                 if (buffer[y][x])
                 {
-                    panel_setPixel(y, x, BRIGHTNESS_4);
+                    panel_setPixel(y, x, BRIGHTNESS_3);
                 }
                 else
                 {

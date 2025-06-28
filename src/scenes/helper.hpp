@@ -30,6 +30,8 @@ void ring_coord(uint8_t pos, uint8_t &x, uint8_t &y)
 }
 
 // A simple timer that can be used to check if a certain interval has passed
+// TODO: write an alternative that does not poll millis() every time, but instead uses IDF gptimer
+// DO NOT use hw_timer for this as it only allow for 2 timers and we already use it for the panel refresh
 struct RenderTimer
 {
     // interval in milliseconds

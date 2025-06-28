@@ -20,7 +20,7 @@ private:
 
         // head
         ring_coord((headPos + 60) % 60, x, y);
-        panel_setPixel(y, x, BRIGHTNESS_4);
+        panel_setPixel(y, x, BRIGHTNESS_3);
 
         ring_coord((headPos - 1 + 60) % 60, x, y);
         panel_setPixel(y, x, BRIGHTNESS_3);

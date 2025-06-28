@@ -15,14 +15,16 @@ The panel works as follows:
 #define P_DI D3    // serial data into SCT2024 SDI; SPI-MOSI
 #define P_OE D4    // OE/ (active‑low output enable)
 
-#define SPI_HZ 23000000         // 20 MHz -> 50 ns per Bit (the SCT2024 can handle up to 25 MHz)
-#define BIT_COUNT (ROWS * COLS) // bits per plane
-#define FRAME_TIME_US 2500      // 2.5 ms per frame -> 400 Hz refresh rate
+#define SPI_HOST SPI2_HOST
+#define SPI_HZ 23000000    // 20 MHz -> 50 ns per Bit (the SCT2024 can handle up to 25 MHz)
+#define BIT_COUNT 256      // bits per plane
+#define FRAME_TIME_US 2500 // 2.5 ms per frame -> 400 Hz refresh rate
 
 // manually set the additive timing windows for the 3 planes (should appear linear in brightness to the eye)
 #define PLANE0_ON_US 32  // 10 %
 #define PLANE1_ON_US 80  // 25 %
 #define PLANE2_ON_US 320 // 100 %
+#define FRAME_US PLANE2_ON_US
 
 #define ROWS 16 // number of rows
 #define COLS 16 // number of columns
@@ -35,9 +37,8 @@ enum Brightness
     BRIGHTNESS_3,
 };
 
-// timing: BASE_US × (2^8 − 1) == full frame duration
-// 8 is the color depth (2^8 = 256 grayscale values)
-const static uint16_t BASE_TIME = 10; // microseconds
+// we have a 2 bit color depth (00 = off, 01 = low, 10 = medium, 11 = high)
+static const uint8_t mask = 0b11;
 
 // LUT For OBEGRÄNSAD (they are wired weirdly)
 static const int lut[16][16] = {
@@ -90,12 +91,3 @@ inline void panel_clear()
 // draws a sprite starting at the top left corner (tlX, tlY)
 // It is also possible to draw sprites that are larger than the panel or (partially) out of bounds, but they will be clipped.
 void panel_drawSprite(int8_t tlX, int8_t tlY, const uint8_t *data, uint8_t width, uint8_t height);
-
-// we have a 2 bit color depth
-static const uint8_t mask = 0b11;
-// FIXME: remove?
-static const Brightness colorMap[4] = {
-    BRIGHTNESS_OFF,
-    BRIGHTNESS_1,
-    BRIGHTNESS_2,
-    BRIGHTNESS_3};

@@ -1,126 +1,143 @@
 #include "led.h"
 
-#include "driver/spi_master.h"
-#include "driver/rmt.h"
-#include "esp_timer.h"
+#include <driver/spi_master.h>
+#include <esp32-hal-rmt.h>
 
 uint8_t gBright = 100; // global brightness (0-255)
-
-constexpr static uint8_t GRAY_LEVELS = 3; // number of grayscale values (besides black/off)
-
-static spi_device_handle_t spi;
-static rmt_item32_t plane_item[GRAY_LEVELS];
-
-// planes
 DRAM_ATTR static uint8_t plane0[32];
 DRAM_ATTR static uint8_t plane1[32];
 DRAM_ATTR static uint8_t plane2[32];
 static const uint8_t *planes[3] = {plane0, plane1, plane2};
 static volatile uint8_t current_plane = 0;
+static volatile uint8_t next_plane = 0;
+static spi_device_handle_t spi;
+static spi_transaction_t trans[3]; // 3 prepared transactions
 
-static void rmt_init()
+// Quick RMT starter
+static inline void rmt_oe_start(uint32_t on_us) IRAM_ATTR
 {
-    rmt_config_t cfg = {
-        .rmt_mode = RMT_MODE_TX,
-        .channel = RMT_CHANNEL_0,
-        .gpio_num = (gpio_num_t)P_OE,
-        .clk_div = 80, // 1 MHz resolution => 1 µs per Tick
-        .mem_block_num = 1,
-        .tx_config{
-            .loop_en = false,
-            .carrier_en = false,
-            .idle_output_en = true,
-            .idle_level = RMT_IDLE_LEVEL_HIGH // LEDs OFF when idle
-        }};
-    rmt_config(&cfg);
-    rmt_driver_install(cfg.channel, 0, 0);
-
-    auto makeItem = [](uint32_t on_us) -> rmt_item32_t
-    {
-        return (rmt_item32_t){
-            .duration0 = on_us, .level0 = 1, // OE aktiv
-            .duration1 = FRAME_TIME_US - on_us,
-            .level1 = 0};
-    };
-    plane_item[0] = makeItem(PLANE0_ON_US);
-    plane_item[1] = makeItem(PLANE1_ON_US);
-    plane_item[2] = makeItem(PLANE2_ON_US);
-}
-
-static void spi_init()
-{
-    spi_bus_config_t bus = {
-        .mosi_io_num = P_DI,
-        .miso_io_num = -1,
-        .sclk_io_num = P_CLK,
-        .max_transfer_sz = 32}; // 256 bits
-    spi_bus_initialize(SPI2_HOST, &bus, SPI_DMA_CH_AUTO);
-
-    spi_device_interface_config_t dev = {
-        .clock_speed_hz = SPI_HZ,
-        .mode = 0,
-        .spics_io_num = -1,
-        .queue_size = GRAY_LEVELS};
-    spi_bus_add_device(SPI2_HOST, &dev, &spi);
+    RMTMEM.chan[0].data32[0].duration0 = on_us;
+    RMTMEM.chan[0].data32[0].level0 = 0; // OE aktiv LOW
+    RMTMEM.chan[0].data32[0].duration1 = FRAME_US - on_us;
+    RMTMEM.chan[0].data32[0].level1 = 1;
+    RMT.channel[0].conf1.tx_start = 1;
 }
 
 // high performance latch pulse
-IRAM_ATTR static inline void latch_pulse()
+static inline void latch_pulse() IRAM_ATTR
 {
     REG_WRITE(GPIO_OUT_W1TS_REG, 1u << P_LATCH); // LAT = 1
     REG_WRITE(GPIO_OUT_W1TC_REG, 1u << P_LATCH); // LAT = 0
 }
 
-static void IRAM_ATTR refresh_isr()
+static inline void IRAM_ATTR oePulse(uint32_t on)
 {
-    const uint8_t plane = current_plane;
+    rmt_item32_t it{on, 0, FRAME_US - on, 1}; // OE aktiv LOW
+    rmtWriteItems(rmtOE, &it, 1, false);
+}
 
-    /* 1) LEDs off → OE High (RMT is off) */
-    REG_WRITE(GPIO_OUT_W1TS_REG, 1u << P_OE);
-
-    /* 2) 256 Bit via SPI DMA (nonblocking) */
-    spi_transaction_t t = {
-        .flags = SPI_TRANS_USE_TXDATA,
-        .length = BIT_COUNT, // of one data plane
-        .tx_buffer = bitplane_data[plane]};
-    spi_device_queue_trans(spi, &t, 0); // don't wait actively
-
-    /* 3) Latch when DMA SPI transfer complete (wait passively, <14 µs) */
-    spi_transaction_t *r;
-    spi_device_get_trans_result(spi, &r, portMAX_DELAY);
+// SPI transfer complete callback --> Latch + OE Window
+static void IRAM_ATTR spi_done_cb(spi_transaction_t *t)
+{
+    uint32_t plane = (uint32_t)t->user;
     latch_pulse();
+    if (plane == 0)
+        rmt_oe_start(PL0_ON_US);
+    else if (plane == 1)
+        rmt_oe_start(PL1_ON_US);
+    else
+        rmt_oe_start(PL2_ON_US);
+}
 
-    /* 4) OE-window for this plane via RMT */
-    rmt_write_items(RMT_CHANNEL_0, &plane_item[plane], 1, false);
+// HW-Timer ISR callback
+static bool IRAM_ATTR gptimer_isr_cb(gptimer_handle_t, const gptimer_alarm_event_data_t *, void *)
+{
+    spi_device_queue_trans(spi, &trans[next_plane], 0); // remove immediately
+    next_plane = (next_plane + 1) % 3;
+    return false; // no yield
+}
+static void init_spi()
+{
+    spi_bus_config_t bus{.mosi_io_num = PIN_MOSI, .miso_io_num = -1, .sclk_io_num = PIN_CLK, .max_transfer_sz = 32};
+    spi_bus_initialize(SPI_HOST, &bus, SPI_DMA_CH_AUTO);
 
-    current_plane = (plane + 1) % 3;
+    spi_device_interface_config_t dev{
+        .clock_speed_hz = 20'000'000,
+        .mode = 0,
+        .spics_io_num = -1,
+        .queue_size = 3,
+        .post_cb = spi_done_cb};
+    spi_bus_add_device(SPI_HOST, &dev, &spi);
+
+    /* 3 Transaktionen vorbereiten */
+    for (int i = 0; i < 3; ++i)
+    {
+        trans[i] = {};
+        trans[i].length = 256;
+        trans[i].tx_buffer = planes[i];
+        trans[i].user = (void *)i;
+    }
+}
+
+static void init_rmt()
+{
+    periph_module_enable(PERIPH_RMT_MODULE);
+    RMT.channel[0].conf0.div_cnt = 80; // 1 µs Ticks
+    RMT.channel[0].conf0.mem_size = 1;
+    RMT.channel[0].conf0.carrier_en = 0;
+    gpio_matrix_out(PIN_OE, RMT_SIG_OUT0_IDX, true, false);
+}
+
+static void init_timer()
+{
+    /* GPTimer 0 @ APB 80 MHz */
+    gptimer_handle_t h;
+    gptimer_config_t cfg{
+        .clk_src = GPTIMER_CLK_SRC_DEFAULT,
+        .direction = GPTIMER_COUNT_UP,
+        .resolution_hz = 1'000'000 // 1 µs
+    };
+    gptimer_new_timer(&cfg, &h);
+
+    gptimer_alarm_config_t alarm{.alarm_count = REFRESH_US, .reload_count = 0, .flags{.auto_reload_on_alarm = true}};
+    gptimer_set_alarm_action(h, &alarm);
+
+    gptimer_event_callbacks_t cbs{.on_alarm = gptimer_isr_cb};
+    gptimer_register_event_callbacks(h, &cbs, nullptr);
+    gptimer_enable(h);
+    gptimer_start(h);
+}
+
+/// TODO: ab hier
+
+void IRAM_ATTR fill_demo()
+{
+    static uint8_t frame = 0;
+    memset(plane0, frame, sizeof plane0);
+    memset(plane1, frame ^ 0x55, sizeof plane1);
+    memset(plane2, frame ^ 0xAA, sizeof plane2);
+    frame++;
 }
 
 void panel_init()
 {
     pinMode(P_LATCH, OUTPUT); // LA/ (active‑low latch); STCP LATCH
-
-    spi_init();
-    rmt_init();
-
-    // FIXME: set pointer to the bitplane data
-    bitplane_data[0] = panel_buf;
+    init_spi();
+    init_rmt();
+    init_timer();
 }
 
 void panel_show()
 {
-    refresh_isr();
+    // FIXME: fix
+    // refresh_isr();
+    fill_demo(); // fill the demo pattern
 }
+
+// TODO: ab hier
 
 void panel_timer_start()
 {
-    /* High-res-Timer → 300 Hz */
-    const esp_timer_create_args_t ta = {
-        .callback = &refresh_isr,
-        .name = "panel300"};
-    esp_timer_handle_t h;
-    esp_timer_create(&ta, &h);
-    esp_timer_start_periodic(h, FRAME_TIME_US); // 3333 µs
 }
 
 void panel_timer_stop()

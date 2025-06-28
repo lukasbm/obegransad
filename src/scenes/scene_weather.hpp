@@ -37,15 +37,15 @@ private:
         panel_drawSprite(9, 9, sprite, thin_font.spriteWidth, thin_font.spriteHeight);
 
         // degree symbol
-        panel_setPixel(9, 14, BRIGHTNESS_4);
-        panel_setPixel(9, 15, BRIGHTNESS_4);
-        panel_setPixel(10, 14, BRIGHTNESS_4);
-        panel_setPixel(10, 15, BRIGHTNESS_4);
+        panel_setPixel(9, 14, BRIGHTNESS_3);
+        panel_setPixel(9, 15, BRIGHTNESS_3);
+        panel_setPixel(10, 14, BRIGHTNESS_3);
+        panel_setPixel(10, 15, BRIGHTNESS_3);
 
         // draw separator (1 pixel row in the middle)
         for (int i = 0; i < 16; i++)
         {
-            panel_setPixel(8, i, BRIGHTNESS_4);
+            panel_setPixel(8, i, BRIGHTNESS_3);
         }
 
         ///////////////// TODO: symbols at top based on weather code (top 9 pixels)

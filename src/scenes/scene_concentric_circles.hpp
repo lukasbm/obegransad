@@ -38,7 +38,7 @@ private:
                 else if ((dist < w1 && dist > w1 - whiteWidth) || (dist < w2 && dist > w2 - whiteWidth))
                 {
                     // full pixel of the white ring
-                    panel_setPixel(y, x, BRIGHTNESS_4);
+                    panel_setPixel(y, x, BRIGHTNESS_3);
                 }
                 else
                 {

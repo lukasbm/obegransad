@@ -31,10 +31,10 @@ private:
         panel_drawSprite(9, 0, sprite, thin_font.spriteWidth, thin_font.spriteHeight);
 
         // degree symbol
-        panel_setPixel(0, 14, BRIGHTNESS_4);
-        panel_setPixel(0, 15, BRIGHTNESS_4);
-        panel_setPixel(1, 14, BRIGHTNESS_4);
-        panel_setPixel(1, 15, BRIGHTNESS_4);
+        panel_setPixel(0, 14, BRIGHTNESS_3);
+        panel_setPixel(0, 15, BRIGHTNESS_3);
+        panel_setPixel(1, 14, BRIGHTNESS_3);
+        panel_setPixel(1, 15, BRIGHTNESS_3);
 
         /////////////// draw forecast for the next days
         const uint8_t center = 7;
@@ -44,7 +44,7 @@ private:
         {
             uint8_t row = 9 + 2 * i;
             // draw center point
-            panel_setPixel(row, center, BRIGHTNESS_4);
+            panel_setPixel(row, center, BRIGHTNESS_3);
             // draw difference to todays max
             int diff = int(weatherData.daily[i + 1].temperatureMax - weatherData.daily[0].temperatureMax); // difference to todays max
             if (diff > 0)

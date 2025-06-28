@@ -57,10 +57,12 @@
         "cinttypes": "cpp",
         "typeinfo": "cpp",
         "esp32-hal.h": "c",
-        "variant": "cpp"
+        "variant": "cpp",
+        "freertos.h": "c"
     },
     "cSpell.words": [
         "fwlink",
+        "gptimer",
         "hotspot",
         "IRAM",
         "ledc",

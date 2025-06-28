@@ -92,7 +92,7 @@ static void update_state(State next)
     case STATE_NORMAL:
         Serial.println("State change to NORMAL");
         captive_portal_stop();
-        start_panel_timer();
+        panel_timer_start();
         settingsServer.start();
         timeSyncTimer.reset();    // reset the timer so that we sync immediately
         weatherSyncTimer.reset(); // reset the timer so that we fetch weather immediately
@@ -102,14 +102,14 @@ static void update_state(State next)
     case STATE_CAPTIVE_PORTAL:
         Serial.println("State change to CAPTIVE_PORTAL");
         settingsServer.stop();
-        stop_panel_timer();
+        panel_timer_stop();
         display_wifi_logo(); // show the Wi-Fi logo
         captive_portal_start();
         break;
 
     case STATE_NO_WIFI:
         Serial.println("State change to NO_WIFI");
-        start_panel_timer();
+        panel_timer_start();
         settingsServer.stop();
         captive_portal_stop();
         sceneSwitcher.skipTo(0); // display a scene
@@ -117,9 +117,9 @@ static void update_state(State next)
 
     case STATE_SLEEPING:
         Serial.println("State change to SLEEPING");
+        panel_timer_stop(); // stop the panel timer
         settingsServer.stop();
         captive_portal_stop();
-        stop_panel_timer();                   // stop the panel timer
         panel_clear();                        // clear the panel
         enter_light_sleep(nextSleepDuration); // enter light sleep
         break;
@@ -214,11 +214,11 @@ void loop()
     // BRIGHTNESS (TODO: ease in and out around the threshold)
     if (state == STATE_NORMAL ? weather_get().isDay : time_isNight(time))
     {
-        panel_setBrightness(gSettings.brightness_night);
+        gBright = gSettings.brightness_night;
     }
     else
     {
-        panel_setBrightness(gSettings.brightness_day);
+        gBright = gSettings.brightness_day;
     }
 
     // OFF HOURS
