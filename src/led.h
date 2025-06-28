@@ -16,7 +16,7 @@ The panel works as follows:
 #define P_OE D4    // OE/ (active‑low output enable)
 
 #define SPI_HOST SPI2_HOST
-#define SPI_HZ 23000000    // 20 MHz -> 50 ns per Bit (the SCT2024 can handle up to 25 MHz)
+#define SPI_HZ 20000000    // 20 MHz -> 50 ns per Bit (the SCT2024 can handle up to 25 MHz)
 #define BIT_COUNT 256      // bits per plane
 #define FRAME_TIME_US 2500 // 2.5 ms per frame -> 400 Hz refresh rate
 

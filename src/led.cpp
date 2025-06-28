@@ -2,19 +2,22 @@
 
 #include <driver/spi_master.h>
 #include <esp32-hal-rmt.h>
+#include <soc/rmt_struct.h>
+#include <soc/rmt_reg.h>
 
 uint8_t gBright = 100; // global brightness (0-255)
 DRAM_ATTR static uint8_t plane0[32];
 DRAM_ATTR static uint8_t plane1[32];
 DRAM_ATTR static uint8_t plane2[32];
 static const uint8_t *planes[3] = {plane0, plane1, plane2};
-static volatile uint8_t current_plane = 0;
-static volatile uint8_t next_plane = 0;
+static volatile uint8_t planeIdx = 0;
 static spi_device_handle_t spi;
 static spi_transaction_t trans[3]; // 3 prepared transactions
+static hw_timer_t *panelTimer = nullptr;
+static rmt_obj_t *rmtOE;
 
 // Quick RMT starter
-static inline void rmt_oe_start(uint32_t on_us) IRAM_ATTR
+static IRAM_ATTR inline void rmt_oe_start(uint32_t on_us)
 {
     RMTMEM.chan[0].data32[0].duration0 = on_us;
     RMTMEM.chan[0].data32[0].level0 = 0; // OE aktiv LOW
@@ -24,7 +27,7 @@ static inline void rmt_oe_start(uint32_t on_us) IRAM_ATTR
 }
 
 // high performance latch pulse
-static inline void latch_pulse() IRAM_ATTR
+static IRAM_ATTR inline void latch_pulse()
 {
     REG_WRITE(GPIO_OUT_W1TS_REG, 1u << P_LATCH); // LAT = 1
     REG_WRITE(GPIO_OUT_W1TC_REG, 1u << P_LATCH); // LAT = 0
@@ -33,105 +36,75 @@ static inline void latch_pulse() IRAM_ATTR
 static inline void IRAM_ATTR oePulse(uint32_t on)
 {
     rmt_item32_t it{on, 0, FRAME_US - on, 1}; // OE aktiv LOW
-    rmtWriteItems(rmtOE, &it, 1, false);
+    rmtWrite(rmtOE, &it, 1, false);
 }
 
 // SPI transfer complete callback --> Latch + OE Window
 static void IRAM_ATTR spi_done_cb(spi_transaction_t *t)
 {
-    uint32_t plane = (uint32_t)t->user;
-    latch_pulse();
-    if (plane == 0)
-        rmt_oe_start(PL0_ON_US);
-    else if (plane == 1)
-        rmt_oe_start(PL1_ON_US);
+    if (planeIdx == 0)
+        oePulse(PLANE0_ON_US);
+    else if (planeIdx == 1)
+        oePulse(PLANE1_ON_US);
     else
-        rmt_oe_start(PL2_ON_US);
+        oePulse(PLANE2_ON_US);
+    latch_pulse();
 }
 
 // HW-Timer ISR callback
-static bool IRAM_ATTR gptimer_isr_cb(gptimer_handle_t, const gptimer_alarm_event_data_t *, void *)
+void IRAM_ATTR panel_isr()
 {
-    spi_device_queue_trans(spi, &trans[next_plane], 0); // remove immediately
-    next_plane = (next_plane + 1) % 3;
-    return false; // no yield
+    /* NUR ISR-safe-Funktion!  queue_trans _ISR sperrt keine Mutexe */
+    static spi_transaction_t trans{};
+    trans.length = 256;
+    trans.tx_buffer = planes[planeIdx];
+    trans.user = nullptr;
+    spi_device_queue_trans_ISR(spi, &trans, nullptr);
+
+    planeIdx = (planeIdx + 1) % 3;
 }
+
 static void init_spi()
 {
-    spi_bus_config_t bus{.mosi_io_num = PIN_MOSI, .miso_io_num = -1, .sclk_io_num = PIN_CLK, .max_transfer_sz = 32};
-    spi_bus_initialize(SPI_HOST, &bus, SPI_DMA_CH_AUTO);
+    spi_bus_config_t bus{.mosi_io_num = P_DI,
+                         .miso_io_num = -1,
+                         .sclk_io_num = P_CLK,
+                         .max_transfer_sz = 32};
+    spi_bus_initialize(SPI2_HOST, &bus, SPI_DMA_CH_AUTO);
 
     spi_device_interface_config_t dev{
-        .clock_speed_hz = 20'000'000,
+        .clock_speed_hz = SPI_HZ,
         .mode = 0,
         .spics_io_num = -1,
-        .queue_size = 3,
+        .queue_size = 2,
         .post_cb = spi_done_cb};
-    spi_bus_add_device(SPI_HOST, &dev, &spi);
-
-    /* 3 Transaktionen vorbereiten */
-    for (int i = 0; i < 3; ++i)
-    {
-        trans[i] = {};
-        trans[i].length = 256;
-        trans[i].tx_buffer = planes[i];
-        trans[i].user = (void *)i;
-    }
+    spi_bus_add_device(SPI2_HOST, &dev, &spi);
 }
 
 static void init_rmt()
 {
-    periph_module_enable(PERIPH_RMT_MODULE);
-    RMT.channel[0].conf0.div_cnt = 80; // 1 µs Ticks
-    RMT.channel[0].conf0.mem_size = 1;
-    RMT.channel[0].conf0.carrier_en = 0;
-    gpio_matrix_out(PIN_OE, RMT_SIG_OUT0_IDX, true, false);
+    rmtOE = rmtInit(P_OE, false, RMT_CHANNEL_0, 80); // 1-µs-Ticks
 }
 
 static void init_timer()
 {
-    /* GPTimer 0 @ APB 80 MHz */
-    gptimer_handle_t h;
-    gptimer_config_t cfg{
-        .clk_src = GPTIMER_CLK_SRC_DEFAULT,
-        .direction = GPTIMER_COUNT_UP,
-        .resolution_hz = 1'000'000 // 1 µs
-    };
-    gptimer_new_timer(&cfg, &h);
-
-    gptimer_alarm_config_t alarm{.alarm_count = REFRESH_US, .reload_count = 0, .flags{.auto_reload_on_alarm = true}};
-    gptimer_set_alarm_action(h, &alarm);
-
-    gptimer_event_callbacks_t cbs{.on_alarm = gptimer_isr_cb};
-    gptimer_register_event_callbacks(h, &cbs, nullptr);
-    gptimer_enable(h);
-    gptimer_start(h);
-}
-
-/// TODO: ab hier
-
-void IRAM_ATTR fill_demo()
-{
-    static uint8_t frame = 0;
-    memset(plane0, frame, sizeof plane0);
-    memset(plane1, frame ^ 0x55, sizeof plane1);
-    memset(plane2, frame ^ 0xAA, sizeof plane2);
-    frame++;
+    panelTimer = timerBegin(0, 80, true); // 1us tick
+    timerAttachInterrupt(panelTimer, &panel_isr, true);
+    timerAlarmWrite(panelTimer, FRAME_TIME_US, true);
+    timerAlarmEnable(panelTimer);
 }
 
 void panel_init()
 {
     pinMode(P_LATCH, OUTPUT); // LA/ (active‑low latch); STCP LATCH
-    init_spi();
     init_rmt();
+    init_spi();
     init_timer();
 }
 
 void panel_show()
 {
-    // FIXME: fix
     // refresh_isr();
-    fill_demo(); // fill the demo pattern
 }
 
 // TODO: ab hier
