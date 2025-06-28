@@ -12,7 +12,6 @@
 #include "scenes/switcher.hpp"
 
 #include "scenes/scene_anniversary.hpp"
-#include "scenes/scene_brightness.hpp"
 #include "scenes/scene_clock_second_ring.hpp"
 #include "scenes/scene_clock.hpp"
 #include "scenes/scene_empty.hpp"
@@ -26,7 +25,6 @@
 
 // all scenes live here, in RAM
 AnniversaryScene anniversaryScene;
-BrightnessScenes brightnessScene;
 ClockSceneWithSecondHand clockSceneSecond;
 ClockScene clockScene;
 EmptyScene emptyScene;

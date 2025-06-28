@@ -52,41 +52,42 @@ void IRAM_ATTR panel_isr()
     }
 }
 
-/* ----------- Initialisierung -------------------------------- */
 static void init_spi()
 {
-    spi_bus_initialize(SPI2_HOST,
-                       &(spi_bus_config_t){
-                           .mosi_io_num = P_DI,
-                           .miso_io_num = -1,
-                           .sclk_io_num = P_CLK,
-                           .max_transfer_sz = 32},
-                       SPI_DMA_CH_AUTO);
+    spi_bus_config_t buscfg = {
+        .mosi_io_num = P_DI,
+        .miso_io_num = -1,
+        .sclk_io_num = P_CLK,
+        .max_transfer_sz = 32,
+    };
+    spi_bus_initialize(SPI2_HOST, &buscfg, SPI_DMA_CH_AUTO);
 
-    spi_bus_add_device(SPI2_HOST,
-                       &(spi_device_interface_config_t){
-                           .clock_speed_hz = SPI_HZ,
-                           .mode = 0,
-                           .spics_io_num = -1,
-                           .queue_size = 3,
-                           .post_cb = spi_done_cb},
-                       &spi);
+    spi_device_interface_config_t devcfg = {
+        .mode = 0,
+        .clock_speed_hz = SPI_HZ,
+        .spics_io_num = -1,
+        .queue_size = 3,
+        .post_cb = spi_done_cb};
+
+    spi_bus_add_device(SPI2_HOST, &devcfg, &spi);
 }
 
 static void init_rmt()
 {
+    rmt_tx_config_t tx_config = {
+        .idle_level = RMT_IDLE_LEVEL_HIGH, // LEDs standard OFF
+        .carrier_en = false,               // Carrier enable
+        .loop_en = false,                  // Loop enable
+        .idle_output_en = true,
+    };
+
     rmt_config_t cfg = {
-        .rmt_mode = RMT_MODE_TX,
-        .channel = RMT_CHANNEL_0,
-        .gpio_num = (gpio_num_t)P_OE,
-        .clk_div = 80, // 1 µs Tick
-        .mem_block_num = 1,
-        .tx_config = {
-            .loop_en = false,
-            .carrier_en = false,
-            .idle_output_en = true,
-            .idle_level = RMT_IDLE_LEVEL_HIGH // LEDs standard OFF
-        }};
+        .rmt_mode = RMT_MODE_TX,      // RMT mode: transmit
+        .channel = RMT_CHANNEL_0,     // RMT channel
+        .gpio_num = (gpio_num_t)P_OE, // GPIO pin for RMT output
+        .clk_div = 80,                // Clock divider (80MHz / 80 = 1MHz -> 1 µs tick)
+        .mem_block_num = 1,           // Number of memory blocks
+        .tx_config = tx_config};
     rmt_config(&cfg);
     rmt_driver_install(cfg.channel, 0, 0); // keine RX-Puffer
 }
@@ -154,4 +155,18 @@ void panel_drawSprite(int8_t tlX, int8_t tlY, const uint8_t *data, uint8_t width
             i++;
         }
     }
+}
+
+void panel_hold()
+{
+    digitalWrite(P_OE, LOW); // OE/ LOW  → LEDs ON
+}
+
+void panel_fill(uint8_t col)
+{
+    // TODO: implement!
+}
+
+void panel_setPixel(int8_t row, int8_t col, uint8_t brightness)
+{
 }
