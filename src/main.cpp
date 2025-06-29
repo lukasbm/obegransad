@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <OneButton.h>
+#include <WiFi.h>
 
 #include "weather.h"
 #include "device.h"
