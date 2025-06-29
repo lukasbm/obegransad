@@ -45,7 +45,7 @@ void IRAM_ATTR panel_isr()
     trans.tx_buffer = planes[planeIdx];
     trans.user = reinterpret_cast<void *>(planeIdx);
 
-    /* ISR-tauglich: 0 Ticks timeout  */
+    /* ISR compatible: 0 Ticks timeout  */
     if (spi_device_queue_trans(spi, &trans, 0) == ESP_OK)
     {
         planeIdx = (planeIdx + 1) % 3;
@@ -97,7 +97,7 @@ static void init_timer()
     panelTimer = timerBegin(0, 80, true); // 1 µs Auflösung
     timerAttachInterrupt(panelTimer, &panel_isr, true);
     timerAlarmWrite(panelTimer, FRAME_TIME_US, true);
-    timerAlarmEnable(panelTimer);
+    timerAlarmEnable(panelTimer); // FIXME: move this line to panel_timer_start()
 }
 
 void panel_init()
@@ -112,13 +112,15 @@ void panel_init()
 
 void panel_refresh()
 {
+    Serial.println("update screen ...");
     /* Demo-Bildinhalt generieren */
     static uint8_t c = 0;
-    memset(plane0, c, sizeof plane0);
-    memset(plane1, c ^ 85, sizeof plane1);
-    memset(plane2, c ^ 170, sizeof plane2);
+    memset(plane0, c, sizeof(plane0));
+    memset(plane1, c ^ 85, sizeof(plane1));
+    memset(plane2, c ^ 170, sizeof(plane2));
     c++;
-    // refresh_isr();
+
+    // the actual painting is done by the ISR
 }
 
 void panel_timer_start()
@@ -159,6 +161,7 @@ void panel_drawSprite(int8_t tlX, int8_t tlY, const uint8_t *data, uint8_t width
 
 void panel_hold()
 {
+    panel_isr(); // FIXME: need to select a brightness level here to hold (and call panel_isr until we have the desired brightness). Obviously this will not hold the proper brightness, 
     digitalWrite(P_OE, LOW); // OE/ LOW  → LEDs ON
 }
 

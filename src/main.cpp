@@ -229,7 +229,6 @@ void loop()
     // }
 
     panel_refresh();
-
     delay(200); // small delay to avoid busy loop and give scheduler a chance to run
 }
 
