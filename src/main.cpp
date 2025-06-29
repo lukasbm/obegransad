@@ -142,6 +142,11 @@ void setup()
     panel_init();  // initialize the LED panel
     Serial.println("Setup done, checking Wi-Fi...");
 
+    for (uint8_t y = 0; y < ROWS; y++)
+    {
+        panel_setPixel(y, 6, Brightness(ROWS / y)); // clear the panel
+    }
+
     // if (wifi_setup())
     // {
     //     // already connected
@@ -227,9 +232,6 @@ void loop()
     //     update_state(STATE_SLEEPING); // switch to sleeping state if it is time to turn off
     //     update_state(STATE_NORMAL);   // switch back to normal state, as everything during the sleep state is blocking
     // }
-
-    panel_refresh();
-    delay(200); // small delay to avoid busy loop and give scheduler a chance to run
 }
 
 ///// button stuff

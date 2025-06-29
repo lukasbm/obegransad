@@ -37,11 +37,10 @@ static void IRAM_ATTR spi_done_cb(spi_transaction_t *t)
     rmt_write_items(RMT_CHANNEL_0, rmt_planes[(uint32_t)t->user], 1, false);
 }
 
-/* ----------- Timer-ISR (300 Hz) ----------------------------- */
 void IRAM_ATTR panel_isr()
 {
     static spi_transaction_t trans{};
-    trans.length = 256; // 256 Bit
+    trans.length = 256;
     trans.tx_buffer = planes[planeIdx];
     trans.user = reinterpret_cast<void *>(planeIdx);
 
@@ -161,15 +160,31 @@ void panel_drawSprite(int8_t tlX, int8_t tlY, const uint8_t *data, uint8_t width
 
 void panel_hold()
 {
-    panel_isr(); // FIXME: need to select a brightness level here to hold (and call panel_isr until we have the desired brightness). Obviously this will not hold the proper brightness, 
+    panel_isr();             // FIXME: need to select a brightness level here to hold (and call panel_isr until we have the desired brightness). Obviously this will not hold the proper brightness,
     digitalWrite(P_OE, LOW); // OE/ LOW  → LEDs ON
 }
 
-void panel_fill(uint8_t col)
+void panel_fill(Brightness col)
 {
-    // TODO: implement!
+    for (uint8_t row = 0; row < ROWS; row++)
+    {
+        for (uint8_t colIdx = 0; colIdx < COLS; colIdx++)
+        {
+            panel_setPixel(row, colIdx, col);
+        }
+    }
 }
 
-void panel_setPixel(int8_t row, int8_t col, uint8_t brightness)
+void panel_setPixel(uint8_t row, uint8_t col, Brightness brightness)
 {
+    if ((row >= ROWS) || (col >= COLS))
+    {
+        return; // out of bounds
+    }
+    // set the pixel in the plane buffers
+    // need to update the entire byte, so we need to calculate the byte index and the bit position
+    // only the &-stuff is the new bit
+    plane0[lut[row][col] / 8] &= ~(((brightness & mask) & 0b01) << lut[row][col] % 8);
+    plane1[lut[row][col] / 8] &= ~(((brightness & mask) & 0b10) << lut[row][col] % 8);
+    plane2[lut[row][col] / 8] &= ~(((brightness & mask) & 0b11) << lut[row][col] % 8);
 }

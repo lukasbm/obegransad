@@ -29,12 +29,12 @@ The panel works as follows:
 #define ROWS 16 // number of rows
 #define COLS 16 // number of columns
 
-enum Brightness
+enum Brightness : uint8_t
 {
-    BRIGHTNESS_OFF,
-    BRIGHTNESS_1,
-    BRIGHTNESS_2,
-    BRIGHTNESS_3,
+    BRIGHTNESS_OFF = 0,
+    BRIGHTNESS_1 = 1,
+    BRIGHTNESS_2 = 2,
+    BRIGHTNESS_3 = 3,
 };
 
 // we have a 2 bit color depth (00 = off, 01 = low, 10 = medium, 11 = high)
@@ -62,7 +62,7 @@ static const int lut[16][16] = {
 extern uint8_t gBright; // global brightness (0-255) (only scaling)
 
 // forward declarations
-void panel_setPixel(int8_t row, int8_t col, uint8_t brightness);
+void panel_setPixel(uint8_t row, uint8_t col, Brightness brightness);
 
 // leaves the panel on (but no PWM)
 // call this once before doing a long blocking task, this keeps the panel on.
@@ -78,11 +78,11 @@ void panel_refresh();
 
 void panel_init();
 
-void panel_fill(uint8_t col);
+void panel_fill(Brightness col);
 
 inline void panel_clear()
 {
-    panel_fill(0);
+    panel_fill(BRIGHTNESS_OFF);
 }
 
 // draws a sprite starting at the top left corner (tlX, tlY)
