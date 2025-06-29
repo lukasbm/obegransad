@@ -135,99 +135,101 @@ void setup()
     WiFi.mode(WIFI_STA); // set Wi-Fi mode to station (initially, otherwise will be STA+AP) // has to be here at the beginning, otherwise it blocks?
 
     // state independent setup code
-    captive_portal_setup(); // set up Wi-Fi, will start captive portal if no credentials are stored
+    // captive_portal_setup(); // set up Wi-Fi, will start captive portal if no credentials are stored
     gSettings = read_from_persistent_storage();
     buttonSetup(); // set up the button
     panel_init();  // initialize the LED panel
     Serial.println("Setup done, checking Wi-Fi...");
 
-    if (wifi_setup())
-    {
-        // already connected
-        Serial.println("Wi-Fi connected");
-        update_state(STATE_NORMAL);
-    }
-    else
-    {
-        // not connected, start captive portal
-        Serial.println("Wi-Fi not connected, starting captive portal");
-        update_state(STATE_CAPTIVE_PORTAL);
-    }
+    // if (wifi_setup())
+    // {
+    //     // already connected
+    //     Serial.println("Wi-Fi connected");
+    //     update_state(STATE_NORMAL);
+    // }
+    // else
+    // {
+    //     // not connected, start captive portal
+    //     Serial.println("Wi-Fi not connected, starting captive portal");
+    //     update_state(STATE_CAPTIVE_PORTAL);
+    // }
 
-    Serial.println("Setup complete, entering main loop...");
+    // Serial.println("Setup complete, entering main loop...");
 
     // only switch to first scene once we have state NORMAL or NO_WIFI, keep wifi logo as long as we are in SETUP or CAPTIVE_PORTAL state
 }
 
 void loop()
 {
-    struct tm time = time_get();
+    // struct tm time = time_get();
 
-    // BUTTON
-    button.tick(); // always tick the button
+    // // BUTTON
+    // button.tick(); // always tick the button
 
-    // CAPTIVE PORTAL
-    if (state == STATE_CAPTIVE_PORTAL)
-    {
-        if (!captive_portal_active() && !wifi_check()) // if the captive portal is not active and Wi-Fi is not connected
-        {
-            Serial.println("Captive portal is not active, switching to one of the other states");
-            update_state(wifi_check() ? STATE_NORMAL : STATE_NO_WIFI); // if the captive portal is not active, switch to one of the normal states
-        }
-        else
-        {
-            captive_portal_tick(); // handle captive portal events
-        }
-    }
-    if (state == STATE_NO_WIFI || state == STATE_NORMAL)
-    {
-        sceneSwitcher.tick(); // progress the current scene
-    }
+    // // CAPTIVE PORTAL
+    // if (state == STATE_CAPTIVE_PORTAL)
+    // {
+    //     if (!captive_portal_active() && !wifi_check()) // if the captive portal is not active and Wi-Fi is not connected
+    //     {
+    //         Serial.println("Captive portal is not active, switching to one of the other states");
+    //         update_state(wifi_check() ? STATE_NORMAL : STATE_NO_WIFI); // if the captive portal is not active, switch to one of the normal states
+    //     }
+    //     else
+    //     {
+    //         captive_portal_tick(); // handle captive portal events
+    //     }
+    // }
+    // if (state == STATE_NO_WIFI || state == STATE_NORMAL)
+    // {
+    //     sceneSwitcher.tick(); // progress the current scene
+    // }
 
-    // WIFI
-    if (state != STATE_CAPTIVE_PORTAL)
-    {
-        if (wifi_check())
-        {
-            update_state(STATE_NORMAL); // if we are in captive portal state and Wi-Fi is connected, switch to normal state
-        }
-        else
-        {
-            update_state(STATE_NO_WIFI); // if we are in normal state and Wi-Fi is not connected, switch to no Wi-Fi state
-        }
-    }
+    // // WIFI
+    // if (state != STATE_CAPTIVE_PORTAL)
+    // {
+    //     if (wifi_check())
+    //     {
+    //         update_state(STATE_NORMAL); // if we are in captive portal state and Wi-Fi is connected, switch to normal state
+    //     }
+    //     else
+    //     {
+    //         update_state(STATE_NO_WIFI); // if we are in normal state and Wi-Fi is not connected, switch to no Wi-Fi state
+    //     }
+    // }
 
-    // WEATHER
-    if (state == STATE_NORMAL && weatherSyncTimer.check())
-    {
-        weather_fetch();
-    }
+    // // WEATHER
+    // if (state == STATE_NORMAL && weatherSyncTimer.check())
+    // {
+    //     weather_fetch();
+    // }
 
-    // TIME
-    if (state == STATE_NORMAL && timeSyncTimer.check())
-    {
-        time_syncNTP();
-    }
+    // // TIME
+    // if (state == STATE_NORMAL && timeSyncTimer.check())
+    // {
+    //     time_syncNTP();
+    // }
 
-    // BRIGHTNESS (TODO: ease in and out around the threshold)
-    if (state == STATE_NORMAL ? weather_get().isDay : time_isNight(time))
-    {
-        gBright = gSettings.brightness_night;
-    }
-    else
-    {
-        gBright = gSettings.brightness_day;
-    }
+    // // BRIGHTNESS (TODO: ease in and out around the threshold)
+    // if (state == STATE_NORMAL ? weather_get().isDay : time_isNight(time))
+    // {
+    //     gBright = gSettings.brightness_night;
+    // }
+    // else
+    // {
+    //     gBright = gSettings.brightness_day;
+    // }
 
-    // OFF HOURS
-    if (shouldTurnOff(time))
-    {
-        nextSleepDuration = calcTurnOffDuration(time);
-        update_state(STATE_SLEEPING); // switch to sleeping state if it is time to turn off
-        update_state(STATE_NORMAL);   // switch back to normal state, as everything during the sleep state is blocking
-    }
+    // // OFF HOURS
+    // if (shouldTurnOff(time))
+    // {
+    //     nextSleepDuration = calcTurnOffDuration(time);
+    //     update_state(STATE_SLEEPING); // switch to sleeping state if it is time to turn off
+    //     update_state(STATE_NORMAL);   // switch back to normal state, as everything during the sleep state is blocking
+    // }
 
-    delay(20); // small delay to avoid busy loop and give scheduler a chance to run
+    panel_refresh();
+
+    delay(200); // small delay to avoid busy loop and give scheduler a chance to run
 }
 
 ///// button stuff

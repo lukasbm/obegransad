@@ -66,7 +66,7 @@ void panel_setPixel(int8_t row, int8_t col, uint8_t brightness);
 
 // leaves the panel on (but no PWM)
 // call this once before doing a long blocking task, this keeps the panel on.
-// after wards just call panel_show() to refresh the panel
+// after wards just call panel_refresh() to refresh the panel
 void panel_hold();
 
 void panel_timer_start();
@@ -74,7 +74,7 @@ void panel_timer_stop();
 
 // refreshes the panel (with PWM)
 // needed for animations and individual pixel brightness
-void panel_show();
+void panel_refresh();
 
 void panel_init();
 

@@ -110,7 +110,7 @@ void panel_init()
 
 // TODO: ab hier
 
-void panel_show()
+void panel_refresh()
 {
     /* Demo-Bildinhalt generieren */
     static uint8_t c = 0;
