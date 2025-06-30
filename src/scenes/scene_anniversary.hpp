@@ -18,24 +18,21 @@ private:
         panel_clear();
 
         // update animation
-        sprite = animation_heart.nextFrame();
-        panel_drawSprite(0, 0, sprite, animation_heart.spriteWidth, animation_heart.spriteHeight);
+        animation_heart.drawNextFrame(0, 0);
 
         // day first digit
-        sprite = thin_font.getGlyph((day / 10) + 48); // day/10 is 0,1 or 2
-        panel_drawSprite(0, 10, sprite, thin_font.spriteWidth, thin_font.spriteHeight);
+        thin_font.drawGlyph((day / 10) + 48, 0, 10); // day/10 is 0,1 or 2
 
         // day second digit
-        sprite = thin_font.getGlyph((day % 10) + 48); // day % 10 is 0-9
-        panel_drawSprite(4, 10, sprite, thin_font.spriteWidth, thin_font.spriteHeight);
+        thin_font.drawGlyph((day % 10) + 48, 4, 10); // day % 10 is 0-9
 
         // month first digit
-        sprite = thin_font.getGlyph((month / 10) + 48); // month/10 is 0-5
-        panel_drawSprite(8, 10, sprite, thin_font.spriteWidth, thin_font.spriteHeight);
+        thin_font.drawGlyph((month / 10) + 48, 8, 10); // month/10 is 0-5
 
         // month second digit
-        sprite = thin_font.getGlyph((month % 10) + 48); // month % 10 is 0-9
-        panel_drawSprite(12, 10, sprite, thin_font.spriteWidth, thin_font.spriteHeight);
+        thin_font.drawGlyph((month % 10) + 48, 12, 10); // month % 10 is 0-9
+
+        panel_commit();
     }
 
 public:
@@ -50,6 +47,7 @@ public:
         static int lastDraw = millis();
 
         // update animation (4 times a second - 4 FPS)
+        // TODO: use render timer!
         if (millis() - lastDraw > 250)
         {
             drawHeart(gSettings.anniversary_day, gSettings.anniversary_month);

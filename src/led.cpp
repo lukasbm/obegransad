@@ -134,34 +134,6 @@ void panel_timer_stop()
     }
 }
 
-void panel_drawSprite(int8_t tlX, int8_t tlY, const uint8_t *data, uint8_t width, uint8_t height)
-{
-    // Iterate over each pixel of the sprite
-    for (uint8_t y = 0; y < height; y++)
-    {
-        for (uint8_t x = 0; x < width; x++)
-        {
-            // Calculate the target coordinates on the panel
-            int16_t targetX = tlX + x;
-            int16_t targetY = tlY + y;
-
-            // Clip the sprite, only draw pixels that are on the panel
-            if (targetX >= 0 && targetX < COLS && targetY >= 0 && targetY < ROWS)
-            {
-                // Sprites are packed with 4 pixels (2 bits each) per byte.
-                size_t pixel_index = y * width + x;
-                size_t byte_index = pixel_index / 4;
-                uint8_t bit_shift = 6 - (pixel_index % 4) * 2; // 6, 4, 2, 0
-
-                // Extract the 2-bit brightness value for the current pixel
-                uint8_t pixel_brightness = (data[byte_index] >> bit_shift) & 0b11;
-
-                panel_setPixel(targetY, targetX, static_cast<Brightness>(pixel_brightness));
-            }
-        }
-    }
-}
-
 void panel_fill(Brightness col)
 {
     for (uint8_t row = 0; row < ROWS; row++)

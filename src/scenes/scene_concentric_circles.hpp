@@ -47,6 +47,7 @@ private:
                 }
             }
         }
+        panel_commit();
     }
 
 public:

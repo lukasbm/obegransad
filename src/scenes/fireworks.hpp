@@ -3,7 +3,13 @@
 #include "led.h"
 #include "sprites/firework.hpp"
 
-// a simple screensaver scene that displays fireworks
+// TODO: a simple screensaver scene that displays fireworks
 class FireworksScene : public Scene
 {
+private:
+    void draw()
+    {
+        panel_clear();
+        panel_commit();
+    }
 };

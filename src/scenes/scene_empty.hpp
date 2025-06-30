@@ -9,5 +9,6 @@ public:
     {
         panel_clear();
         Serial.println("Empty scene activated");
+        panel_commit();
     }
 };

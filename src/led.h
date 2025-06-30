@@ -16,7 +16,7 @@ The panel works as follows:
 #define P_OE D4    // OE/ (active‑low output enable)
 
 #define SPI_HOST SPI2_HOST
-#define SPI_HZ 10000000         // the SCT2024 can handle up to 25 MHz
+#define SPI_HZ 5000000          // 1 Mhz (ESP cant handle more); though the SCT2024 can handle up to 25 MHz
 #define BIT_COUNT (ROWS * COLS) // bits per plane
 #define FRAME_TIME_US 2500      // 2.5 ms per frame -> 400 Hz refresh rate
 
@@ -78,7 +78,3 @@ inline void panel_clear()
 
 // Commits the contents of the framebuffer to the display driver planes.
 void panel_commit();
-
-// draws a sprite starting at the top left corner (tlX, tlY)
-// It is also possible to draw sprites that are larger than the panel or (partially) out of bounds, but they will be clipped.
-void panel_drawSprite(int8_t tlX, int8_t tlY, const uint8_t *data, uint8_t width, uint8_t height);

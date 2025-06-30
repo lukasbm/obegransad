@@ -3,6 +3,7 @@
 #include "scene.h"
 #include "led.h"
 
+// TODO: rewrite statically so it can be used elsewhere without stupid singletons
 template <size_t numScenes>
 class SceneSwitcher
 {

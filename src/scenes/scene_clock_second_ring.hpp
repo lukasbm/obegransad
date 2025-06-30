@@ -17,9 +17,9 @@ private:
 
         // draw second hand around it
         uint8_t x, y;
-        for(uint8_t i = 0; i < 60; i++)
+        for (uint8_t i = 0; i < 60; i++)
         {
-            ring_coord((i + 8) % 60 , x, y);  // start at 8 to have the second hand at the center top
+            ring_coord((i + 8) % 60, x, y); // start at 8 to have the second hand at the center top
             if (i == second)
             {
                 panel_setPixel(y, x, BRIGHTNESS_3); // bright for second hand
@@ -31,20 +31,18 @@ private:
         }
 
         // hour first digit
-        sprite = thin_font.getGlyph((hour / 10) + 48); // hour/10 is 0,1 or 2
-        panel_drawSprite(3, 1, sprite, thin_font.spriteWidth, thin_font.spriteHeight);
+        thin_font.drawGlyph((hour / 10) + 48, 3, 1); // hour/10 is 0,1 or 2
 
         // hour second digit
-        sprite = thin_font.getGlyph((hour % 10) + 48); // hour % 10 is 0-9
-        panel_drawSprite(9, 1, sprite, thin_font.spriteWidth, thin_font.spriteHeight);
+        thin_font.drawGlyph((hour % 10) + 48, 9, 1); // hour % 10 is 0-9
 
         // minute first digit
-        sprite = thin_font.getGlyph((minute / 10) + 48); // minute/10 is 0-5
-        panel_drawSprite(3, 9, sprite, thin_font.spriteWidth, thin_font.spriteHeight);
+        thin_font.drawGlyph((minute / 10) + 48, 3, 9); // minute/10 is 0-5
 
         // minute second digit
-        sprite = thin_font.getGlyph((minute % 10) + 48); // minute % 10 is 0-9
-        panel_drawSprite(9, 9, sprite, thin_font.spriteWidth, thin_font.spriteHeight);
+        thin_font.drawGlyph((minute % 10) + 48, 9, 9); // minute % 10 is 0-9
+
+        panel_commit();
     }
 
 public:
@@ -62,7 +60,8 @@ public:
         struct tm time = time_get();
         if (time.tm_sec != lastSecond)
         {
-            drawTime(time.tm_hour, time.tm_min, time.tm_sec);;
+            drawTime(time.tm_hour, time.tm_min, time.tm_sec);
+            ;
             lastSecond = time.tm_sec;
         }
     }

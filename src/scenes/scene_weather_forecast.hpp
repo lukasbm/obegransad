@@ -19,16 +19,13 @@ private:
         // minus sign
         if (weatherData.temperature < 0)
         {
-            sprite = thin_font.getGlyph(45); // minus sign
-            panel_drawSprite(0, 0, sprite, thin_font.spriteWidth, thin_font.spriteHeight);
+            thin_font.drawGlyph(45, 0, 0); // minus sign
         }
         int temperature = (int)abs(weatherData.temperature);
         // first digit
-        sprite = thin_font.getGlyph(temperature / 10 + 48); // temperature/10 is 0-2
-        panel_drawSprite(4, 0, sprite, thin_font.spriteWidth, thin_font.spriteHeight);
+        thin_font.drawGlyph(temperature / 10 + 48, 4, 0); // temperature/10 is 0-2
         // second digit
-        sprite = thin_font.getGlyph(temperature % 10 + 48);
-        panel_drawSprite(9, 0, sprite, thin_font.spriteWidth, thin_font.spriteHeight);
+        thin_font.drawGlyph(temperature % 10 + 48, 9, 0);
 
         // degree symbol
         panel_setPixel(0, 14, BRIGHTNESS_3);
@@ -64,6 +61,8 @@ private:
                 }
             }
         }
+
+        panel_commit();
     }
 
 public:

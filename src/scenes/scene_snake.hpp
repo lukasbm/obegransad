@@ -30,6 +30,8 @@ private:
 
         ring_coord((headPos - 3 + 60) % 60, x, y);
         panel_setPixel(y, x, BRIGHTNESS_1);
+
+        panel_commit();
     }
 
 public:

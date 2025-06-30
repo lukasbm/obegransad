@@ -16,6 +16,8 @@ private:
         /////////////// draw max temp at the top
 
         ////////////// draw min temp at the bottom
+
+        panel_commit();
     }
 
 public:

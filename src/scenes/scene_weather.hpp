@@ -24,17 +24,14 @@ private:
         // minus sign
         if (weatherData.temperature < 0)
         {
-            sprite = thin_font.getGlyph(45); // minus sign
-            panel_drawSprite(0, 9, sprite, thin_font.spriteWidth, thin_font.spriteHeight);
+            thin_font.drawGlyph(45, 0, 9); // minus sign
         }
 
         int temperature = (int)abs(weatherData.temperature);
         // first digit
-        sprite = thin_font.getGlyph(temperature / 10 + 48); // temperature/10 is 0-2
-        panel_drawSprite(4, 9, sprite, thin_font.spriteWidth, thin_font.spriteHeight);
+        thin_font.drawGlyph(temperature / 10 + 48, 4, 9); // temperature/10 is 0-2
         // second digit
-        sprite = thin_font.getGlyph(temperature % 10 + 48);
-        panel_drawSprite(9, 9, sprite, thin_font.spriteWidth, thin_font.spriteHeight);
+        thin_font.drawGlyph(temperature % 10 + 48, 9, 9);
 
         // degree symbol
         panel_setPixel(9, 14, BRIGHTNESS_3);
@@ -51,11 +48,12 @@ private:
         ///////////////// TODO: symbols at top based on weather code (top 9 pixels)
 
         // cloud
-        panel_drawSprite(0, 0, cloud_sprite.data, cloud_sprite.width, cloud_sprite.height);
+        cloud_sprite.draw(0, 0);
 
         // rain
-        sprite = animation_rain.nextFrame();
-        panel_drawSprite(9, 0, sprite, 7, 8);
+        animation_rain.drawNextFrame(9, 0);
+
+        panel_commit();
     }
 
 public:

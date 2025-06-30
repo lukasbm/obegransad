@@ -13,13 +13,11 @@ public:
         Serial.println("Sprite test scene activated");
         panel_clear();
 
-        sprite = font_bold.getGlyph('1');
-        panel_drawSprite(0, 0, sprite, font_bold.spriteWidth, font_bold.spriteHeight);
-        sprite = font_bold.getGlyph('9');
-        panel_drawSprite(0, 8, sprite, font_bold.spriteWidth, font_bold.spriteHeight);
-        sprite = font_bold.getGlyph('A');
-        panel_drawSprite(9, 0, sprite, font_bold.spriteWidth, font_bold.spriteHeight);
-        sprite = font_bold.getGlyph('Y');
-        panel_drawSprite(9, 8, sprite, font_bold.spriteWidth, font_bold.spriteHeight);
+        font_bold.drawGlyph('1', 0, 0);
+        font_bold.drawGlyph('9', 0, 8);
+        font_bold.drawGlyph('A', 9, 0);
+        font_bold.drawGlyph('Y', 9, 8);
+
+        panel_commit();
     }
 };

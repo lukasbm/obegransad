@@ -2,7 +2,6 @@
 #include "scene.h"
 #include "led.h"
 
-// a simple screensaver scene that displays fireworks
 class GameOfLifeScene : public Scene
 {
 private:
@@ -63,6 +62,7 @@ private:
                 }
             }
         }
+        panel_commit();
     }
 
 public:

@@ -6,7 +6,7 @@ void display_wifi_logo(void)
 {
     // display the wifi logo while connecting
     panel_clear();
-    panel_drawSprite(3, 5, wifi_sprite.data, wifi_sprite.width, wifi_sprite.height);
+    wifi_sprite.draw(3, 5);
     // panel_hold();
 }
 

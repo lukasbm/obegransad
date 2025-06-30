@@ -15,20 +15,18 @@ private:
         panel_clear();
 
         // hour first digit
-        sprite = font_bold.getGlyph((hour / 10) + 48); // hour/10 is 0,1 or 2
-        panel_drawSprite(2, 0, sprite, font_bold.spriteWidth, font_bold.spriteHeight);
+        font_bold.drawGlyph((hour / 10) + 48, 2, 0); // hour/10 is 0,1 or 2
 
         // hour second digit
-        sprite = font_bold.getGlyph((hour % 10) + 48); // hour % 10 is 0-9
-        panel_drawSprite(9, 0, sprite, font_bold.spriteWidth, font_bold.spriteHeight);
+        font_bold.drawGlyph((hour % 10) + 48, 9, 0); // hour % 10 is 0-9
 
         // minute first digit
-        sprite = font_bold.getGlyph((minute / 10) + 48); // minute/10 is 0-5
-        panel_drawSprite(2, 9, sprite, font_bold.spriteWidth, font_bold.spriteHeight);
+        font_bold.drawGlyph((minute / 10) + 48, 2, 9); // minute/10 is 0-5
 
         // minute second digit
-        sprite = font_bold.getGlyph((minute % 10) + 48); // minute % 10 is 0-9
-        panel_drawSprite(9, 9, sprite, font_bold.spriteWidth, font_bold.spriteHeight);
+        font_bold.drawGlyph((minute % 10) + 48, 9, 9); // minute % 10 is 0-9
+
+        panel_commit();
     }
 
 public:
