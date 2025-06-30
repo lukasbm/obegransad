@@ -142,11 +142,10 @@ void setup()
     panel_init();  // initialize the LED panel
     Serial.println("Setup done, checking Wi-Fi...");
 
-    for (uint8_t y = 0; y < ROWS; y++)
+   for (uint8_t y = 0; y < ROWS; y++)
     {
-        panel_setPixel(y, 6, Brightness(ROWS / y)); // clear the panel
+        panel_setPixel(y, 6, Brightness(y % 4)); // clear the panel
     }
-
     // if (wifi_setup())
     // {
     //     // already connected

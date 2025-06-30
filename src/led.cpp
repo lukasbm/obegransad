@@ -22,6 +22,9 @@ DRAM_ATTR static rmt_item32_t rmt_plane1 = {PLANE1_ON_US, 0, FRAME_US - PLANE1_O
 DRAM_ATTR static rmt_item32_t rmt_plane2 = {PLANE2_ON_US, 0, FRAME_US - PLANE2_ON_US, 1};
 constexpr rmt_item32_t *rmt_planes[3] = {&rmt_plane0, &rmt_plane1, &rmt_plane2};
 
+// One transaction descriptor for each plane to avoid race conditions in the ISR
+DRAM_ATTR static spi_transaction_t trans[3];
+
 // high performance latch pulse
 static IRAM_ATTR inline void latch_pulse()
 {
@@ -39,13 +42,9 @@ static void IRAM_ATTR spi_done_cb(spi_transaction_t *t)
 
 void IRAM_ATTR panel_isr()
 {
-    static spi_transaction_t trans{};
-    trans.length = BIT_COUNT;
-    trans.tx_buffer = planes[planeIdx];
-    trans.user = reinterpret_cast<void *>(planeIdx);
-
     /* ISR compatible: 0 Ticks timeout  */
-    if (spi_device_queue_trans(spi, &trans, 0) == ESP_OK)
+    // Queue the transaction for the current plane. The transaction descriptor is already configured in init_spi().
+    if (spi_device_queue_trans(spi, &trans[planeIdx], 0) == ESP_OK)
     {
         planeIdx = (planeIdx + 1) % 3;
     }
@@ -61,15 +60,25 @@ static void init_spi()
     };
     spi_bus_initialize(SPI2_HOST, &buscfg, SPI_DMA_CH_AUTO);
 
-    // as per SCT2024 datasheet, data is sampled at the rising edge of CLK
+    // as per SCT2024 datasheet, data is sampled at the rising edge of CLK (idle low).
     spi_device_interface_config_t devcfg = {
-        .mode = 0, // CPOL=1, CPHA=0. Clock is idle high.
+        .mode = 0, // CPOL=0, CPHA=0. Clock is idle low, data is sampled on rising edge.
         .clock_speed_hz = SPI_HZ,
         .spics_io_num = -1,
         .queue_size = 3,
         .post_cb = spi_done_cb};
 
     spi_bus_add_device(SPI2_HOST, &devcfg, &spi);
+
+    // Initialize the transaction descriptors once
+    for (int i = 0; i < 3; i++)
+    {
+        trans[i] = {
+            .length = BIT_COUNT,
+            .tx_buffer = planes[i],
+            .user = reinterpret_cast<void *>(i),
+        };
+    }
 }
 
 static void init_rmt()
@@ -97,7 +106,6 @@ static void init_timer()
     panelTimer = timerBegin(0, 80, true); // 1 µs Auflösung
     timerAttachInterrupt(panelTimer, &panel_isr, true);
     timerAlarmWrite(panelTimer, FRAME_TIME_US, true);
-    timerAlarmEnable(panelTimer); // FIXME: move this line to panel_timer_start()
 }
 
 void panel_init()
@@ -106,6 +114,7 @@ void panel_init()
     init_spi();
     init_rmt();
     init_timer();
+    panel_timer_start(); // Start the refresh cycle
 }
 
 // TODO: ab hier
@@ -125,10 +134,18 @@ void panel_refresh()
 
 void panel_timer_start()
 {
+    if (panelTimer != nullptr)
+    {
+        timerAlarmEnable(panelTimer);
+    }
 }
 
 void panel_timer_stop()
 {
+    if (panelTimer != nullptr)
+    {
+        timerAlarmDisable(panelTimer);
+    }
 }
 
 void panel_drawSprite(int8_t tlX, int8_t tlY, const uint8_t *data, uint8_t width, uint8_t height)
@@ -182,10 +199,32 @@ void panel_setPixel(uint8_t row, uint8_t col, Brightness brightness)
     {
         return; // out of bounds
     }
-    // set the pixel in the plane buffers
-    // need to update the entire byte, so we need to calculate the byte index and the bit position
-    // only the &-stuff is the new bit
-    plane0[lut[row][col] / 8] &= ~(((brightness & mask) & 0b01) << lut[row][col] % 8);
-    plane1[lut[row][col] / 8] &= ~(((brightness & mask) & 0b10) << lut[row][col] % 8);
-    plane2[lut[row][col] / 8] &= ~(((brightness & mask) & 0b11) << lut[row][col] % 8);
+
+    int pixel_idx = lut[row][col];
+    int byte_idx = pixel_idx / 8;
+    uint8_t bit_mask = 1 << (pixel_idx % 8);
+    uint8_t b = static_cast<uint8_t>(brightness);
+
+    // Plane 0 (LSB of brightness)
+    if (b & 0b01)
+    {
+        plane0[byte_idx] |= bit_mask; // Set bit for brightness level 1 or 3
+    }
+    else
+    {
+        plane0[byte_idx] &= ~bit_mask; // Clear bit
+    }
+
+    // Plane 1 (MSB of brightness)
+    if (b & 0b10)
+    {
+        plane1[byte_idx] |= bit_mask; // Set bit for brightness level 2 or 3
+    }
+    else
+    {
+        plane1[byte_idx] &= ~bit_mask; // Clear bit
+    }
+
+    // Plane 2 is unused with 2-bit color depth, ensure its bit is clear.
+    plane2[byte_idx] &= ~bit_mask;
 }
