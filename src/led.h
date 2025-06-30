@@ -64,17 +64,8 @@ extern uint8_t gBright; // global brightness (0-255) (only scaling)
 // forward declarations
 void panel_setPixel(uint8_t row, uint8_t col, Brightness brightness);
 
-// leaves the panel on (but no PWM)
-// call this once before doing a long blocking task, this keeps the panel on.
-// after wards just call panel_refresh() to refresh the panel
-void panel_hold();
-
 void panel_timer_start();
 void panel_timer_stop();
-
-// refreshes the panel (with PWM)
-// needed for animations and individual pixel brightness
-void panel_refresh();
 
 void panel_init();
 
@@ -84,6 +75,9 @@ inline void panel_clear()
 {
     panel_fill(BRIGHTNESS_OFF);
 }
+
+// Commits the contents of the framebuffer to the display driver planes.
+void panel_commit();
 
 // draws a sprite starting at the top left corner (tlX, tlY)
 // It is also possible to draw sprites that are larger than the panel or (partially) out of bounds, but they will be clipped.

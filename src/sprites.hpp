@@ -108,3 +108,13 @@ struct AnimationSheet : TextureAtlas
         }
     }
 };
+
+// Helper to pack four 2-bit brightness values into a single byte.
+// The order is from most significant to least significant pixel in the byte.
+constexpr uint8_t pack_pixels(Brightness p1, Brightness p2, Brightness p3, Brightness p4)
+{
+    return (static_cast<uint8_t>(p1) << 6) |
+           (static_cast<uint8_t>(p2) << 4) |
+           (static_cast<uint8_t>(p3) << 2) |
+           (static_cast<uint8_t>(p4));
+}

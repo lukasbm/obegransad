@@ -11,6 +11,7 @@ static spi_device_handle_t spi;
 static hw_timer_t *panelTimer = nullptr;
 
 // image buffers
+DRAM_ATTR static Brightness framebuffer[ROWS][COLS];
 DRAM_ATTR static uint8_t plane0[32];
 DRAM_ATTR static uint8_t plane1[32];
 DRAM_ATTR static uint8_t plane2[32];
@@ -23,7 +24,10 @@ DRAM_ATTR static rmt_item32_t rmt_plane2 = {PLANE2_ON_US, 0, FRAME_US - PLANE2_O
 constexpr rmt_item32_t *rmt_planes[3] = {&rmt_plane0, &rmt_plane1, &rmt_plane2};
 
 // One transaction descriptor for each plane to avoid race conditions in the ISR
-DRAM_ATTR static spi_transaction_t trans[3];
+DRAM_ATTR static spi_transaction_t trans[3] = {
+    {.length = BIT_COUNT, .user = reinterpret_cast<void *>(0), .tx_buffer = plane0},
+    {.length = BIT_COUNT, .user = reinterpret_cast<void *>(1), .tx_buffer = plane1},
+    {.length = BIT_COUNT, .user = reinterpret_cast<void *>(2), .tx_buffer = plane2}};
 
 // high performance latch pulse
 static IRAM_ATTR inline void latch_pulse()
@@ -69,16 +73,6 @@ static void init_spi()
         .post_cb = spi_done_cb};
 
     spi_bus_add_device(SPI2_HOST, &devcfg, &spi);
-
-    // Initialize the transaction descriptors once
-    for (int i = 0; i < 3; i++)
-    {
-        trans[i] = {
-            .length = BIT_COUNT,
-            .tx_buffer = planes[i],
-            .user = reinterpret_cast<void *>(i),
-        };
-    }
 }
 
 static void init_rmt()
@@ -117,21 +111,6 @@ void panel_init()
     panel_timer_start(); // Start the refresh cycle
 }
 
-// TODO: ab hier
-
-void panel_refresh()
-{
-    Serial.println("update screen ...");
-    /* Demo-Bildinhalt generieren */
-    static uint8_t c = 0;
-    memset(plane0, c, sizeof(plane0));
-    memset(plane1, c ^ 85, sizeof(plane1));
-    memset(plane2, c ^ 170, sizeof(plane2));
-    c++;
-
-    // the actual painting is done by the ISR
-}
-
 void panel_timer_start()
 {
     if (panelTimer != nullptr)
@@ -150,36 +129,30 @@ void panel_timer_stop()
 
 void panel_drawSprite(int8_t tlX, int8_t tlY, const uint8_t *data, uint8_t width, uint8_t height)
 {
-    uint8_t *p = const_cast<uint8_t *>(data);
-    uint8_t i = 0;
-    // move over entire sprite (2 bits per pixel)
+    // Iterate over each pixel of the sprite
     for (uint8_t y = 0; y < height; y++)
     {
         for (uint8_t x = 0; x < width; x++)
         {
-            // move to next byte
-            if (i >= 4)
+            // Calculate the target coordinates on the panel
+            int16_t targetX = tlX + x;
+            int16_t targetY = tlY + y;
+
+            // Clip the sprite, only draw pixels that are on the panel
+            if (targetX >= 0 && targetX < COLS && targetY >= 0 && targetY < ROWS)
             {
-                p++;
-                i = 0;
+                // Sprites are packed with 4 pixels (2 bits each) per byte.
+                size_t pixel_index = y * width + x;
+                size_t byte_index = pixel_index / 4;
+                uint8_t bit_shift = 6 - (pixel_index % 4) * 2; // 6, 4, 2, 0
+
+                // Extract the 2-bit brightness value for the current pixel
+                uint8_t pixel_brightness = (data[byte_index] >> bit_shift) & 0b11;
+
+                panel_setPixel(targetY, targetX, static_cast<Brightness>(pixel_brightness));
             }
-            // get the pixel value (2 bits per pixel) - they are big endian.
-            // draw it (if not out of bounds)
-            if ((tlX + x >= 0) && (tlX + x < 16) && (tlY + y >= 0) && (tlY + y < 16))
-            {
-                // set pixel in the panel buffer
-                uint8_t pixel = (*p >> (6 - i * 2)) & mask;
-                // panel_setPixel(tlY + y, tlX + x, colorMap[pixel]);
-            }
-            i++;
         }
     }
-}
-
-void panel_hold()
-{
-    panel_isr();             // FIXME: need to select a brightness level here to hold (and call panel_isr until we have the desired brightness). Obviously this will not hold the proper brightness,
-    digitalWrite(P_OE, LOW); // OE/ LOW  → LEDs ON
 }
 
 void panel_fill(Brightness col)
@@ -188,43 +161,55 @@ void panel_fill(Brightness col)
     {
         for (uint8_t colIdx = 0; colIdx < COLS; colIdx++)
         {
-            panel_setPixel(row, colIdx, col);
+            framebuffer[row][colIdx] = col;
         }
     }
 }
 
 void panel_setPixel(uint8_t row, uint8_t col, Brightness brightness)
 {
-    if ((row >= ROWS) || (col >= COLS))
+    if (row < ROWS && col < COLS)
     {
-        return; // out of bounds
+        framebuffer[row][col] = brightness;
     }
+}
 
-    int pixel_idx = lut[row][col];
-    int byte_idx = pixel_idx / 8;
-    uint8_t bit_mask = 1 << (pixel_idx % 8);
-    uint8_t b = static_cast<uint8_t>(brightness);
+void panel_commit()
+{
+    // This function translates the logical framebuffer into the physical bit-plane buffers
+    // that the ISR uses for display refresh.
 
-    // Plane 0 (LSB of brightness)
-    if (b & 0b01)
-    {
-        plane0[byte_idx] |= bit_mask; // Set bit for brightness level 1 or 3
-    }
-    else
-    {
-        plane0[byte_idx] &= ~bit_mask; // Clear bit
-    }
+    // First, clear all plane buffers. This is faster than conditionally clearing bits.
+    memset(plane0, 0, sizeof(plane0));
+    memset(plane1, 0, sizeof(plane1));
+    memset(plane2, 0, sizeof(plane2));
 
-    // Plane 1 (MSB of brightness)
-    if (b & 0b10)
+    for (uint8_t r = 0; r < ROWS; r++)
     {
-        plane1[byte_idx] |= bit_mask; // Set bit for brightness level 2 or 3
-    }
-    else
-    {
-        plane1[byte_idx] &= ~bit_mask; // Clear bit
-    }
+        for (uint8_t c = 0; c < COLS; c++)
+        {
+            Brightness b = framebuffer[r][c];
+            if (b == BRIGHTNESS_OFF)
+                continue; // Skip if pixel is off
 
-    // Plane 2 is unused with 2-bit color depth, ensure its bit is clear.
-    plane2[byte_idx] &= ~bit_mask;
+            int pixel_idx = lut[r][c];
+            int byte_idx = pixel_idx / 8;
+            uint8_t bit_mask = 1 << (pixel_idx % 8);
+
+            switch (b)
+            {
+            case BRIGHTNESS_1:
+                plane0[byte_idx] |= bit_mask;
+                break;
+            case BRIGHTNESS_2:
+                plane1[byte_idx] |= bit_mask;
+                break;
+            case BRIGHTNESS_3:
+                plane2[byte_idx] |= bit_mask;
+                break;
+            default:
+                break;
+            }
+        }
+    }
 }
