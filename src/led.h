@@ -21,9 +21,9 @@ The panel works as follows:
 #define FRAME_TIME_US 2500      // 2.5 ms per frame -> 400 Hz refresh rate
 
 // manually set the additive timing windows for the 3 planes (should appear linear in brightness to the eye)
-#define PLANE0_ON_US 32  // 10 %
-#define PLANE1_ON_US 80  // 25 %
-#define PLANE2_ON_US 320 // 100 %
+#define PLANE0_ON_US 320  // 10 %
+#define PLANE1_ON_US 800  // 25 %
+#define PLANE2_ON_US 1500 // 100 %
 #define FRAME_US PLANE2_ON_US
 
 #define ROWS 16 // number of rows

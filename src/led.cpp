@@ -24,10 +24,7 @@ DRAM_ATTR static rmt_item32_t rmt_plane2 = {PLANE2_ON_US, 0, FRAME_US - PLANE2_O
 constexpr rmt_item32_t *rmt_planes[3] = {&rmt_plane0, &rmt_plane1, &rmt_plane2};
 
 // One transaction descriptor for each plane to avoid race conditions in the ISR
-DRAM_ATTR static spi_transaction_t trans[3] = {
-    {.length = BIT_COUNT, .user = reinterpret_cast<void *>(0), .tx_buffer = plane0},
-    {.length = BIT_COUNT, .user = reinterpret_cast<void *>(1), .tx_buffer = plane1},
-    {.length = BIT_COUNT, .user = reinterpret_cast<void *>(2), .tx_buffer = plane2}};
+DRAM_ATTR static spi_transaction_t trans[3];
 
 // high performance latch pulse
 static IRAM_ATTR inline void latch_pulse()
@@ -71,6 +68,16 @@ static void init_spi()
         .spics_io_num = -1,
         .queue_size = 3,
         .post_cb = spi_done_cb};
+
+    // Initialize the transaction descriptors.
+    // It's CRITICAL to zero them out first, otherwise uninitialized flags can cause issues.
+    for (int i = 0; i < 3; i++)
+    {
+        memset(&trans[i], 0, sizeof(spi_transaction_t)); // Zero out the transaction
+        trans[i].length = BIT_COUNT;
+        trans[i].tx_buffer = planes[i];
+        trans[i].user = reinterpret_cast<void *>(i);
+    }
 
     spi_bus_add_device(SPI2_HOST, &devcfg, &spi);
 }
@@ -188,27 +195,24 @@ void panel_commit()
     {
         for (uint8_t c = 0; c < COLS; c++)
         {
-            Brightness b = framebuffer[r][c];
-            if (b == BRIGHTNESS_OFF)
+            uint8_t b_val = static_cast<uint8_t>(framebuffer[r][c]);
+            if (b_val == 0)
                 continue; // Skip if pixel is off
 
             int pixel_idx = lut[r][c];
             int byte_idx = pixel_idx / 8;
             uint8_t bit_mask = 1 << (pixel_idx % 8);
 
-            switch (b)
+            // Correctly implement Binary Coded Modulation (BCM)
+            // A brightness of 3 (0b11) should light up plane0 AND plane1.
+            // The switch statement was mutually exclusive and incorrect.
+            if (b_val & 0b01) // For BRIGHTNESS_1 and BRIGHTNESS_3
             {
-            case BRIGHTNESS_1:
                 plane0[byte_idx] |= bit_mask;
-                break;
-            case BRIGHTNESS_2:
+            }
+            if (b_val & 0b10) // For BRIGHTNESS_2 and BRIGHTNESS_3
+            {
                 plane1[byte_idx] |= bit_mask;
-                break;
-            case BRIGHTNESS_3:
-                plane2[byte_idx] |= bit_mask;
-                break;
-            default:
-                break;
             }
         }
     }
