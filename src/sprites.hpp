@@ -7,7 +7,7 @@
 
 // draws a sprite starting at the top left corner (tlX, tlY)
 // It is also possible to draw sprites that are larger than the panel or (partially) out of bounds, but they will be clipped.
-void drawSprite(int8_t tlX, int8_t tlY, const uint8_t *data, uint8_t width, uint8_t height)
+inline void drawSprite(int8_t tlX, int8_t tlY, const uint8_t *data, uint8_t width, uint8_t height)
 {
     // Iterate over each pixel of the sprite
     for (uint8_t y = 0; y < height; y++)
