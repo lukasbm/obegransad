@@ -40,7 +40,7 @@ static void IRAM_ATTR spi_done_cb(spi_transaction_t *t)
 void IRAM_ATTR panel_isr()
 {
     static spi_transaction_t trans{};
-    trans.length = 256;
+    trans.length = BIT_COUNT;
     trans.tx_buffer = planes[planeIdx];
     trans.user = reinterpret_cast<void *>(planeIdx);
 
@@ -57,12 +57,13 @@ static void init_spi()
         .mosi_io_num = P_DI,
         .miso_io_num = -1,
         .sclk_io_num = P_CLK,
-        .max_transfer_sz = 32,
+        .max_transfer_sz = BIT_COUNT / 8,
     };
     spi_bus_initialize(SPI2_HOST, &buscfg, SPI_DMA_CH_AUTO);
 
+    // as per SCT2024 datasheet, data is sampled at the rising edge of CLK
     spi_device_interface_config_t devcfg = {
-        .mode = 0,
+        .mode = 0, // CPOL=1, CPHA=0. Clock is idle high.
         .clock_speed_hz = SPI_HZ,
         .spics_io_num = -1,
         .queue_size = 3,
