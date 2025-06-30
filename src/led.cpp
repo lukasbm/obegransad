@@ -9,6 +9,8 @@ uint8_t gBright = 100; // global brightness (0-255)
 static volatile uint8_t planeIdx = 0;
 static spi_device_handle_t spi;
 static hw_timer_t *panelTimer = nullptr;
+static QueueHandle_t rmtQueue = nullptr; // 1 word deep is enough
+static TaskHandle_t rmtTask = nullptr;   // optional, but handy to keep
 
 // image buffers
 DRAM_ATTR static Brightness framebuffer[ROWS][COLS];
@@ -33,12 +35,31 @@ static IRAM_ATTR inline void latch_pulse()
     REG_WRITE(GPIO_OUT_W1TC_REG, 1u << P_LATCH); // LAT = 0
 }
 
+static void IRAM_ATTR rmtSenderTask(void * /*arg*/)
+{
+    uint32_t plane;
+    for (;;)
+    {
+        if (xQueueReceive(rmtQueue, &plane, portMAX_DELAY) == pdPASS)
+        {
+            // one-item "OE window"
+            rmt_write_items(RMT_CHANNEL_0, rmt_planes[plane], 1, false);
+        }
+    }
+}
+
 /* ----------- SPI-Callback: Latch + OE ----------------------- */
 static void IRAM_ATTR spi_done_cb(spi_transaction_t *t)
 {
     latch_pulse();
-    /* OE-window (1 Item) – ISR-safe */
-    rmt_write_items(RMT_CHANNEL_0, rmt_planes[(uint32_t)t->user], 1, false);
+
+    uint32_t plane = (uint32_t)t->user; // 0…2
+    BaseType_t hpw = pdFALSE;           // higher-prio-woken flag
+    if (rmtQueue != nullptr)
+        xQueueSendFromISR(rmtQueue, &plane, &hpw);
+
+    if (hpw)
+        portYIELD_FROM_ISR(); // switch now if needed
 }
 
 void IRAM_ATTR panel_isr()
@@ -111,11 +132,18 @@ static void init_timer()
 
 void panel_init()
 {
-    pinMode(P_LATCH, OUTPUT); // LA/ (active‑low latch); STCP LATCH
+    pinMode(P_LATCH, OUTPUT);
     init_spi();
     init_rmt();
+
+    /* -------- NEW: create queue + task ---------------------------- */
+    rmtQueue = xQueueCreate(1, sizeof(uint32_t)); // depth = 1 is fine
+    xTaskCreatePinnedToCore(rmtSenderTask,        // function
+                            "rmtTx", 2048, nullptr,
+                            10, &rmtTask, 0); // run on core 0
+
     init_timer();
-    panel_timer_start(); // Start the refresh cycle
+    panel_timer_start(); // start the refresh cycle
 }
 
 void panel_timer_start()

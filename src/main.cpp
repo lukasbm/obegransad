@@ -136,7 +136,7 @@ void setup()
     WiFi.mode(WIFI_STA); // set Wi-Fi mode to station (initially, otherwise will be STA+AP) // has to be here at the beginning, otherwise it blocks?
 
     // state independent setup code
-    // captive_portal_setup(); // set up Wi-Fi, will start captive portal if no credentials are stored
+    captive_portal_setup(); // set up Wi-Fi, will start captive portal if no credentials are stored
     gSettings = read_from_persistent_storage();
     buttonSetup(); // set up the button
     panel_init();  // initialize the LED panel
