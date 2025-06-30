@@ -180,6 +180,8 @@ void loop()
             captive_portal_tick(); // handle captive portal events
         }
     }
+
+    // SCENE
     if (state == STATE_NO_WIFI || state == STATE_NORMAL)
     {
         sceneSwitcher.tick(); // progress the current scene

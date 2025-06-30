@@ -13,29 +13,6 @@ static WiFiManager wm;
 
 static const char *PORTAL_NAME = "Obegransad-Setup"; // captive portal name
 
-// handles the cases when connection is lost in AP/STA mode
-// the driver fires the event typically every 3-10 seconds when disconnected
-static void callback_STA_disconnected(WiFiEvent_t event, WiFiEventInfo_t info)
-{
-    static uint8_t failCount = 0;
-
-    // print reason
-    Serial.printf("Driver Wi-Fi lost event (callback_STA_disconnected), reason %d … reconnecting\n", info.wifi_sta_disconnected.reason);
-
-    if (++failCount < 10)
-    {
-        Serial.printf("Reconnecting to Wi-Fi, attempt %d …\n", failCount);
-        WiFi.reconnect();
-    }
-    else
-    {
-        Serial.println("Failed to reconnect, starting captive portal again…");
-        failCount = 0;
-        display_wifi_logo();               // show the wifi logo
-        wm.startConfigPortal(PORTAL_NAME); // blocking until user fixes wifi.
-    }
-}
-
 bool wifi_check()
 {
     return (WiFi.status() == WL_CONNECTED);
@@ -51,7 +28,6 @@ void wifi_clear_credentials(void)
 // need to call captive portal setup first
 bool wifi_setup(void)
 {
-    WiFi.onEvent(callback_STA_disconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
     return wm.autoConnect(PORTAL_NAME);
 }
 
@@ -96,7 +72,6 @@ void captive_portal_start()
 {
     // Need to disconnect first to ensure clean AP setup
     WiFi.disconnect();
-
     if (!captive_portal_active())
         wm.startConfigPortal(PORTAL_NAME);
 }
@@ -199,7 +174,6 @@ DeviceError enter_light_sleep(uint64_t seconds)
     // re-auth to wifi
     if (!WiFi.reconnect())
     {
-        // will call callback_STA_disconnected if it fails
         Serial.println("Failed to reconnect to WiFi after sleep");
         return ERR_WIFI;
     }
