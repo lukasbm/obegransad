@@ -11,4 +11,8 @@
     "IDF_TARGET": "esp32c3"
   },
   "idf.monitorPort": "/dev/ttyACM0",
+  "files.associations": {
+    "ikea-obegransad-panel.h": "c",
+    "stdio.h": "c"
+  },
 }

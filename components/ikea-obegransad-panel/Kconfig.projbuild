@@ -1,0 +1,27 @@
+menu "Driver for IKEA Obegransad Panel"
+    
+    config MY_DISPLAY_OE_PIN
+        int "OE Pin"
+        default 6
+        help
+            GPIO number for Output Enable (OE) pin.
+
+    config MY_DISPLAY_DI_PIN
+        int "DI Pin"
+        default 5
+        help
+            GPIO number for Data In (DI) pin.
+
+    config MY_DISPLAY_CLK_PIN
+        int "CLK Pin"
+        default 4
+        help
+            GPIO number for Clock (CLK) pin.
+
+    config MY_DISPLAY_LATCH_PIN
+        int "LATCH Pin"
+        default 3
+        help
+            GPIO number for Latch (LATCH) pin.
+
+endmenu
