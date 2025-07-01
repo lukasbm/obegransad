@@ -1,87 +1,58 @@
-// #define BUTTON_GPIO 0
 
-// typedef enum
-// {
-//     APP_STATE_SETUP = 0,
-//     APP_STATE_NORMAL,
-//     APP_STATE_CAPTIVE_PORTAL,
-//     APP_STATE_NO_WIFI,
-//     APP_STATE_SLEEPING,
-// } app_state_t;
+#include "iot_button.h"
+#include "esp_log.h"
+#include "esp_err.h"
 
-// static httpd_handle_t portal_srv = NULL;
+#define BUTTON_GPIO_NUM 0     // Replace with your button's GPIO number
+#define BUTTON_ACTIVE_LEVEL 1 // For pull-down, active level is HIGH
 
-// static esp_err_t wifi_portal_start(void) { /* httpd_start(); set AP creds */ }
-// static void wifi_portal_stop(void) { httpd_stop(portal_srv); }
+static const char *TAG = "button_example";
 
-// static volatile app_state_t g_state = APP_STATE_SETUP;
-// static void app_update_state(app_state_t next);
-
-// static button_handle_t btn;
-
-// static void cb_single(void *arg, void *data)
-// {
-//     if (g_state == APP_STATE_NORMAL)
-//     {
-//         scene_switcher_next();
-//     }
-//     else if (g_state == APP_STATE_CAPTIVE_PORTAL)
-//     {
-//         app_update_state(wifi_is_connected() ? APP_STATE_NORMAL : APP_STATE_NO_WIFI);
-//     }
-// }
-
-// static void cb_long_start(void *arg, void *data) { /* timestamp if you like */ }
-
-// static void cb_long_up(void *arg, void *data)
-// {
-//     /* 10-s long press means erase credentials */
-//     if (iot_button_get_ticks_time((button_handle_t)arg) >= 10 * 1000)
-//     {
-//         wifi_clear_credentials();
-//     }
-// }
-
-// static void button_init(void)
-// {
-//     const button_config_t cfg = {
-//         .type = BUTTON_TYPE_GPIO,
-//         .long_press_time = 10000, // ms
-//     };
-//     const button_gpio_config_t gpio_cfg = {
-//         .gpio_num = BUTTON_GPIO,
-//         .active_level = 0, // active-low
-//     };
-//     ESP_ERROR_CHECK(iot_button_create(&cfg, &gpio_cfg, &btn)); // g_state safe
-
-//     iot_button_register_cb(btn, BUTTON_SINGLE_CLICK, NULL, cb_single, NULL);
-//     iot_button_register_cb(btn, BUTTON_LONG_PRESS_START, NULL, cb_long_start, NULL);
-//     iot_button_register_cb(btn, BUTTON_LONG_PRESS_UP, NULL, cb_long_up, NULL);
-// }
-
-// static void weather_task(void *arg)
-// {
-//     const TickType_t delay = 30 * 60 * 1000 / portTICK_PERIOD_MS;
-//     while (1)
-//     {
-//         if (g_state == APP_STATE_NORMAL)
-//         {
-//             weather_fetch_once(); // esp_http_client_perform()
-//         }
-//         vTaskDelay(delay);
-//     }
-// }
-
-// static void ntp_task(void *arg)
-// {
-//     while (1)
-//     {
-//         sntp_sync_time(); // blocks until update or timeout
-//         /* sntp has its own interval but we can force sync if needed */
-//         vTaskDelay(pdMS_TO_TICKS(30 * 60 * 1000));
-//     }
-// }
-
-extern "C" void app_main()
+// Callback for single click
+static void button_single_click_cb(void *arg, void *usr_data)
 {
+    ESP_LOGI(TAG, "BUTTON_SINGLE_CLICK");
+    ESP_LOGI(TAG, "%s", "BUTTON_SINGLE_CLICK");
+}
+
+// Callback for double click
+static void button_double_click_cb(void *arg, void *usr_data)
+{
+    ESP_LOGI(TAG, "BUTTON_DOUBLE_CLICK");
+    ESP_LOGI(TAG, "%s", "BUTTON_DOUBLE_CLICK");
+}
+
+// Callback for long press
+static void button_long_press_cb(void *arg, void *usr_data)
+{
+    ESP_LOGI(TAG, "BUTTON_LONG_PRESS_START");
+    ESP_LOGI(TAG, "%s", "BUTTON_LONG_PRESS_START");
+}
+
+void app_main(void)
+{
+    // Configure the button
+    const button_config_t btn_cfg = {0};
+    const button_gpio_config_t btn_gpio_cfg = {
+        .gpio_num = BUTTON_GPIO_NUM,
+        .active_level = BUTTON_ACTIVE_LEVEL,
+    };
+    button_handle_t gpio_btn = NULL;
+    esp_err_t ret = iot_button_new_gpio_device(&btn_cfg, &btn_gpio_cfg, &gpio_btn);
+    if (NULL == gpio_btn)
+    {
+        ESP_LOGE(TAG, "Button create failed");
+        ESP_LOGE(TAG, "%s", "Button create failed");
+    }
+
+    // Register single click callback
+    iot_button_register_cb(gpio_btn, BUTTON_SINGLE_CLICK, NULL, button_single_click_cb, NULL);
+
+    // Register double click callback
+    iot_button_register_cb(gpio_btn, BUTTON_DOUBLE_CLICK, NULL, button_double_click_cb, NULL);
+
+    // Register long press callback (default long press time)
+    iot_button_register_cb(gpio_btn, BUTTON_LONG_PRESS_START, NULL, button_long_press_cb, NULL);
+
+    // TODO: also consider low power mode: https://docs.espressif.com/projects/esp-iot-solution/en/latest/input_device/button.html#low-power
 }

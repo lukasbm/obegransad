@@ -13,6 +13,8 @@
   "idf.monitorPort": "/dev/ttyACM0",
   "files.associations": {
     "ikea-obegransad-panel.h": "c",
-    "stdio.h": "c"
+    "stdio.h": "c",
+    "cstdlib": "cpp",
+    "freertos.h": "c"
   },
 }

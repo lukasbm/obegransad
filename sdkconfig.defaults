@@ -2,3 +2,8 @@
 # Espressif IoT Development Framework (ESP-IDF) 5.4.2 Project Minimal Configuration
 #
 CONFIG_IDF_TARGET="esp32c3"
+# TODO: set correct pins!
+CONFIG_PANEL_PIN_LATCH=1
+CONFIG_PANEL_PIN_CLOCK=2
+CONFIG_PANEL_PIN_DATA=3
+CONFIG_PANEL_PIN_ENABLE=4
