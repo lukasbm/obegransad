@@ -10,5 +10,5 @@
   "idf.customExtraVars": {
     "IDF_TARGET": "esp32c3"
   },
-  "idf.monitorPort": "/dev/ttyACM0"
+  "idf.monitorPort": "/dev/ttyACM0",
 }
