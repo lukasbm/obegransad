@@ -1,14 +1,14 @@
 {
   "C_Cpp.intelliSenseEngine": "default",
-  "idf.espIdfPath": "/home/lukas/.espressif/esp/v5.4.2/esp-idf",
+  "idf.espIdfPath": "/home/lukas/esp/v5.4.2/esp-idf",
   "idf.pythonInstallPath": "/usr/bin/python3",
   "idf.openOcdConfigs": [
-    "board/esp32-wrover-kit-3.3v.cfg"
+    "board/esp32c3-builtin.cfg"
   ],
   "idf.port": "/dev/ttyACM0",
   "idf.toolsPath": "/home/lukas/.espressif",
   "idf.customExtraVars": {
-    "IDF_TARGET": "esp32"
+    "IDF_TARGET": "esp32c3"
   },
   "idf.monitorPort": "/dev/ttyACM0"
 }
