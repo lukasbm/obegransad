@@ -1,0 +1,11 @@
+{
+    "servers": {
+        "my-mcp-server-e6ebaa66": {
+            "type": "stdio",
+            "command": "idp.py",
+            "args": [
+                "build"
+            ]
+        }
+    }
+}

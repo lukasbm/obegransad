@@ -15,6 +15,18 @@
     "ikea-obegransad-panel.h": "c",
     "stdio.h": "c",
     "cstdlib": "cpp",
-    "freertos.h": "c"
+    "freertos.h": "c",
+    "esp_log.h": "c",
+    "iot_button.h": "c"
   },
+  "cSpell.words": [
+    "gptimer",
+    "SRCS"
+  ],
+  "clangd.path": "/home/lukas/.espressif/tools/esp-clang/esp-18.1.2_20240912/esp-clang/bin/clangd",
+  "clangd.arguments": [
+    "--background-index",
+    "--query-driver=/home/lukas/.espressif/tools/riscv32-esp-elf/esp-14.2.0_20241119/riscv32-esp-elf/bin/riscv32-esp-elf-gcc",
+    "--compile-commands-dir=/home/lukas/Documents/projects/obegransad-esp-idf/build"
+  ]
 }
