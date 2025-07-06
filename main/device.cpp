@@ -35,7 +35,7 @@ void wifi_clear_credentials() {
 // FIXME: check if already active??
 void start_captive_portal() {
   auto &ap = WifiConfigurationAp::GetInstance();
-  ap.SetSsidPrefix("ESP32");
+  ap.SetSsidPrefix("Obegransad");
   ap.Start();
 }
 
