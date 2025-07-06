@@ -1,33 +1,63 @@
 #include "device.h"
 
-void device_init()
-{
-    // Initialize the default event loop
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
+// ESP-IDF core dependencies
+#include "esp_err.h"   // for esp_err_t and ESP_ERROR_CHECK
+#include "esp_event.h" // for esp_event_loop_create_default()
+#include "nvs_flash.h" // for nvs_flash_init()
+#include <esp_sleep.h>
 
-    // Initialize NVS flash for Wi-Fi configuration
-    esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
-    {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ret = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK(ret);
+// esp-wifi-connect headers
+#include "ssid_manager.h"          // SsidManager::GetInstance()
+#include "wifi_configuration_ap.h" // WifiConfigurationAp::GetInstance()
+#include "wifi_station.h"          // WifiStation::GetInstance()
+
+void device_init() {
+  // Initialize the default event loop
+  ESP_ERROR_CHECK(esp_event_loop_create_default());
+
+  // Initialize NVS flash for Wi-Fi configuration
+  esp_err_t ret = nvs_flash_init();
+  if (ret == ESP_ERR_NVS_NO_FREE_PAGES ||
+      ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+    ESP_ERROR_CHECK(nvs_flash_erase());
+    ret = nvs_flash_init();
+  }
+  ESP_ERROR_CHECK(ret);
 }
 
-void wifi_init()
-{
-    // Get the Wi-Fi configuration
-    auto &ssid_list = SsidManager::GetInstance().GetSsidList();
-    if (ssid_list.empty())
-    {
-        // Start the Wi-Fi configuration AP
-        auto &ap = WifiConfigurationAp::GetInstance();
-        ap.SetSsidPrefix("ESP32");
-        ap.Start();
-        return;
-    }
+void wifi_clear_credentials() {
+  // Clear stored Wi-Fi credentials
+  SsidManager::GetInstance().Clear();
+  WifiStation::GetInstance().Stop();
+  stop_captive_portal();
+}
 
-    // Otherwise, connect to the Wi-Fi network
+// FIXME: check if already active??
+void start_captive_portal() {
+  auto &ap = WifiConfigurationAp::GetInstance();
+  ap.SetSsidPrefix("ESP32");
+  ap.Start();
+}
+
+// FIXME: check if already active??
+void stop_captive_portal() {
+  // Stop the captive portal
+  WifiConfigurationAp::GetInstance().Stop();
+}
+
+void wifi_init() {
+  auto &ssid_list = SsidManager::GetInstance().GetSsidList();
+  if (ssid_list.empty()) {
+    start_captive_portal();
+  } else {
     WifiStation::GetInstance().Start();
+  }
+}
+
+bool wifi_check() { return WifiStation::GetInstance().IsConnected(); }
+
+void enter_light_sleep() {
+  // Enter light sleep mode
+  // esp_sleep_enable_ext0_wakeup(BUTTON_PIN, 0); // Wake up on button press
+  esp_light_sleep_start();
 }
