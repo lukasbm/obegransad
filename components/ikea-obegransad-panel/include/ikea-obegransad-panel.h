@@ -7,14 +7,18 @@
 extern "C" {
 #endif
 
+#define PANEL_WIDTH 16
+#define PANEL_HEIGHT 16
+#define BIT_DEPTH 2
+
 extern uint8_t gBright; // global brightness (0-255) (only scaling)
 
-enum Brightness {
-  PANEL_BRIGHTNESS_OFF,
-  PANEL_BRIGHTNESS_1,
-  PANEL_BRIGHTNESS_2,
-  PANEL_BRIGHTNESS_3,
-};
+typedef enum {
+  PANEL_BRIGHTNESS_OFF = 0,
+  PANEL_BRIGHTNESS_1 = 1,
+  PANEL_BRIGHTNESS_2 = 2,
+  PANEL_BRIGHTNESS_3 = 3,
+} Brightness;
 
 typedef struct {
   int latch_pin;
@@ -38,7 +42,7 @@ void panel_setPixel(uint8_t row, uint8_t col, Brightness brightness);
 
 void panel_fill(Brightness col);
 
-inline void panel_clear() { panel_fill(PANEL_BRIGHTNESS_OFF); }
+static inline void panel_clear(void) { panel_fill(PANEL_BRIGHTNESS_OFF); }
 
 uint8_t *panel_get_framebuffer(void);
 
