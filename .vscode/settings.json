@@ -17,7 +17,13 @@
     "cstdlib": "cpp",
     "freertos.h": "c",
     "esp_log.h": "c",
-    "iot_button.h": "c"
+    "iot_button.h": "c",
+    "array": "cpp",
+    "any": "cpp",
+    "string_view": "cpp",
+    "ranges": "cpp",
+    "span": "cpp",
+    "regex": "cpp"
   },
   "cSpell.words": [
     "gptimer",
