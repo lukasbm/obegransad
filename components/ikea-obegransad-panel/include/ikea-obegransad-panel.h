@@ -13,8 +13,6 @@ extern "C" {
 #define PANEL_HEIGHT 16
 #define BIT_DEPTH 2
 
-extern uint8_t gBright; // global brightness (0-255) (only scaling)
-
 typedef enum {
   PANEL_BRIGHTNESS_OFF = 0,
   PANEL_BRIGHTNESS_1 = 1,
@@ -39,11 +37,12 @@ void panel_timer_stop(void);
 
 void panel_setPixel(uint8_t row, uint8_t col, Brightness brightness);
 
-void panel_fill(Brightness col);
+void panel_fill(Brightness brightness);
 
 static inline void panel_clear(void) { panel_fill(PANEL_BRIGHTNESS_OFF); }
 
-uint8_t *panel_get_framebuffer(void);
+void panel_set_global_brightness(uint8_t brightness);
+uint8_t panel_get_global_brightness(void);
 
 void panel_commit(void);
 

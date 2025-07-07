@@ -57,7 +57,6 @@ static spi_device_handle_t g_spi;
 static rmt_channel_handle_t g_rmt_oe;
 static rmt_encoder_handle_t g_rmt_encoder;
 static esp_timer_handle_t g_refresh_timer; // ESP Timer for precise 500Hz timing
-static TaskHandle_t g_refresh_task;         // FreeRTOS task for display work
 
 // Buffers
 static Brightness g_framebuffer[PANEL_HEIGHT][PANEL_WIDTH];
@@ -69,7 +68,6 @@ static const uint32_t plane_times_us[BIT_DEPTH] = {PLANE0_ON_US, PLANE1_ON_US};
 
 // Forward declarations
 static void refresh_timer_callback(void *arg);
-static void refresh_task(void *pvParameters);
 static void prepare_bitplane(uint8_t plane);
 static void display_plane(uint8_t plane);
 
@@ -77,7 +75,6 @@ static void display_plane(uint8_t plane);
 static esp_err_t init_gpio_pins(void);
 static esp_err_t init_spi_interface(void);
 static esp_err_t init_refresh_timer(void);
-static esp_err_t init_refresh_task(void);
 
 // RMT helper functions for precise OE (Output Enable) timing control
 static esp_err_t rmt_setup_oe_channel(void);
@@ -113,7 +110,6 @@ esp_err_t panel_init(const panel_config_t *config) {
   ESP_RETURN_ON_ERROR(init_gpio_pins(), TAG, "GPIO initialization failed");
   ESP_RETURN_ON_ERROR(rmt_setup_oe_channel(), TAG, "RMT setup failed");
   ESP_RETURN_ON_ERROR(init_spi_interface(), TAG, "SPI initialization failed");
-  ESP_RETURN_ON_ERROR(init_refresh_task(), TAG, "Task creation failed");
   ESP_RETURN_ON_ERROR(init_refresh_timer(), TAG, "Timer initialization failed");
 
   ESP_LOGI(TAG,
@@ -164,41 +160,40 @@ void panel_fill(Brightness brightness) {
 void panel_commit(void) { g_refresh_needed = true; }
 
 /**
- * @brief ESP Timer ISR callback - triggers display refresh at 500Hz
- * This ISR runs in IRAM for minimal latency and notifies the refresh task
- * @param arg User-defined argument (unused)
+ * @brief Set global brightness scaling factor
+ * @param brightness Global brightness (0-255), applied to all pixels
  */
-static void IRAM_ATTR refresh_timer_callback(void *arg) {
-  BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-  // Notify the refresh task that it's time to update the display
-  vTaskNotifyGiveFromISR(g_refresh_task, &xHigherPriorityTaskWoken);
-  // Yield to higher priority task if needed
-  portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+void panel_set_global_brightness(uint8_t brightness) {
+  gBright = brightness;
+  g_refresh_needed = true; // Trigger refresh with new brightness
 }
 
 /**
- * @brief Refresh task - handles the actual display update in task context
- * This task performs the heavy work that's not suitable for ISR context
- * @param pvParameters Task parameters (unused)
+ * @brief Get current global brightness scaling factor
+ * @return Current global brightness (0-255)
  */
-static void refresh_task(void *pvParameters) {
-  while (1) {
-    // Wait for timer notification (500Hz from ESP Timer ISR)
-    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+uint8_t panel_get_global_brightness(void) {
+  return gBright;
+}
 
-    // Prepare bitplanes from framebuffer if changes were made
-    if (g_refresh_needed) {
-      for (int i = 0; i < BIT_DEPTH; i++) {
-        prepare_bitplane(i);
-      }
-      g_refresh_needed = false;
+/**
+ * @brief ESP Timer callback - triggers display refresh at 500Hz
+ * This callback runs in ESP Timer task context and can safely do blocking operations
+ * @param arg User-defined argument (unused)
+ */
+static void refresh_timer_callback(void *arg) {
+  // Prepare bitplanes from framebuffer if changes were made
+  if (g_refresh_needed) {
+    for (int i = 0; i < BIT_DEPTH; i++) {
+      prepare_bitplane(i);
     }
+    g_refresh_needed = false;
+  }
 
-    // Display each bitplane with precise RMT-controlled timing
-    // This implements Bit Code Modulation (BCM) for brightness control
-    for (int plane = 0; plane < BIT_DEPTH; plane++) {
-      display_plane(plane);
-    }
+  // Display each bitplane with precise RMT-controlled timing
+  // This implements Bit Code Modulation (BCM) for brightness control
+  for (int plane = 0; plane < BIT_DEPTH; plane++) {
+    display_plane(plane);
   }
 }
 
@@ -266,7 +261,7 @@ static esp_err_t rmt_setup_oe_channel(void) {
  * Generates active-low pulse for the specified duration to enable LED output
  * @param duration_us Duration in microseconds to keep LEDs enabled
  */
-static void IRAM_ATTR rmt_send_oe_pulse(uint32_t duration_us) {
+static void rmt_send_oe_pulse(uint32_t duration_us) {
   // Create RMT symbol for OE pulse (active low timing)
   rmt_symbol_word_t oe_symbol = {
       .level0 = 0,              // OE active (low) - LEDs enabled
@@ -383,34 +378,14 @@ static esp_err_t init_refresh_timer(void) {
   ESP_LOGI(TAG, "Creating ESP timer for 500Hz refresh (%d µs period)",
            FRAME_PERIOD_US);
 
-  // ESP Timer configuration for ISR callback execution
+  // ESP Timer configuration for task callback execution
   esp_timer_create_args_t timer_args = {
       .callback = refresh_timer_callback,
       .name = "panel_refresh",
-      .dispatch_method = ESP_TIMER_TASK, // Run in timer task context (safer than ISR)
+      .dispatch_method = ESP_TIMER_TASK, // Run in timer task context (safe for blocking ops)
   };
 
   ESP_RETURN_ON_ERROR(esp_timer_create(&timer_args, &g_refresh_timer), TAG,
                       "ESP Timer creation failed");
-  return ESP_OK;
-}
-
-/**
- * @brief Create high-priority refresh task for display updates
- * Task handles BCM display updates triggered by ESP Timer
- * @return ESP_OK on success, error code on failure
- */
-static esp_err_t init_refresh_task(void) {
-  ESP_LOGI(TAG, "Creating refresh task with priority 10");
-
-  // Create refresh task with high priority for consistent timing
-  BaseType_t result = xTaskCreate(refresh_task, "panel_refresh", 4096, NULL, 10,
-                                  &g_refresh_task);
-
-  if (result != pdPASS) {
-    ESP_LOGE(TAG, "Failed to create refresh task");
-    return ESP_ERR_NO_MEM;
-  }
-
   return ESP_OK;
 }
