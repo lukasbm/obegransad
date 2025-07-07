@@ -1,6 +1,5 @@
 #include "ikea-obegransad-panel.h"
 
-#include "driver/gpio.h"
 #include "driver/gptimer.h"
 #include "driver/rmt_tx.h"
 #include "driver/spi_master.h"
@@ -12,13 +11,11 @@
 #include <string.h>
 
 // Timing constants for BCM (Bit Code Modulation)
-#define PLANE0_ON_US                                                           \
-  320 // LSB plane: shorter duration for fine brightness control
-#define PLANE1_ON_US                                                           \
-  800 // MSB plane: longer duration (2.5x LSB) for coarse brightness
+#define PLANE0_ON_US 320
+#define PLANE1_ON_US 800
 #define FRAME_PERIOD_US 2000 // 500Hz refresh rate = 2000µs period total
 
-static const char *TAG = "obegransad_panel";
+static const char *TAG = "panel";
 
 // Each bitplane requires 32 bytes (256 LEDs / 8 bits per byte)
 #define BITPLANE_SIZE_BYTES ((PANEL_WIDTH * PANEL_HEIGHT) / 8)
@@ -63,9 +60,8 @@ static gptimer_handle_t g_timer; // Hardware timer for precise 500Hz timing
 static TaskHandle_t g_refresh_task;
 
 // Buffers
-static uint8_t g_framebuffer[PANEL_WIDTH * PANEL_HEIGHT];
+static Brightness g_framebuffer[PANEL_HEIGHT][PANEL_WIDTH];
 static uint8_t g_bitplanes[BIT_DEPTH][BITPLANE_SIZE_BYTES];
-static volatile uint8_t g_current_plane = 0;
 static volatile bool g_refresh_needed = false;
 
 // Timing in microseconds
@@ -99,14 +95,12 @@ static void rmt_send_oe_pulse(uint32_t duration_us);
 // latches
 static inline void IRAM_ATTR latch_pulse(void) {
   GPIO.out_w1ts.val = (1 << g_config.latch_pin); // Set high
-  GPIO.out_w1tc.val =
-      (1 << g_config.latch_pin); // Set low - data is latched on falling edge
+  GPIO.out_w1tc.val = (1 << g_config.latch_pin); // Set low
 }
 
 // OE (Output Enable) control - OE is active low on OBEGRÄNSAD panel
 static inline void IRAM_ATTR oe_disable(void) {
-  GPIO.out_w1ts.val =
-      (1 << g_config.oe_pin); // Set high = LEDs disabled (OE is active low)
+  GPIO.out_w1ts.val = (1 << g_config.oe_pin); // Set high (OE is active low)
 }
 
 esp_err_t panel_init(const panel_config_t *config) {
@@ -150,7 +144,7 @@ void panel_timer_stop(void) { gptimer_stop(g_timer); }
 void panel_setPixel(uint8_t row, uint8_t col, Brightness brightness) {
   if (row >= PANEL_HEIGHT || col >= PANEL_WIDTH)
     return;
-  g_framebuffer[row * PANEL_WIDTH + col] = (uint8_t)brightness;
+  g_framebuffer[row][col] = brightness;
   g_refresh_needed = true;
 }
 
@@ -162,12 +156,6 @@ void panel_fill(Brightness brightness) {
   memset(g_framebuffer, (uint8_t)brightness, sizeof(g_framebuffer));
   g_refresh_needed = true;
 }
-
-/**
- * @brief Get direct access to framebuffer for advanced manipulation
- * @return Pointer to framebuffer array (256 bytes, row-major order)
- */
-uint8_t *panel_get_framebuffer(void) { return g_framebuffer; }
 
 /**
  * @brief Mark framebuffer as needing refresh (call after direct framebuffer
@@ -227,7 +215,7 @@ static void prepare_bitplane(uint8_t plane) {
   // Process each pixel in the framebuffer
   for (int y = 0; y < PANEL_HEIGHT; y++) {
     for (int x = 0; x < PANEL_WIDTH; x++) {
-      uint8_t pixel_brightness = g_framebuffer[y * PANEL_WIDTH + x];
+      uint8_t pixel_brightness = g_framebuffer[y][x];
 
       // Apply global brightness scaling (0-255 range)
       pixel_brightness = (pixel_brightness * gBright) / 255;
@@ -258,8 +246,7 @@ static esp_err_t rmt_setup_oe_channel(void) {
       .gpio_num = g_config.oe_pin,
       .clk_src = RMT_CLK_SRC_DEFAULT,
       .resolution_hz = 1000000, // 1MHz = 1µs resolution for precise timing
-      .mem_block_symbols =
-          64, // Small memory block is sufficient for simple pulses
+      .mem_block_symbols = 64,
       .trans_queue_depth = 1, // Single transaction at a time
   };
   ESP_RETURN_ON_ERROR(rmt_new_tx_channel(&tx_config, &g_rmt_oe), TAG,
