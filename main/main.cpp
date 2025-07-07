@@ -1,4 +1,5 @@
 
+#include "freertos/idf_additions.h"
 #include <button_gpio.h>
 #include <esp_err.h>
 #include <esp_log.h>
@@ -6,7 +7,7 @@
 #include <iot_button.h>
 
 #include "device.h"
-#include "freertos/idf_additions.h"
+#include "ikea-obegransad-panel.h"
 
 static const char *TAG = "main";
 
@@ -48,12 +49,24 @@ extern "C" void app_main() {
 
   device_init();
   button_init();
-  wifi_init();
-  // panel_init();
+  // wifi_init();
+
+  static panel_config_t panel_config = {
+      .latch_pin = (gpio_num_t)1,
+      .clk_pin = (gpio_num_t)2,
+      .di_pin = (gpio_num_t)3,
+      .oe_pin = (gpio_num_t)4,
+      .spi_host = SPI2_HOST,                  // Use SPI2 for better performance
+      .spi_clock_speed_hz = 10 * 1000 * 1000, // 10 MHz
+  };
+  panel_init(&panel_config);
+  panel_timer_start();
+  // set up some example image
+  panel_setPixel(8, 8, PANEL_BRIGHTNESS_2);
 
   while (true) {
     advance_state_machine();
-
-    vTaskDelay(pdMS_TO_TICKS(10)); // Delay for scheduler
+    ESP_LOGI(TAG, "State machine advanced");
+    vTaskDelay(pdMS_TO_TICKS(1000)); // Delay for scheduler
   }
 }

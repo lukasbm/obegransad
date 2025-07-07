@@ -1,5 +1,7 @@
 #pragma once
 
+#include "soc/gpio_num.h"
+#include <driver/spi_master.h>
 #include <esp_err.h>
 #include <stdint.h>
 
@@ -21,15 +23,12 @@ typedef enum {
 } Brightness;
 
 typedef struct {
-  int latch_pin;
-  int clk_pin;
-  int di_pin;
-  int oe_pin;
-  int spi_host;
+  gpio_num_t latch_pin;
+  gpio_num_t clk_pin;
+  gpio_num_t di_pin;
+  gpio_num_t oe_pin;
+  spi_host_device_t spi_host;
   int spi_clock_speed_hz;
-  int rmt_channel;
-  int timer_group;
-  int timer_idx;
 } panel_config_t;
 
 esp_err_t panel_init(const panel_config_t *config);
