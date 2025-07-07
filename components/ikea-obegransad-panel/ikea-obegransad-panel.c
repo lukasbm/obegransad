@@ -1,11 +1,11 @@
 #include "ikea-obegransad-panel.h"
 
-#include "driver/gptimer.h"
 #include "driver/rmt_tx.h"
 #include "driver/spi_master.h"
 #include "esp_attr.h"
 #include "esp_check.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "freertos/task.h"
 #include "soc/gpio_struct.h"
 #include <string.h>
@@ -56,8 +56,8 @@ static panel_config_t g_config;
 static spi_device_handle_t g_spi;
 static rmt_channel_handle_t g_rmt_oe;
 static rmt_encoder_handle_t g_rmt_encoder;
-static gptimer_handle_t g_timer; // Hardware timer for precise 500Hz timing
-static TaskHandle_t g_refresh_task;
+static esp_timer_handle_t g_refresh_timer; // ESP Timer for precise 500Hz timing
+static TaskHandle_t g_refresh_task;         // FreeRTOS task for display work
 
 // Buffers
 static Brightness g_framebuffer[PANEL_HEIGHT][PANEL_WIDTH];
@@ -68,9 +68,7 @@ static volatile bool g_refresh_needed = false;
 static const uint32_t plane_times_us[BIT_DEPTH] = {PLANE0_ON_US, PLANE1_ON_US};
 
 // Forward declarations
-static bool refresh_timer_callback(gptimer_handle_t timer,
-                                   const gptimer_alarm_event_data_t *edata,
-                                   void *user_data);
+static void refresh_timer_callback(void *arg);
 static void refresh_task(void *pvParameters);
 static void prepare_bitplane(uint8_t plane);
 static void display_plane(uint8_t plane);
@@ -78,7 +76,7 @@ static void display_plane(uint8_t plane);
 // Initialization helper functions for modular setup
 static esp_err_t init_gpio_pins(void);
 static esp_err_t init_spi_interface(void);
-static esp_err_t init_gptimer(void);
+static esp_err_t init_refresh_timer(void);
 static esp_err_t init_refresh_task(void);
 
 // RMT helper functions for precise OE (Output Enable) timing control
@@ -116,7 +114,7 @@ esp_err_t panel_init(const panel_config_t *config) {
   ESP_RETURN_ON_ERROR(rmt_setup_oe_channel(), TAG, "RMT setup failed");
   ESP_RETURN_ON_ERROR(init_spi_interface(), TAG, "SPI initialization failed");
   ESP_RETURN_ON_ERROR(init_refresh_task(), TAG, "Task creation failed");
-  ESP_RETURN_ON_ERROR(init_gptimer(), TAG, "GPTimer initialization failed");
+  ESP_RETURN_ON_ERROR(init_refresh_timer(), TAG, "Timer initialization failed");
 
   ESP_LOGI(TAG,
            "Panel driver initialized successfully - ready for 500Hz refresh");
@@ -124,16 +122,18 @@ esp_err_t panel_init(const panel_config_t *config) {
 }
 
 /**
- * @brief Start the hardware timer for 500Hz display refresh
+ * @brief Start the ESP timer for 500Hz display refresh
  * Must be called after panel_init() to begin automatic display updates
  */
-void panel_timer_start(void) { gptimer_start(g_timer); }
+void panel_timer_start(void) {
+  esp_timer_start_periodic(g_refresh_timer, FRAME_PERIOD_US);
+}
 
 /**
- * @brief Stop the hardware timer to halt display refresh
+ * @brief Stop the ESP timer to halt display refresh
  * LEDs will remain in their current state until timer is restarted
  */
-void panel_timer_stop(void) { gptimer_stop(g_timer); }
+void panel_timer_stop(void) { esp_timer_stop(g_refresh_timer); }
 
 /**
  * @brief Set individual pixel brightness using logical coordinates
@@ -164,27 +164,26 @@ void panel_fill(Brightness brightness) {
 void panel_commit(void) { g_refresh_needed = true; }
 
 /**
- * @brief Hardware timer ISR callback - triggers display refresh at 500Hz
+ * @brief ESP Timer ISR callback - triggers display refresh at 500Hz
  * This ISR runs in IRAM for minimal latency and notifies the refresh task
- * @param timer Handle to the GPTimer that triggered the alarm
- * @param edata Event data containing alarm information
- * @param user_data User-defined data (unused)
- * @return true if a higher priority task was woken, false otherwise
+ * @param arg User-defined argument (unused)
  */
-static bool IRAM_ATTR refresh_timer_callback(
-    gptimer_handle_t timer, const gptimer_alarm_event_data_t *edata,
-    void *user_data) {
+static void IRAM_ATTR refresh_timer_callback(void *arg) {
   BaseType_t xHigherPriorityTaskWoken = pdFALSE;
   // Notify the refresh task that it's time to update the display
   vTaskNotifyGiveFromISR(g_refresh_task, &xHigherPriorityTaskWoken);
-  // Return whether a context switch is needed
-  return xHigherPriorityTaskWoken == pdTRUE;
+  // Yield to higher priority task if needed
+  portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
-// Refresh task - handles the actual display update in task context
+/**
+ * @brief Refresh task - handles the actual display update in task context
+ * This task performs the heavy work that's not suitable for ISR context
+ * @param pvParameters Task parameters (unused)
+ */
 static void refresh_task(void *pvParameters) {
   while (1) {
-    // Wait for timer notification (500Hz from hardware timer ISR)
+    // Wait for timer notification (500Hz from ESP Timer ISR)
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 
     // Prepare bitplanes from framebuffer if changes were made
@@ -376,54 +375,35 @@ static esp_err_t init_spi_interface(void) {
 }
 
 /**
- * @brief Initialize GPTimer for precise 500Hz refresh timing
- * Sets up hardware timer with ISR callback for consistent display refresh
+ * @brief Initialize ESP Timer for precise 500Hz refresh timing
+ * Creates and configures timer that will call refresh callback directly
  * @return ESP_OK on success, error code on failure
  */
-static esp_err_t init_gptimer(void) {
-  ESP_LOGI(TAG, "Initializing GPTimer for 500Hz refresh (%d µs period)",
+static esp_err_t init_refresh_timer(void) {
+  ESP_LOGI(TAG, "Creating ESP timer for 500Hz refresh (%d µs period)",
            FRAME_PERIOD_US);
 
-  // GPTimer configuration for precise timing
-  gptimer_config_t timer_config = {
-      .clk_src = GPTIMER_CLK_SRC_DEFAULT,
-      .direction = GPTIMER_COUNT_UP,
-      .resolution_hz = 1000000, // 1MHz resolution = 1µs precision
+  // ESP Timer configuration for ISR callback execution
+  esp_timer_create_args_t timer_args = {
+      .callback = refresh_timer_callback,
+      .name = "panel_refresh",
+      .dispatch_method = ESP_TIMER_TASK, // Run in timer task context (safer than ISR)
   };
-  ESP_RETURN_ON_ERROR(gptimer_new_timer(&timer_config, &g_timer), TAG,
-                      "GPTimer creation failed");
 
-  // Register ISR callback for timer alarm (runs in IRAM for speed)
-  gptimer_event_callbacks_t cbs = {
-      .on_alarm = refresh_timer_callback, // IRAM ISR function
-  };
-  ESP_RETURN_ON_ERROR(gptimer_register_event_callbacks(g_timer, &cbs, NULL),
-                      TAG, "GPTimer callback registration failed");
-
-  // Configure alarm for 500Hz refresh (2000µs period)
-  gptimer_alarm_config_t alarm_config = {
-      .reload_count = 0,              // Start from 0
-      .alarm_count = FRAME_PERIOD_US, // 2000µs = 500Hz refresh rate
-      .flags.auto_reload_on_alarm =
-          true, // Automatic reload for continuous operation
-  };
-  ESP_RETURN_ON_ERROR(gptimer_set_alarm_action(g_timer, &alarm_config), TAG,
-                      "GPTimer alarm config failed");
-  ESP_RETURN_ON_ERROR(gptimer_enable(g_timer), TAG, "GPTimer enable failed");
-
+  ESP_RETURN_ON_ERROR(esp_timer_create(&timer_args, &g_refresh_timer), TAG,
+                      "ESP Timer creation failed");
   return ESP_OK;
 }
 
 /**
  * @brief Create high-priority refresh task for display updates
- * Task handles BCM display updates triggered by hardware timer ISR
+ * Task handles BCM display updates triggered by ESP Timer
  * @return ESP_OK on success, error code on failure
  */
 static esp_err_t init_refresh_task(void) {
   ESP_LOGI(TAG, "Creating refresh task with priority 10");
 
   // Create refresh task with high priority for consistent timing
-  // This task handles display updates triggered by the hardware timer
   BaseType_t result = xTaskCreate(refresh_task, "panel_refresh", 4096, NULL, 10,
                                   &g_refresh_task);
 
