@@ -68,7 +68,7 @@ extern "C" void app_main() {
       .clk_pin = (gpio_num_t)4,
       .di_pin = (gpio_num_t)5,
       .oe_pin = (gpio_num_t)6,
-      .spi_host = SPI2_HOST,                  // Use SPI2 for better performance
+      .spi_host = SPI2_HOST,                 // Use SPI2 for better performance
       .spi_clock_speed_hz = 5 * 1000 * 1000, // 10 MHz
   };
   panel_init(&panel_config);
@@ -76,10 +76,11 @@ extern "C" void app_main() {
   // set up some example image
   panel_clear();
   panel_setPixel(8, 8, PANEL_BRIGHTNESS_2);
+  panel_setPixel(1, 8, PANEL_BRIGHTNESS_3);
 
   while (true) {
     // advance_state_machine();
-    ESP_LOGI(TAG, "State machine advanced");
+    // ESP_LOGI(TAG, "State machine advanced");
     vTaskDelay(pdMS_TO_TICKS(1000)); // Delay for scheduler
   }
 }

@@ -12,8 +12,11 @@
 #include <string.h>
 
 // Timing constants for BCM (Bit Code Modulation)
+// TODO: make configurable in panel_config_t
 #define PLANE0_ON_US 320
-#define PLANE1_ON_US 800
+#define PLANE1_ON_US 1200
+// TODO: make sure that the sum of all plane times is less than
+// FRAME_PERIOD_US - (some buffer for spi, scheduler, etc. overhead)
 #define FRAME_PERIOD_US 2000 // 500Hz refresh rate = 2000µs period total
 
 static const char *TAG = "panel";
@@ -58,6 +61,7 @@ static spi_device_handle_t g_spi;
 static rmt_channel_handle_t g_rmt_oe;
 static rmt_encoder_handle_t g_rmt_encoder;
 static esp_timer_handle_t g_refresh_timer; // ESP Timer for precise 500Hz timing
+static uint8_t g_plane_idx = 0; // Current bit plane index for display
 
 // Buffers
 static Brightness g_framebuffer[PANEL_HEIGHT][PANEL_WIDTH];
@@ -71,6 +75,7 @@ static const uint32_t plane_times_us[BIT_DEPTH] = {PLANE0_ON_US, PLANE1_ON_US};
 static void refresh_timer_callback(void *arg);
 static void prepare_bitplane(uint8_t plane);
 static void display_bitplane(uint8_t plane);
+static void print_bitplane(uint8_t plane);
 
 // Initialization helper functions for modular setup
 static esp_err_t init_gpio_pins(void);
@@ -166,7 +171,7 @@ void panel_set_global_brightness(uint8_t brightness) {
 uint8_t panel_get_global_brightness(void) { return gBright; }
 
 /**
- * @brief ESP Timer callback - triggers display refresh at 500Hz
+ * @brief ESP Timer callback - triggers display refresh
  * This callback runs in ESP Timer task context and can safely do blocking
  * operations
  * @param arg User-defined argument (unused)
@@ -182,10 +187,17 @@ static void refresh_timer_callback(void *arg) {
 
   // Display each bitplane with precise RMT-controlled timing
   // This implements Bit Code Modulation (BCM) for brightness control
-  for (int plane = 0; plane < BIT_DEPTH; plane++) {
-    // FIXME: there is no timing for BCM!!
-    display_bitplane(plane);
+  display_bitplane(g_plane_idx);
+  g_plane_idx = (g_plane_idx + 1) % BIT_DEPTH; // Increment plane index
+}
+
+static void print_bitplane(uint8_t plane) {
+  // print the newly prepared bitplane for debugging
+  ESP_LOGD(TAG, "Prepared bitplane %d: ", plane);
+  for (int i = 0; i < BITPLANE_SIZE_BYTES; i++) {
+    ESP_LOGD(TAG, "%02X ", g_bitplanes[plane][i]);
   }
+  ESP_LOGD(TAG, "\n");
 }
 
 /**
@@ -194,37 +206,29 @@ static void refresh_timer_callback(void *arg) {
  * @param plane The bit plane to prepare (0 = LSB, 1 = MSB for 2-bit depth)
  */
 static void prepare_bitplane(uint8_t plane) {
+  if (plane >= BIT_DEPTH) {
+    ESP_LOGE(TAG, "Invalid bit plane %d requested", plane);
+    return;
+  }
+
   // Clear the bitplane buffer
   memset(g_bitplanes[plane], 0, BITPLANE_SIZE_BYTES);
 
   // Process each pixel in the framebuffer
   for (int y = 0; y < PANEL_HEIGHT; y++) {
     for (int x = 0; x < PANEL_WIDTH; x++) {
-      uint8_t pixel_brightness = g_framebuffer[y][x];  // range: 0 to 2^BIT_DEPTH-1
-
-      // Apply global brightness scaling (0-255 range)
-      pixel_brightness = (pixel_brightness * gBright) / 255;
-
-      // Check if this bit plane should be lit for this pixel in BCM
-      // Lower bit planes (LSB) control fine brightness, higher planes (MSB)
-      // control coarse brightness
+      uint8_t pixel_brightness = g_framebuffer[y][x]; // 0 to 2^BIT_DEPTH-1
+      // Check if this bit plane should be lit for this pixel in the plane
       if (pixel_brightness & (1 << plane)) {
         // Map logical pixel position to physical LED using the wiring LUT
         uint8_t physical_led = lut[y][x];
         uint8_t byte_idx = physical_led / 8;
         uint8_t bit_idx = 7 - (physical_led % 8); // MSB first bit ordering
-
+        // set the corresponding bit in the bitplane
         g_bitplanes[plane][byte_idx] |= (1 << bit_idx);
       }
     }
   }
-
-  // print the newly prepared bitplane for debugging
-  ESP_LOGD(TAG, "Prepared bitplane %d: ", plane);
-  for (int i = 0; i < BITPLANE_SIZE_BYTES; i++) {
-    ESP_LOGD(TAG, "%02X ", g_bitplanes[plane][i]);
-  }
-  ESP_LOGD(TAG, "\n");
 }
 
 /**
@@ -241,7 +245,7 @@ static esp_err_t rmt_setup_oe_channel(void) {
       .mem_block_symbols = 64,
       .trans_queue_depth = 1, // Single transaction at a time
       .flags.with_dma = false,
-      .flags.invert_out = true, // OE is active low
+      .flags.invert_out = false,
   };
   ESP_RETURN_ON_ERROR(rmt_new_tx_channel(&tx_config, &g_rmt_oe), TAG,
                       "Failed to create RMT TX channel");
@@ -267,7 +271,7 @@ static void rmt_send_oe_pulse(uint32_t duration_us) {
       .level0 = 0,              // OE active (low) - LEDs enabled
       .duration0 = duration_us, // Duration for this bitplane (BCM timing)
       .level1 = 1,              // OE inactive (high) - LEDs disabled
-      .duration1 = 1,           // Brief high period before next operation
+      .duration1 = 10,          // Brief high period before next operation
   };
 
   rmt_transmit_config_t tx_config = {
