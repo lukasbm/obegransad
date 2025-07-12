@@ -14,7 +14,7 @@
 // Timing constants for BCM (Bit Code Modulation)
 // TODO: make configurable in panel_config_t
 #define PLANE0_ON_US 320
-#define PLANE1_ON_US 1200
+#define PLANE1_ON_US 800
 // TODO: make sure that the sum of all plane times is less than
 // FRAME_PERIOD_US - (some buffer for spi, scheduler, etc. overhead)
 #define FRAME_PERIOD_US 2000 // 500Hz refresh rate = 2000µs period total
@@ -76,6 +76,7 @@ static void refresh_timer_callback(void *arg);
 static void prepare_bitplane(uint8_t plane);
 static void display_bitplane(uint8_t plane);
 static void print_bitplane(uint8_t plane);
+static void print_framebuffer(void);
 
 // Initialization helper functions for modular setup
 static esp_err_t init_gpio_pins(void);
@@ -97,6 +98,7 @@ esp_err_t panel_init(const panel_config_t *config) {
   ESP_LOGI(TAG, "Initializing IKEA Obegränsad panel driver");
   g_config = *config;
 
+  // FIXME: does not work?
   esp_log_level_set(TAG, ESP_LOG_DEBUG); // Set debug level for this component
 
   // Initialize framebuffer and bitplanes to zero (all LEDs off)
@@ -179,25 +181,53 @@ uint8_t panel_get_global_brightness(void) { return gBright; }
 static void refresh_timer_callback(void *arg) {
   // Prepare bitplanes from framebuffer if changes were made
   if (g_refresh_needed) {
+    // print_framebuffer();
     for (int i = 0; i < BIT_DEPTH; i++) {
       prepare_bitplane(i);
+      // print_bitplane(i); // Print each prepared bitplane for debugging
     }
     g_refresh_needed = false;
   }
 
   // Display each bitplane with precise RMT-controlled timing
   // This implements Bit Code Modulation (BCM) for brightness control
+  GPIO.out_w1ts.val = (1 << g_config.oe_pin); // Set OE high (LEDs off)
   display_bitplane(g_plane_idx);
   g_plane_idx = (g_plane_idx + 1) % BIT_DEPTH; // Increment plane index
 }
 
 static void print_bitplane(uint8_t plane) {
   // print the newly prepared bitplane for debugging
-  ESP_LOGD(TAG, "Prepared bitplane %d: ", plane);
-  for (int i = 0; i < BITPLANE_SIZE_BYTES; i++) {
-    ESP_LOGD(TAG, "%02X ", g_bitplanes[plane][i]);
+  ESP_LOGI(TAG, "Prepared bitplane %d: ", plane);
+
+  // 256 bits → 256 chars, +1 for NUL
+  char line[256 + 1];
+
+  // Fill in each bit
+  for (size_t i = 0; i < BITPLANE_SIZE_BYTES; ++i) {
+    for (int b = 0; b < 8; ++b) {
+      // bit 7 of byte i goes to position i*8 + 0, etc.
+      line[i * 8 + b] = (g_bitplanes[plane][i] & (1u << (7 - b))) ? '1' : '0';
+    }
   }
-  ESP_LOGD(TAG, "\n");
+  line[BITPLANE_SIZE_BYTES * 8] = '\0';
+
+  // Single log call prints entire 256-bit string on one line
+  ESP_LOGI(TAG, "%s", line);
+}
+
+static void print_framebuffer(void) {
+  ESP_LOGI(TAG, "Current framebuffer state:");
+  for (int i = 0; i < PANEL_HEIGHT; i++) {
+    // Build one formatted line per row
+    char line[4 * PANEL_WIDTH + 1] = {0}; // adjust size for your max row length
+    int pos = 0;
+    for (int j = 0; j < PANEL_WIDTH; j++) {
+      pos +=
+          snprintf(line + pos, sizeof(line) - pos, "%2d ", g_framebuffer[i][j]);
+    }
+    ESP_LOGI(TAG, "%s", line);
+  }
 }
 
 /**
@@ -308,6 +338,8 @@ static void display_bitplane(uint8_t plane) {
     // Step 3: Enable LED output for precise duration using RMT
     // Shorter duration for LSB plane (fine brightness), longer for MSB plane
     // (coarse brightness)
+    // FIXME: only for debug!!! GPIO.out_w1tc.val = (1 << g_config.oe_pin); //
+    // Set low
     rmt_send_oe_pulse(plane_times_us[plane]);
   }
 }

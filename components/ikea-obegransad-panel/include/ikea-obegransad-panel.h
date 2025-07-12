@@ -13,7 +13,7 @@ extern "C" {
 #define PANEL_HEIGHT 16
 #define BIT_DEPTH 2 // has to be between 1 and 8
 
-typedef enum {
+typedef enum : uint8_t {
   PANEL_BRIGHTNESS_OFF = 0,
   PANEL_BRIGHTNESS_1 = 1,
   PANEL_BRIGHTNESS_2 = 2,
