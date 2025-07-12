@@ -80,8 +80,7 @@ extern "C" void app_main() {
     // advance_state_machine();
     // ESP_LOGI(TAG, "State machine advanced");
     vTaskDelay(pdMS_TO_TICKS(1000)); // Delay for scheduler
-    panel_setPixel(pix / PANEL_WIDTH, pix % PANEL_WIDTH,
-                   PANEL_BRIGHTNESS_3); //  Brightness(pix % 4));
+    panel_setPixel(pix / PANEL_WIDTH, pix % PANEL_WIDTH, Brightness(pix % 4));
     pix = (pix + 1) % (PANEL_WIDTH * PANEL_HEIGHT);
   }
 }

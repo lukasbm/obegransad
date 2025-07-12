@@ -13,7 +13,7 @@
 
 // Timing constants for BCM (Bit Code Modulation)
 // TODO: make configurable in panel_config_t
-#define PLANE0_ON_US 320
+#define PLANE0_ON_US 100
 #define PLANE1_ON_US 800
 // TODO: make sure that the sum of all plane times is less than
 // FRAME_PERIOD_US - (some buffer for spi, scheduler, etc. overhead)
@@ -53,7 +53,7 @@ static const uint8_t lut[16][16] = {
     {232, 233, 234, 235, 236, 237, 238, 239, 248, 249, 250, 251, 252, 253, 254,
      255}};
 
-uint8_t gBright = 100; // global brightness (0-255)
+uint8_t gBright = 255; // global brightness (0-255)
 
 // Driver state - hardware handles and configuration
 static panel_config_t g_config;
@@ -338,9 +338,8 @@ static void display_bitplane(uint8_t plane) {
     // Step 3: Enable LED output for precise duration using RMT
     // Shorter duration for LSB plane (fine brightness), longer for MSB plane
     // (coarse brightness)
-    // FIXME: only for debug!!! GPIO.out_w1tc.val = (1 << g_config.oe_pin); //
-    // Set low
-    rmt_send_oe_pulse(plane_times_us[plane]);
+    // FIXME: only for debug!!! GPIO.out_w1tc.val = (1 << g_config.oe_pin);
+    rmt_send_oe_pulse((plane_times_us[plane] * gBright) / 255);
   }
 }
 
