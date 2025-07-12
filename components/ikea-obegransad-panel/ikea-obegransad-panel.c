@@ -69,7 +69,7 @@ static const uint32_t plane_times_us[BIT_DEPTH] = {PLANE0_ON_US, PLANE1_ON_US};
 // Forward declarations
 static void refresh_timer_callback(void *arg);
 static void prepare_bitplane(uint8_t plane);
-static void display_plane(uint8_t plane);
+static void display_bitplane(uint8_t plane);
 
 // Initialization helper functions for modular setup
 static esp_err_t init_gpio_pins(void);
@@ -113,7 +113,7 @@ esp_err_t panel_init(const panel_config_t *config) {
   ESP_RETURN_ON_ERROR(init_refresh_timer(), TAG, "Timer initialization failed");
 
   ESP_LOGI(TAG,
-           "Panel driver initialized successfully - ready for 500Hz refresh");
+           "Panel driver initialized successfully - ready for refresh");
   return ESP_OK;
 }
 
@@ -172,13 +172,12 @@ void panel_set_global_brightness(uint8_t brightness) {
  * @brief Get current global brightness scaling factor
  * @return Current global brightness (0-255)
  */
-uint8_t panel_get_global_brightness(void) {
-  return gBright;
-}
+uint8_t panel_get_global_brightness(void) { return gBright; }
 
 /**
  * @brief ESP Timer callback - triggers display refresh at 500Hz
- * This callback runs in ESP Timer task context and can safely do blocking operations
+ * This callback runs in ESP Timer task context and can safely do blocking
+ * operations
  * @param arg User-defined argument (unused)
  */
 static void refresh_timer_callback(void *arg) {
@@ -193,7 +192,7 @@ static void refresh_timer_callback(void *arg) {
   // Display each bitplane with precise RMT-controlled timing
   // This implements Bit Code Modulation (BCM) for brightness control
   for (int plane = 0; plane < BIT_DEPTH; plane++) {
-    display_plane(plane);
+    display_bitplane(plane);
   }
 }
 
@@ -285,7 +284,7 @@ static void rmt_send_oe_pulse(uint32_t duration_us) {
  * pulse
  * @param plane The bitplane to display (0-1 for 2-bit BCM)
  */
-static void display_plane(uint8_t plane) {
+static void display_bitplane(uint8_t plane) {
   // Step 1: Transfer bitplane data to shift registers via high-speed SPI
   spi_transaction_t trans = {
       .length = BITPLANE_SIZE_BYTES * 8, // Length in bits
@@ -382,7 +381,8 @@ static esp_err_t init_refresh_timer(void) {
   esp_timer_create_args_t timer_args = {
       .callback = refresh_timer_callback,
       .name = "panel_refresh",
-      .dispatch_method = ESP_TIMER_TASK, // Run in timer task context (safe for blocking ops)
+      .dispatch_method =
+          ESP_TIMER_TASK, // Run in timer task context (safe for blocking ops)
   };
 
   ESP_RETURN_ON_ERROR(esp_timer_create(&timer_args, &g_refresh_timer), TAG,

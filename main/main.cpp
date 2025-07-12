@@ -11,19 +11,25 @@
 
 static const char *TAG = "main";
 
-#define BUTTON_ACTIVE_LEVEL 0 // Active low (pressed = LOW)
+static void button_long_press(void *arg, void *usr_data) {
+  ESP_LOGI(TAG, "Button long press detected");
+}
+
+static void button_short_press(void *arg, void *usr_data) {
+  ESP_LOGI(TAG, "Button short press detected");
+}
 
 void button_init() {
   // TODO: also consider low power mode:
   // https://docs.espressif.com/projects/esp-iot-solution/en/latest/input_device/button.html#low-power
 
   const button_config_t btn_cfg = {
-      .long_press_time = 1000, // 1 second for long press
+      .long_press_time = 5000, // 1 second for long press
       .short_press_time = 50   // 50ms for short press
   };
   const button_gpio_config_t btn_gpio_cfg = {
       .gpio_num = BUTTON_PIN,
-      .active_level = BUTTON_ACTIVE_LEVEL,
+      .active_level = 0,         // Active low (pressed = LOW)
       .enable_power_save = true, // Enable power saving mode
       .disable_pull = false      // Enable internal pull-up
   };
@@ -35,6 +41,12 @@ void button_init() {
     return;
   }
   ESP_LOGI(TAG, "Button created successfully");
+
+  // register callbacks
+  ESP_ERROR_CHECK(iot_button_register_cb(btn, BUTTON_SINGLE_CLICK, nullptr,
+                                         button_short_press, nullptr));
+  ESP_ERROR_CHECK(iot_button_register_cb(btn, BUTTON_LONG_PRESS_UP, nullptr,
+                                         button_long_press, nullptr));
 }
 
 void advance_state_machine() {
@@ -52,20 +64,21 @@ extern "C" void app_main() {
   // wifi_init();
 
   static panel_config_t panel_config = {
-      .latch_pin = (gpio_num_t)1,
-      .clk_pin = (gpio_num_t)2,
-      .di_pin = (gpio_num_t)3,
-      .oe_pin = (gpio_num_t)4,
+      .latch_pin = (gpio_num_t)3,
+      .clk_pin = (gpio_num_t)4,
+      .di_pin = (gpio_num_t)5,
+      .oe_pin = (gpio_num_t)6,
       .spi_host = SPI2_HOST,                  // Use SPI2 for better performance
-      .spi_clock_speed_hz = 10 * 1000 * 1000, // 10 MHz
+      .spi_clock_speed_hz = 5 * 1000 * 1000, // 10 MHz
   };
   panel_init(&panel_config);
   panel_timer_start();
   // set up some example image
+  panel_clear();
   panel_setPixel(8, 8, PANEL_BRIGHTNESS_2);
 
   while (true) {
-    advance_state_machine();
+    // advance_state_machine();
     ESP_LOGI(TAG, "State machine advanced");
     vTaskDelay(pdMS_TO_TICKS(1000)); // Delay for scheduler
   }
