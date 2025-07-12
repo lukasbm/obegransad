@@ -5,6 +5,7 @@
 #include "esp_attr.h"
 #include "esp_check.h"
 #include "esp_log.h"
+#include "esp_log_level.h"
 #include "esp_timer.h"
 #include "freertos/task.h"
 #include "soc/gpio_struct.h"
@@ -80,12 +81,6 @@ static esp_err_t init_refresh_timer(void);
 static esp_err_t rmt_setup_oe_channel(void);
 static void rmt_send_oe_pulse(uint32_t duration_us);
 
-/**
- * @brief Fast GPIO operations using direct register access for minimal latency
- * These functions are optimized for speed as they're called during
- * time-critical display refresh
- */
-
 // Latch pulse: High->Low transition to capture shift register data into output
 // latches
 static inline void IRAM_ATTR latch_pulse(void) {
@@ -93,14 +88,11 @@ static inline void IRAM_ATTR latch_pulse(void) {
   GPIO.out_w1tc.val = (1 << g_config.latch_pin); // Set low
 }
 
-// OE (Output Enable) control - OE is active low on OBEGRÄNSAD panel
-static inline void IRAM_ATTR oe_disable(void) {
-  GPIO.out_w1ts.val = (1 << g_config.oe_pin); // Set high (OE is active low)
-}
-
 esp_err_t panel_init(const panel_config_t *config) {
   ESP_LOGI(TAG, "Initializing IKEA Obegränsad panel driver");
   g_config = *config;
+
+  esp_log_level_set(TAG, ESP_LOG_DEBUG); // Set debug level for this component
 
   // Initialize framebuffer and bitplanes to zero (all LEDs off)
   memset(g_framebuffer, 0, sizeof(g_framebuffer));
@@ -112,8 +104,7 @@ esp_err_t panel_init(const panel_config_t *config) {
   ESP_RETURN_ON_ERROR(init_spi_interface(), TAG, "SPI initialization failed");
   ESP_RETURN_ON_ERROR(init_refresh_timer(), TAG, "Timer initialization failed");
 
-  ESP_LOGI(TAG,
-           "Panel driver initialized successfully - ready for refresh");
+  ESP_LOGI(TAG, "Panel driver initialized successfully - ready for refresh");
   return ESP_OK;
 }
 
@@ -192,6 +183,7 @@ static void refresh_timer_callback(void *arg) {
   // Display each bitplane with precise RMT-controlled timing
   // This implements Bit Code Modulation (BCM) for brightness control
   for (int plane = 0; plane < BIT_DEPTH; plane++) {
+    // FIXME: there is no timing for BCM!!
     display_bitplane(plane);
   }
 }
@@ -208,7 +200,7 @@ static void prepare_bitplane(uint8_t plane) {
   // Process each pixel in the framebuffer
   for (int y = 0; y < PANEL_HEIGHT; y++) {
     for (int x = 0; x < PANEL_WIDTH; x++) {
-      uint8_t pixel_brightness = g_framebuffer[y][x];
+      uint8_t pixel_brightness = g_framebuffer[y][x];  // range: 0 to 2^BIT_DEPTH-1
 
       // Apply global brightness scaling (0-255 range)
       pixel_brightness = (pixel_brightness * gBright) / 255;
@@ -226,6 +218,13 @@ static void prepare_bitplane(uint8_t plane) {
       }
     }
   }
+
+  // print the newly prepared bitplane for debugging
+  ESP_LOGD(TAG, "Prepared bitplane %d: ", plane);
+  for (int i = 0; i < BITPLANE_SIZE_BYTES; i++) {
+    ESP_LOGD(TAG, "%02X ", g_bitplanes[plane][i]);
+  }
+  ESP_LOGD(TAG, "\n");
 }
 
 /**
@@ -241,6 +240,8 @@ static esp_err_t rmt_setup_oe_channel(void) {
       .resolution_hz = 1000000, // 1MHz = 1µs resolution for precise timing
       .mem_block_symbols = 64,
       .trans_queue_depth = 1, // Single transaction at a time
+      .flags.with_dma = false,
+      .flags.invert_out = true, // OE is active low
   };
   ESP_RETURN_ON_ERROR(rmt_new_tx_channel(&tx_config, &g_rmt_oe), TAG,
                       "Failed to create RMT TX channel");
@@ -269,8 +270,10 @@ static void rmt_send_oe_pulse(uint32_t duration_us) {
       .duration1 = 1,           // Brief high period before next operation
   };
 
-  // Transmit the precisely timed pulse
-  rmt_transmit_config_t tx_config = {.loop_count = 0};
+  rmt_transmit_config_t tx_config = {
+      .loop_count = 0,     // do not repeat signal
+      .flags.eot_level = 1 // End of transmission level (1 = high)
+  };
   rmt_transmit(g_rmt_oe, g_rmt_encoder, &oe_symbol, sizeof(oe_symbol),
                &tx_config);
 
@@ -287,11 +290,12 @@ static void rmt_send_oe_pulse(uint32_t duration_us) {
 static void display_bitplane(uint8_t plane) {
   // Step 1: Transfer bitplane data to shift registers via high-speed SPI
   spi_transaction_t trans = {
-      .length = BITPLANE_SIZE_BYTES * 8, // Length in bits
-      .tx_buffer = g_bitplanes[plane],   // Prepared bitplane data
       .flags = 0,
+      .length = (PANEL_WIDTH * PANEL_HEIGHT), // Length in bits
+      .tx_buffer = g_bitplanes[plane],        // Prepared bitplane data
   };
 
+  // active blocking SPI transfer (not in ISR)
   esp_err_t ret = spi_device_polling_transmit(g_spi, &trans);
   if (ret == ESP_OK) {
     // Step 2: Latch the data from shift registers to output registers
@@ -321,7 +325,8 @@ static esp_err_t init_gpio_pins(void) {
   // Initialize GPIO states: latch low (idle), OE high (LEDs disabled - active
   // low)
   GPIO.out_w1tc.val = (1 << g_config.latch_pin); // Latch low (idle state)
-  oe_disable(); // Start with output disabled (OE high, since it's active low)
+  GPIO.out_w1ts.val =
+      (1 << g_config.oe_pin); // Set high (OE is active low) - output disabled
 
   return ESP_OK;
 }
@@ -349,12 +354,11 @@ static esp_err_t init_spi_interface(void) {
 
   // SPI device configuration for optimal LED matrix performance
   spi_device_interface_config_t dev_config = {
-      .clock_speed_hz =
-          g_config.spi_clock_speed_hz, // User-configurable SPI speed
-      .mode = 0,                       // SPI mode 0 (CPOL=0, CPHA=0)
-      .spics_io_num = -1,              // No CS pin (manual latch control)
-      .queue_size = 1,                 // Single transaction queue
-      .flags = SPI_DEVICE_NO_DUMMY,    // No dummy cycles needed
+      .clock_speed_hz = g_config.spi_clock_speed_hz,
+      .mode = 0,                    // SPI mode 0 (CPOL=0, CPHA=0)
+      .spics_io_num = -1,           // No CS pin (manual latch control)
+      .queue_size = 1,              // Single transaction queue
+      .flags = SPI_DEVICE_NO_DUMMY, // No dummy cycles needed
   };
 
   // Initialize SPI bus and add device
@@ -381,8 +385,8 @@ static esp_err_t init_refresh_timer(void) {
   esp_timer_create_args_t timer_args = {
       .callback = refresh_timer_callback,
       .name = "panel_refresh",
-      .dispatch_method =
-          ESP_TIMER_TASK, // Run in timer task context (safe for blocking ops)
+      .dispatch_method = ESP_TIMER_TASK, // Run in timer task context (not ISR,
+                                         // safe for blocking ops)
   };
 
   ESP_RETURN_ON_ERROR(esp_timer_create(&timer_args, &g_refresh_timer), TAG,

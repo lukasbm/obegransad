@@ -11,7 +11,7 @@ extern "C" {
 
 #define PANEL_WIDTH 16
 #define PANEL_HEIGHT 16
-#define BIT_DEPTH 2
+#define BIT_DEPTH 2 // has to be between 1 and 8
 
 typedef enum {
   PANEL_BRIGHTNESS_OFF = 0,
