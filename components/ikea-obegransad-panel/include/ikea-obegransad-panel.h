@@ -11,13 +11,14 @@ extern "C" {
 
 #define PANEL_WIDTH 16
 #define PANEL_HEIGHT 16
-#define BIT_DEPTH 2 // has to be between 1 and 8
+#define BIT_DEPTH 4 // has to be between 1 and 8
 
+// provide a simple set of nice brightness levels (manually selected)
 typedef enum : uint8_t {
   PANEL_BRIGHTNESS_OFF = 0,
   PANEL_BRIGHTNESS_1 = 1,
-  PANEL_BRIGHTNESS_2 = 2,
-  PANEL_BRIGHTNESS_3 = 3,
+  PANEL_BRIGHTNESS_2 = 5,
+  PANEL_BRIGHTNESS_3 = 16,
 } Brightness;
 
 typedef struct {

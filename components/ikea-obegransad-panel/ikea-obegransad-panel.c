@@ -14,7 +14,9 @@
 // Timing constants for BCM (Bit Code Modulation)
 // TODO: make configurable in panel_config_t
 #define PLANE0_ON_US 100
-#define PLANE1_ON_US 800
+#define PLANE1_ON_US 200
+#define PLANE2_ON_US 400
+#define PLANE3_ON_US 800
 // TODO: make sure that the sum of all plane times is less than
 // FRAME_PERIOD_US - (some buffer for spi, scheduler, etc. overhead)
 #define FRAME_PERIOD_US 2000 // 500Hz refresh rate = 2000µs period total
@@ -24,7 +26,7 @@ static const char *TAG = "panel";
 // Each bitplane requires 32 bytes (256 LEDs / 8 bits per byte)
 #define BITPLANE_SIZE_BYTES ((PANEL_WIDTH * PANEL_HEIGHT) / 8)
 
-// Simplified LUT for OBEGRÄNSAD panel wiring
+// LUT for OBEGRÄNSAD panel wiring
 static const uint8_t lut[16][16] = {
     {23, 22, 21, 20, 19, 18, 17, 16, 7, 6, 5, 4, 3, 2, 1, 0},
     {24, 25, 26, 27, 28, 29, 30, 31, 8, 9, 10, 11, 12, 13, 14, 15},
@@ -69,7 +71,8 @@ static uint8_t g_bitplanes[BIT_DEPTH][BITPLANE_SIZE_BYTES];
 static volatile bool g_refresh_needed = false;
 
 // Timing in microseconds
-static const uint32_t plane_times_us[BIT_DEPTH] = {PLANE0_ON_US, PLANE1_ON_US};
+static const uint32_t plane_times_us[BIT_DEPTH] = {PLANE0_ON_US, PLANE1_ON_US,
+                                                   PLANE2_ON_US, PLANE3_ON_US};
 
 // Forward declarations
 static void refresh_timer_callback(void *arg);
@@ -88,7 +91,6 @@ static esp_err_t rmt_setup_oe_channel(void);
 static void rmt_send_oe_pulse(uint32_t duration_us);
 
 // Latch pulse: High->Low transition to capture shift register data into output
-// latches
 static inline void IRAM_ATTR latch_pulse(void) {
   GPIO.out_w1ts.val = (1 << g_config.latch_pin); // Set high
   GPIO.out_w1tc.val = (1 << g_config.latch_pin); // Set low
@@ -191,7 +193,7 @@ static void refresh_timer_callback(void *arg) {
 
   // Display each bitplane with precise RMT-controlled timing
   // This implements Bit Code Modulation (BCM) for brightness control
-  GPIO.out_w1ts.val = (1 << g_config.oe_pin); // Set OE high (LEDs off)
+  GPIO.out_w1ts.val = (1 << g_config.oe_pin); // LEDs off to avoid flickering!)
   display_bitplane(g_plane_idx);
   g_plane_idx = (g_plane_idx + 1) % BIT_DEPTH; // Increment plane index
 }
@@ -218,14 +220,19 @@ static void print_bitplane(uint8_t plane) {
 
 static void print_framebuffer(void) {
   ESP_LOGI(TAG, "Current framebuffer state:");
+
   for (int i = 0; i < PANEL_HEIGHT; i++) {
     // Build one formatted line per row
-    char line[4 * PANEL_WIDTH + 1] = {0}; // adjust size for your max row length
+    // the 3 is for 3 digits (max 255) + space and a final null terminator
+    char line[4 * PANEL_WIDTH + 1] = {0};
     int pos = 0;
     for (int j = 0; j < PANEL_WIDTH; j++) {
       pos +=
-          snprintf(line + pos, sizeof(line) - pos, "%2d ", g_framebuffer[i][j]);
+          snprintf(line + pos, sizeof(line) - pos, "%3d ", g_framebuffer[i][j]);
     }
+    // Ensure null-termination
+    line[sizeof(line) - 1] = '\0'; // Safety null-termination
+    // Log the formatted line
     ESP_LOGI(TAG, "%s", line);
   }
 }
@@ -301,7 +308,7 @@ static void rmt_send_oe_pulse(uint32_t duration_us) {
       .level0 = 0,              // OE active (low) - LEDs enabled
       .duration0 = duration_us, // Duration for this bitplane (BCM timing)
       .level1 = 1,              // OE inactive (high) - LEDs disabled
-      .duration1 = 10,          // Brief high period before next operation
+      .duration1 = 1,           // Brief high period before next operation
   };
 
   rmt_transmit_config_t tx_config = {
@@ -338,7 +345,6 @@ static void display_bitplane(uint8_t plane) {
     // Step 3: Enable LED output for precise duration using RMT
     // Shorter duration for LSB plane (fine brightness), longer for MSB plane
     // (coarse brightness)
-    // FIXME: only for debug!!! GPIO.out_w1tc.val = (1 << g_config.oe_pin);
     rmt_send_oe_pulse((plane_times_us[plane] * gBright) / 255);
   }
 }
@@ -357,11 +363,8 @@ static esp_err_t init_gpio_pins(void) {
   // Set pins as outputs
   GPIO.enable_w1ts.val = (1 << g_config.latch_pin) | (1 << g_config.oe_pin);
 
-  // Initialize GPIO states: latch low (idle), OE high (LEDs disabled - active
-  // low)
   GPIO.out_w1tc.val = (1 << g_config.latch_pin); // Latch low (idle state)
-  GPIO.out_w1ts.val =
-      (1 << g_config.oe_pin); // Set high (OE is active low) - output disabled
+  GPIO.out_w1ts.val = (1 << g_config.oe_pin);    // Set high (LEDs off)
 
   return ESP_OK;
 }

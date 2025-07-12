@@ -79,8 +79,8 @@ extern "C" void app_main() {
   while (true) {
     // advance_state_machine();
     // ESP_LOGI(TAG, "State machine advanced");
-    vTaskDelay(pdMS_TO_TICKS(1000)); // Delay for scheduler
-    panel_setPixel(pix / PANEL_WIDTH, pix % PANEL_WIDTH, Brightness(pix % 4));
+    vTaskDelay(pdMS_TO_TICKS(200)); // Delay for scheduler
+    panel_setPixel(pix / PANEL_WIDTH, pix % PANEL_WIDTH, Brightness(pix % 16));
     pix = (pix + 1) % (PANEL_WIDTH * PANEL_HEIGHT);
   }
 }
