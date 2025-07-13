@@ -6,6 +6,7 @@
 #include <freertos/projdefs.h>
 #include <iot_button.h>
 
+#include "clock.h"
 #include "device.h"
 #include "ikea-obegransad-panel.h"
 #include "weather.h"
@@ -66,6 +67,8 @@ extern "C" void app_main() {
 
   wifi_init();
 
+  clock_init("CET-1CEST,M3.5.0,M10.5.0/3");
+
   static panel_config_t panel_config = {
       .latch_pin = (gpio_num_t)3,
       .clk_pin = (gpio_num_t)4,
@@ -97,6 +100,17 @@ extern "C" void app_main() {
   // main loop
   while (true) {
     advance_state_machine();
-    vTaskDelay(pdMS_TO_TICKS(20)); // Delay for scheduler
+
+    // TEST TIME
+    struct tm timeinfo;
+    if (get_local_time(timeinfo)) {
+      char time_str[32];
+      strftime(time_str, sizeof(time_str), "%H:%M", &timeinfo);
+      ESP_LOGI(TAG, "Current time: %s", time_str);
+    } else {
+      ESP_LOGW(TAG, "Failed to get local time");
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(2000)); // Delay for scheduler
   }
 }
