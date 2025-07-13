@@ -37,9 +37,20 @@ dependencies:
     source:
       type: idf
     version: 5.4.2
+  joltwallet/littlefs:
+    component_hash: 8e12955f47e27e6070b76715a96d6c75fc2b44f069e8c33679332d9bdd3120c4
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.20.1
 direct_dependencies:
 - 78/esp-wifi-connect
 - espressif/button
-manifest_hash: a83346704496e4dfd95c6e18743dfdc03931da10151c7862ba262cb5ce1584e1
+- joltwallet/littlefs
+manifest_hash: 655761fbcd24e7107297083220dbfea3ae719fde2a966a3b3acd1b9584e947eb
 target: esp32c3
 version: 2.0.0

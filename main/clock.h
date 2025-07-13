@@ -1,23 +1,22 @@
+#include <time.h>
+
 // TODO: move to kconfig!
-#define MY_NTP_SERVER "pool.ntp.org"
+#define NTP_SERVER "pool.ntp.org"
 
-void time_syncNTP();
+void clock_init();
+bool get_local_time(struct tm &timeinfo);
+bool get_time_precise(struct timeval &tv);
+time_t get_unix_time(void);
 
-bool shouldTurnOff(struct tm const &time);
-time_t calcTurnOffDuration(struct tm time);
+// enum MoonPhase : uint8_t {
+//   NEW,
+//   WAXING_CRESCENT,
+//   FIRST_QUARTER,
+//   WAXING_GIBBOUS,
+//   FULL,
+//   WANING_GIBBOUS,
+//   LAST_QUARTER,
+//   WANING_CRESCENT,
+// };
 
-// gets local time (from RTC) and updates if needed
-struct tm time_get();
-
-enum MoonPhase : uint8_t {
-  NEW,
-  WAXING_CRESCENT,
-  FIRST_QUARTER,
-  WAXING_GIBBOUS,
-  FULL,
-  WANING_GIBBOUS,
-  LAST_QUARTER,
-  WANING_CRESCENT,
-};
-
-MoonPhase calcMoonPhase(struct tm const &time);
+// MoonPhase calcMoonPhase(struct tm const &time);
