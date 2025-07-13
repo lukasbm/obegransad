@@ -160,62 +160,6 @@ static esp_err_t request_weather_data(const char *url, char *response_data) {
   return ESP_OK;
 }
 
-// HTTP fallback function (insecure, for testing only)
-static esp_err_t request_weather_data_http(const char *url,
-                                           char *response_data) {
-  // Set up response structure for event handler
-  http_response_t response = {
-      .buffer = response_data, .capacity = MAX_HTTP_BUFFER, .length = 0};
-
-  esp_http_client_config_t cfg = {};
-  cfg.url = url;
-  cfg.timeout_ms = 10000; // Shorter timeout for HTTP
-  cfg.method = HTTP_METHOD_GET;
-  cfg.transport_type = HTTP_TRANSPORT_OVER_TCP; // HTTP instead of HTTPS
-  cfg.is_async = false;                         // Synchronous requests
-  cfg.event_handler = event_handler;            // Event handler for response
-  cfg.user_data = &response;                    // Pass our response structure
-  cfg.buffer_size = 1024;                       // Reduce buffer size
-  cfg.buffer_size_tx = 1024;                    // Reduce TX buffer size
-
-  // Initialize the HTTP client
-  esp_http_client_handle_t client = esp_http_client_init(&cfg);
-  if (!client) {
-    ESP_LOGE(TAG, "Failed to initialize HTTP client");
-    return ESP_ERR_NO_MEM;
-  }
-
-  // Perform the HTTP request
-  ESP_LOGI(TAG, "Starting HTTP request (insecure fallback)...");
-  esp_err_t err = esp_http_client_perform(client);
-  if (err != ESP_OK) {
-    ESP_LOGE(TAG, "HTTP request failed: %s (0x%x)", esp_err_to_name(err), err);
-    esp_http_client_cleanup(client);
-    return err;
-  }
-
-  // check status code
-  int status_code = esp_http_client_get_status_code(client);
-  ESP_LOGI(TAG, "HTTP response status: %d", status_code);
-  if (status_code < 200 || status_code >= 300) {
-    esp_http_client_cleanup(client);
-    ESP_LOGE(TAG, "HTTP request failed with status code: %d", status_code);
-    return ESP_ERR_INVALID_RESPONSE;
-  }
-
-  esp_http_client_cleanup(client);
-
-  // Check if we received any data
-  if (response.length <= 0) {
-    ESP_LOGE(TAG, "No data received from server");
-    return ESP_ERR_INVALID_RESPONSE;
-  }
-
-  ESP_LOGI(TAG, "Received %d bytes of weather data via HTTP", response.length);
-
-  return ESP_OK;
-}
-
 static esp_err_t parse_weather_data(char *json_body, WeatherData &out) {
   cJSON *root = cJSON_Parse(json_body);
   if (!root)
@@ -301,22 +245,12 @@ esp_err_t fetch_weather(float latitude, float longitude, WeatherData &data) {
   }
   memset(response_data, 0, MAX_HTTP_BUFFER + 1); // Initialize buffer
 
-  // 2. Try HTTPS first, fallback to HTTP if needed
+  // 2. make request
   esp_err_t ret = request_weather_data(url, response_data);
-
   if (ret != ESP_OK) {
-    ESP_LOGW(TAG, "HTTPS request failed, trying HTTP fallback...");
-
-    // Replace https:// with http:// for fallback
-    char http_url[512];
-    snprintf(http_url, sizeof(http_url), "http%s", url + 5); // Skip "https"
-
-    ret = request_weather_data_http(http_url, response_data);
-    if (ret != ESP_OK) {
-      free(response_data);
-      ESP_LOGE(TAG, "Both HTTPS and HTTP requests failed");
-      return ret;
-    }
+    free(response_data);
+    ESP_LOGE(TAG, "Failed to fetch weather data: %s", esp_err_to_name(ret));
+    return ret;
   }
 
   // 3. Parse JSON (will free the json body string)
