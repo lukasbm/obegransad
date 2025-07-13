@@ -8,8 +8,6 @@
 // TODO: move to kconfig!
 constexpr uint8_t FORECAST_DAYS = 7; // number of days to forecast
 
-static const char *TAG = "weather";
-
 // from: https://open-meteo.com/en/docs#weather_variable_documentation
 enum WeatherCode : uint8_t {
   WEATHER_CLEAR = 0,                            // sprite: clear sky
@@ -40,14 +38,14 @@ enum WeatherCode : uint8_t {
   WEATHER_SLIGHT_OR_MODERATE_THUNDERSTORM = 95, // sprite: lightning bolts
   WEATHER_THUNDERSTORM_WITH_LIGHT_HAIL = 96,    // sprite: lightning bolts
   WEATHER_THUNDERSTORM_WITH_HEAVY_HAIL = 99,    // sprite: lightning bolts
-  WEATHER_UNINITIALIZED = 255 // custom placeholder for uninitialized codes
+  WEATHER_INVALID = 255 // custom placeholder for uninitialized codes
 };
 
 struct WeatherData {
   time_t requestTime; // time when the weather data was fetched, unix time
   // current weather
   float temperature;
-  WeatherCode weatherCode = WEATHER_UNINITIALIZED; // default to uninitialized
+  WeatherCode weatherCode = WEATHER_INVALID; // default to uninitialized
   bool isDay;
   // daily weather
   struct {
@@ -60,23 +58,7 @@ struct WeatherData {
     WeatherCode weatherCode;
   } daily[FORECAST_DAYS]; // daily weather for the next days
 
-  void print() const {
-    ESP_LOGI(TAG,
-             "Weather Data: RequestTime: %u, temperature: %.2f, weatherCode: "
-             "%d, isDay: %d",
-             (unsigned int)requestTime, temperature, weatherCode, isDay);
-    for (int i = 0; i < FORECAST_DAYS; ++i) {
-      ESP_LOGI(
-          TAG,
-          "Day %d: sunrise: %u, sunset: %u, uvIndexMax: %.2f, temperatureMax: "
-          "%.2f, temperatureMin: %.2f, temperatureMean: %.2f, weatherCode: %d",
-          i + 1, (unsigned int)daily[i].sunrise, (unsigned int)daily[i].sunset,
-          daily[i].uvIndexMax, daily[i].temperatureMax, daily[i].temperatureMin,
-          daily[i].temperatureMean, daily[i].weatherCode);
-    }
-  }
-
-  bool uninitialized() const { return weatherCode == WEATHER_UNINITIALIZED; }
+  void print() const;
 };
 
 esp_err_t fetch_weather(float latitude, float longitude, WeatherData &data);

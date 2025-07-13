@@ -1,15 +1,32 @@
 #include "weather.h"
 
-#include "esp_check.h"
-#include "esp_err.h"
+#include <cJSON.h>
 #include <cstdio>
 #include <ctime>
+#include <esp_check.h>
 #include <esp_err.h>
-#include <string.h>
+
+static const char *TAG = "weather";
+
+void WeatherData::print() const {
+  ESP_LOGI(TAG,
+           "Weather Data: RequestTime: %u, temperature: %.2f, weatherCode: "
+           "%d, isDay: %d",
+           (unsigned int)requestTime, temperature, weatherCode, isDay);
+  for (int i = 0; i < FORECAST_DAYS; ++i) {
+    ESP_LOGI(
+        TAG,
+        "Day %d: sunrise: %u, sunset: %u, uvIndexMax: %.2f, temperatureMax: "
+        "%.2f, temperatureMin: %.2f, temperatureMean: %.2f, weatherCode: %d",
+        i + 1, (unsigned int)daily[i].sunrise, (unsigned int)daily[i].sunset,
+        daily[i].uvIndexMax, daily[i].temperatureMax, daily[i].temperatureMin,
+        daily[i].temperatureMean, daily[i].weatherCode);
+  }
+}
 
 // the caller needs to free the body (when successful)
 static esp_err_t request_weather_data(const char *url, char *&out_body) {
-  esp_http_client_config_t cfg = {0};
+  esp_http_client_config_t cfg;
   cfg.url = url;
   cfg.timeout_ms = 8000;
   cfg.method = HTTP_METHOD_GET;
@@ -69,23 +86,29 @@ static esp_err_t parse_weather_data(char *json_body, WeatherData &out) {
     return ESP_ERR_INVALID_RESPONSE;
 
   /* --- current weather --- */
-  cJSON *current_weather = cJSON_GetObjectItem(root, "current_weather");
+  cJSON *current_weather = cJSON_GetObjectItem(root, "current");
   if (!current_weather) {
     cJSON_Delete(root);
     return ESP_ERR_INVALID_RESPONSE;
   }
 
-  out.requestTime = time(NULL); // FIXME: local fetch time
-  out.temperature =
-      (float)cJSON_GetObjectItem(current_weather, "temperature")->valuedouble;
-  out.weatherCode =
-      (WeatherCode)cJSON_GetObjectItem(current_weather, "weathercode")
-          ->valueint;
-  out.isDay =
-      cJSON_GetObjectItem(current_weather, "is_day")->valueint ? true : false;
+  // FIXME: is this parsing for timestamps correct?
+  out.requestTime = static_cast<time_t>(
+      cJSON_GetObjectItem(current_weather, "time")->valueint);
+  out.temperature = static_cast<float>(
+      cJSON_GetObjectItem(current_weather, "temperature_2m")->valuedouble);
+  out.weatherCode = static_cast<WeatherCode>(
+      cJSON_GetObjectItem(current_weather, "weather_code")->valueint);
+  out.isDay = cJSON_GetObjectItem(current_weather, "is_day")->valueint == 1
+                  ? true
+                  : false;
 
   /* --- daily arrays --- */
   cJSON *daily_weather = cJSON_GetObjectItem(root, "daily");
+  if (!daily_weather) {
+    cJSON_Delete(root);
+    return ESP_ERR_INVALID_RESPONSE;
+  }
 
   cJSON *dates = cJSON_GetObjectItem(daily_weather, "time");
   cJSON *wx_codes = cJSON_GetObjectItem(daily_weather, "weather_code");
@@ -97,18 +120,20 @@ static esp_err_t parse_weather_data(char *json_body, WeatherData &out) {
   cJSON *sunset = cJSON_GetObjectItem(daily_weather, "sunset");
 
   for (int i = 0; i < FORECAST_DAYS && i < cJSON_GetArraySize(dates); ++i) {
-    out.daily[i].sunrise = time_t(cJSON_GetArrayItem(sunrise, i)->valuestring);
-    out.daily[i].sunset = time_t(cJSON_GetArrayItem(sunset, i)->valuestring);
+    out.daily[i].sunrise =
+        static_cast<time_t>(cJSON_GetArrayItem(sunrise, i)->valueint);
+    out.daily[i].sunset =
+        static_cast<time_t>(cJSON_GetArrayItem(sunset, i)->valueint);
     out.daily[i].uvIndexMax =
-        (float)cJSON_GetArrayItem(uvi_max, i)->valuedouble;
+        static_cast<float>(cJSON_GetArrayItem(uvi_max, i)->valuedouble);
     out.daily[i].temperatureMax =
-        (float)cJSON_GetArrayItem(t_max, i)->valuedouble;
+        static_cast<float>(cJSON_GetArrayItem(t_max, i)->valuedouble);
     out.daily[i].temperatureMin =
-        (float)cJSON_GetArrayItem(t_min, i)->valuedouble;
+        static_cast<float>(cJSON_GetArrayItem(t_min, i)->valuedouble);
     out.daily[i].temperatureMean =
-        (float)cJSON_GetArrayItem(t_mean, i)->valuedouble;
+        static_cast<float>(cJSON_GetArrayItem(t_mean, i)->valuedouble);
     out.daily[i].weatherCode =
-        (WeatherCode)cJSON_GetArrayItem(wx_codes, i)->valueint;
+        static_cast<WeatherCode>(cJSON_GetArrayItem(wx_codes, i)->valueint);
   }
 
   cJSON_Delete(root);

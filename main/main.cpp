@@ -8,6 +8,7 @@
 
 #include "device.h"
 #include "ikea-obegransad-panel.h"
+#include "weather.h"
 
 static const char *TAG = "main";
 
@@ -60,8 +61,10 @@ extern "C" void app_main() {
   ESP_LOGI(TAG, "Startup");
 
   device_init();
+
   button_init();
-  // wifi_init();
+
+  wifi_init();
 
   static panel_config_t panel_config = {
       .latch_pin = (gpio_num_t)3,
@@ -73,14 +76,25 @@ extern "C" void app_main() {
   };
   panel_init(&panel_config);
   panel_timer_start();
-  // set up some example image
+
+  // TEST PANEL
+  ESP_LOGI(TAG, "Testing panel display");
   panel_clear();
-  uint8_t pix = 0;
+  panel_setPixel(8, 8, PANEL_BRIGHTNESS_2);
+
+  // TEST WEATHER
+  ESP_LOGI(TAG, "Fetching weather data");
+  WeatherData weather_data;
+  esp_err_t ret = fetch_weather(49, 11, weather_data);
+  if (ret == ESP_OK) {
+    weather_data.print();
+  } else {
+    ESP_LOGE(TAG, "Failed to fetch weather: %s", esp_err_to_name(ret));
+  }
+
+  // main loop
   while (true) {
-    // advance_state_machine();
-    // ESP_LOGI(TAG, "State machine advanced");
-    vTaskDelay(pdMS_TO_TICKS(200)); // Delay for scheduler
-    panel_setPixel(pix / PANEL_WIDTH, pix % PANEL_WIDTH, Brightness(pix % 16));
-    pix = (pix + 1) % (PANEL_WIDTH * PANEL_HEIGHT);
+    advance_state_machine();
+    vTaskDelay(pdMS_TO_TICKS(20)); // Delay for scheduler
   }
 }
