@@ -5,26 +5,36 @@
 #include <cstdio>
 #include <ctime>
 #include <esp_check.h>
+#include <esp_crt_bundle.h>
 #include <esp_err.h>
 #include <esp_http_client.h>
-#include <esp_crt_bundle.h>
 
 #define MAX_HTTP_BUFFER 1024 * 5
 
 static const char *TAG = "weather";
 
-esp_err_t event_handler(esp_http_client_event_t *evt) {
-  static char *output_buffer; // Buffer to store response of http request from
-                              // event handler
-  static int output_len;      // Stores number of bytes read
-  switch (evt->event_id) {
+// Response buffer structure for chunked data handling
+typedef struct {
+  char *buffer;
+  int capacity;
+  int length;
+} http_response_t;
 
+esp_err_t event_handler(esp_http_client_event_t *evt) {
+  http_response_t *response = (http_response_t *)evt->user_data;
+
+  switch (evt->event_id) {
   case HTTP_EVENT_ERROR:
     ESP_LOGD(TAG, "HTTP_EVENT_ERROR");
     break;
 
   case HTTP_EVENT_ON_CONNECTED:
     ESP_LOGD(TAG, "HTTP_EVENT_ON_CONNECTED");
+    // Reset response buffer for new request
+    if (response && response->buffer) {
+      response->length = 0;
+      memset(response->buffer, 0, response->capacity);
+    }
     break;
 
   case HTTP_EVENT_HEADER_SENT:
@@ -38,58 +48,37 @@ esp_err_t event_handler(esp_http_client_event_t *evt) {
 
   case HTTP_EVENT_ON_DATA:
     ESP_LOGD(TAG, "HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
-    // Clean the buffer in case of a new request
-    if (output_len == 0 && evt->user_data) {
-      // we are just starting to copy the output data into the use
-      memset(evt->user_data, 0, MAX_HTTP_BUFFER);
-    }
-    /*
-     *  Check for chunked encoding is added as the URL for chunked encoding used
-     * in this example returns binary data. However, event handler can also be
-     * used in case chunked encoding is used.
-     */
-    if (!esp_http_client_is_chunked_response(evt->client)) {
-      // If user_data buffer is configured, copy the response into the buffer
-      int copy_len = 0;
-      if (evt->user_data) {
-        // The last byte in evt->user_data is kept for the NULL character in
-        // case of out-of-bound access.
-        copy_len = MIN(evt->data_len, (MAX_HTTP_BUFFER - output_len));
-        if (copy_len) {
-          memcpy(evt->user_data + output_len, evt->data, copy_len);
-        }
-      } else {
-        int content_len = esp_http_client_get_content_length(evt->client);
-        if (output_buffer == NULL) {
-          // We initialize output_buffer with 0 because it is used by strlen()
-          // and similar functions therefore should be null terminated.
-          output_buffer = (char *)calloc(content_len + 1, sizeof(char));
-          output_len = 0;
-          if (output_buffer == NULL) {
-            ESP_LOGE(TAG, "Failed to allocate memory for output buffer");
-            return ESP_FAIL;
-          }
-        }
-        copy_len = MIN(evt->data_len, (content_len - output_len));
-        if (copy_len) {
-          memcpy(output_buffer + output_len, evt->data, copy_len);
-        }
-      }
-      output_len += copy_len;
+
+    if (!response || !response->buffer) {
+      ESP_LOGE(TAG, "No response buffer provided");
+      return ESP_FAIL;
     }
 
+    // Check buffer capacity before copying
+    if (response->length + evt->data_len >= response->capacity) {
+      ESP_LOGE(TAG, "Response buffer overflow: %d + %d >= %d", response->length,
+               evt->data_len, response->capacity);
+      return ESP_FAIL;
+    }
+
+    // Copy chunk data to buffer
+    memcpy(response->buffer + response->length, evt->data, evt->data_len);
+    response->length += evt->data_len;
+
+    ESP_LOGD(TAG, "Received chunk: %d bytes, total: %d/%d", evt->data_len,
+             response->length, response->capacity);
     break;
 
   case HTTP_EVENT_ON_FINISH:
     ESP_LOGD(TAG, "HTTP_EVENT_ON_FINISH");
-    if (output_buffer != NULL) {
-      free(output_buffer);
-      output_buffer = NULL;
+    if (response && response->buffer && response->length > 0) {
+      // Null terminate the response
+      response->buffer[response->length] = '\0';
+      ESP_LOGI(TAG, "HTTP response complete: %d bytes", response->length);
     }
-    output_len = 0;
     break;
 
-  case HTTP_EVENT_DISCONNECTED: {
+  case HTTP_EVENT_DISCONNECTED:
     ESP_LOGI(TAG, "HTTP_EVENT_DISCONNECTED");
     int mbedtls_err = 0;
     esp_err_t err = esp_tls_get_and_clear_last_error(
@@ -98,31 +87,21 @@ esp_err_t event_handler(esp_http_client_event_t *evt) {
       ESP_LOGI(TAG, "Last esp error code: 0x%x", err);
       ESP_LOGI(TAG, "Last mbedtls failure: 0x%x", mbedtls_err);
     }
-    if (output_buffer != NULL) {
-      free(output_buffer);
-      output_buffer = NULL;
-    }
-    output_len = 0;
     break;
-  }
 
-  case HTTP_EVENT_REDIRECT: {
+  case HTTP_EVENT_REDIRECT:
     ESP_LOGD(TAG, "HTTP_EVENT_REDIRECT");
     esp_http_client_set_redirection(evt->client);
     break;
-  }
   }
   return ESP_OK;
 }
 
 // the caller needs to free the body (when successful)
-static esp_err_t request_weather_data(const char *url, char *&out_body) {
-  char *response_data = (char *)malloc(MAX_HTTP_BUFFER + 1);
-  if (!response_data) {
-    ESP_LOGE(TAG, "Failed to allocate memory for response data");
-    return ESP_ERR_NO_MEM;
-  }
-  memset(response_data, 0, MAX_HTTP_BUFFER + 1); // Initialize buffer
+static esp_err_t request_weather_data(const char *url, char *response_data) {
+  // Set up response structure for event handler
+  http_response_t response = {
+      .buffer = response_data, .capacity = MAX_HTTP_BUFFER, .length = 0};
 
   esp_http_client_config_t cfg = {};
   cfg.url = url;
@@ -134,7 +113,7 @@ static esp_err_t request_weather_data(const char *url, char *&out_body) {
   cfg.use_global_ca_store = false;   // Use bundle instead of global store
   cfg.is_async = false;              // Synchronous requests
   cfg.event_handler = event_handler; // Event handler for response
-  cfg.user_data = &response_data;    // Pass our response buffer
+  cfg.user_data = &response;         // Pass our response structure
 
   // Initialize the HTTP client
   esp_http_client_handle_t client = esp_http_client_init(&cfg);
@@ -161,13 +140,19 @@ static esp_err_t request_weather_data(const char *url, char *&out_body) {
 
   esp_http_client_cleanup(client);
 
-  out_body = response_data; // Pass the response data to the caller
+  // Check if we received any data
+  if (response.length <= 0) {
+    ESP_LOGE(TAG, "No data received from server");
+    return ESP_ERR_INVALID_RESPONSE;
+  }
+
+  ESP_LOGI(TAG, "Received %d bytes of weather data", response.length);
+
   return ESP_OK;
 }
 
 static esp_err_t parse_weather_data(char *json_body, WeatherData &out) {
   cJSON *root = cJSON_Parse(json_body);
-  free(json_body);
   if (!root)
     return ESP_ERR_INVALID_RESPONSE;
 
@@ -244,16 +229,28 @@ esp_err_t fetch_weather(float latitude, float longitude, WeatherData &data) {
 
   ESP_LOGI(TAG, "Fetching weather data from URL: %s", url);
 
+  char *response_data = (char *)malloc(MAX_HTTP_BUFFER + 1);
+  if (!response_data) {
+    ESP_LOGE(TAG, "Failed to allocate memory for response data");
+    return ESP_ERR_NO_MEM;
+  }
+  memset(response_data, 0, MAX_HTTP_BUFFER + 1); // Initialize buffer
+
   // 2. Make request
-  char *json_body = nullptr;
-  ESP_RETURN_ON_ERROR(request_weather_data(url, json_body), TAG,
-                      "Failed to fetch weather data");
+  if (request_weather_data(url, response_data) != ESP_OK) {
+    free(response_data);
+    ESP_LOGE(TAG, "Failed to fetch weather data");
+    return ESP_ERR_INVALID_RESPONSE;
+  }
 
   // 3. Parse JSON (will free the json body string)
-  ESP_RETURN_ON_ERROR(parse_weather_data(json_body, data), TAG,
-                      "Failed to parse weather data");
+  esp_err_t err = parse_weather_data(response_data, data);
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to parse weather data: %s", esp_err_to_name(err));
+  }
 
-  return ESP_OK;
+  free(response_data);
+  return err;
 }
 
 void WeatherData::print() const {
