@@ -2,3 +2,10 @@
 # Espressif IoT Development Framework (ESP-IDF) 5.4.2 Project Minimal Configuration
 #
 CONFIG_IDF_TARGET="esp32c3"
+
+# Enable certificate bundle for secure HTTPS requests
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=y
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_FULL=y
+
+# Enable HTTP client with HTTPS support
+CONFIG_ESP_HTTP_CLIENT_ENABLE_HTTPS=y

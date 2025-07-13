@@ -5,6 +5,12 @@
 #include <ctime>
 #include <esp_check.h>
 #include <esp_err.h>
+#include <esp_http_client.h>
+
+// Forward declaration for certificate bundle
+extern "C" {
+esp_err_t esp_crt_bundle_attach(void *conf);
+}
 
 static const char *TAG = "weather";
 
@@ -30,6 +36,11 @@ static esp_err_t request_weather_data(const char *url, char *&out_body) {
   cfg.url = url;
   cfg.timeout_ms = 8000;
   cfg.method = HTTP_METHOD_GET;
+  cfg.transport_type = HTTP_TRANSPORT_OVER_SSL;
+  cfg.crt_bundle_attach =
+      esp_crt_bundle_attach;       // Use ESP-IDF certificate bundle
+  cfg.use_global_ca_store = false; // Use bundle instead of global store
+  cfg.is_async = false;            // Synchronous requests
 
   esp_http_client_handle_t cli = esp_http_client_init(&cfg);
   if (!cli) {
@@ -46,6 +57,7 @@ static esp_err_t request_weather_data(const char *url, char *&out_body) {
 
   int len = esp_http_client_get_content_length(cli);
   if (len <= 0) {
+    ESP_LOGE(TAG, "Invalid content length: %d", len);
     esp_http_client_cleanup(cli);
     return ESP_ERR_INVALID_SIZE;
   }
@@ -159,6 +171,8 @@ esp_err_t fetch_weather(float latitude, float longitude, WeatherData &data) {
            "&timeformat=unixtime"
            "&forecast_days=%d",
            latitude, longitude, FORECAST_DAYS);
+
+  ESP_LOGI(TAG, "Fetching weather data from URL: %s", url);
 
   // 2. Make request
   char *json_body = nullptr;
