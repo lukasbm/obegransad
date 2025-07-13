@@ -1,4 +1,5 @@
 #include "weather.h"
+#include "esp_tls.h"
 
 #include <cJSON.h>
 #include <cstdio>
@@ -30,6 +31,71 @@ void WeatherData::print() const {
   }
 }
 
+static esp_err_t client_event_get_handler(esp_http_client_event_handle_t evt) {
+  static char *output_buffer; // Buffer to store response of http request from
+                              // event handler
+  static int output_len;      // Stores number of bytes read
+
+  switch (evt->event_id) {
+  case HTTP_EVENT_ON_DATA:
+    ESP_LOGD(TAG, "HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
+    /*
+     *  Check for chunked encoding is added as the URL for chunked encoding used
+     * in this example returns binary data. However, event handler can also be
+     * used in case chunked encoding is used.
+     */
+    if (!esp_http_client_is_chunked_response(evt->client)) {
+      // If user_data buffer is configured, copy the response into the buffer
+      if (evt->user_data) {
+        memcpy(evt->user_data + output_len, evt->data, evt->data_len);
+      } else {
+        if (output_buffer == NULL) {
+          output_buffer =
+              (char *)malloc(esp_http_client_get_content_length(evt->client));
+          output_len = 0;
+          if (output_buffer == NULL) {
+            ESP_LOGE(TAG, "Failed to allocate memory for output buffer");
+            return ESP_FAIL;
+          }
+        }
+        memcpy(output_buffer + output_len, evt->data, evt->data_len);
+      }
+      output_len += evt->data_len;
+    }
+
+    break;
+  case HTTP_EVENT_ON_FINISH:
+    ESP_LOGD(TAG, "HTTP_EVENT_ON_FINISH");
+    if (output_buffer != NULL) {
+      // Response is accumulated in output_buffer. Uncomment the below line to
+      // print the accumulated response ESP_LOG_BUFFER_HEX(TAG, output_buffer,
+      // output_len);
+      free(output_buffer);
+      output_buffer = NULL;
+    }
+    output_len = 0;
+    break;
+  case HTTP_EVENT_DISCONNECTED:
+    ESP_LOGI(TAG, "HTTP_EVENT_DISCONNECTED");
+    int mbedtls_err = 0;
+    esp_err_t err =
+        esp_tls_get_and_clear_last_error(evt->data, &mbedtls_err, NULL);
+    if (err != 0) {
+      ESP_LOGI(TAG, "Last esp error code: 0x%x", err);
+      ESP_LOGI(TAG, "Last mbedtls failure: 0x%x", mbedtls_err);
+    }
+    if (output_buffer != NULL) {
+      free(output_buffer);
+      output_buffer = NULL;
+    }
+    output_len = 0;
+    break;
+  default:
+    break;
+  }
+  return ESP_OK;
+}
+
 // the caller needs to free the body (when successful)
 static esp_err_t request_weather_data(const char *url, char *&out_body) {
   esp_http_client_config_t cfg = {};
@@ -42,54 +108,77 @@ static esp_err_t request_weather_data(const char *url, char *&out_body) {
   cfg.use_global_ca_store = false; // Use bundle instead of global store
   cfg.is_async = false;            // Synchronous requests
 
-  esp_http_client_handle_t cli = esp_http_client_init(&cfg);
-  if (!cli) {
+  esp_http_client_handle_t client = esp_http_client_init(&cfg);
+  if (!client) {
     ESP_LOGE(TAG, "Failed to initialize HTTP client");
     return ESP_ERR_NO_MEM;
   }
 
-  esp_err_t err = esp_http_client_perform(cli);
+  esp_err_t err = esp_http_client_perform(client);
   if (err != ESP_OK) {
     ESP_LOGE(TAG, "HTTP request failed: %s", esp_err_to_name(err));
-    esp_http_client_cleanup(cli);
+    esp_http_client_cleanup(client);
     return err;
   }
 
-  int len = esp_http_client_get_content_length(cli);
-  if (len <= 0) {
-    ESP_LOGE(TAG, "Invalid content length: %d", len);
-    esp_http_client_cleanup(cli);
-    return ESP_ERR_INVALID_SIZE;
-  }
-
-  int status_code = esp_http_client_get_status_code(cli);
+  int status_code = esp_http_client_get_status_code(client);
   if (status_code < 200 || status_code >= 300) {
-    esp_http_client_cleanup(cli);
+    esp_http_client_cleanup(client);
     ESP_LOGE(TAG, "HTTP request failed with status code: %d", status_code);
     return ESP_ERR_INVALID_RESPONSE;
   }
 
-  // Allocate memory for the response body
-  if (len > 1024 * 10) { // limit to 10KB
-    esp_http_client_cleanup(cli);
-    ESP_LOGE(TAG, "Response body too large: %d bytes", len);
-    return ESP_ERR_INVALID_SIZE;
-  }
-
-  char *json_body = (char *)malloc(len + 1);
+  // FIXME: broken from here on
+  // Read response data
+  const int max_response_size = 1024 * 10; // 10KB limit
+  char *json_body = (char *)malloc(max_response_size + 1);
   if (!json_body) {
     ESP_LOGE(TAG, "Failed to allocate memory for response body");
-    esp_http_client_cleanup(cli);
+    esp_http_client_cleanup(client);
     return ESP_ERR_NO_MEM;
   }
 
-  int r = esp_http_client_read(cli, json_body, len);
-  esp_http_client_cleanup(cli); // Cleanup the client after reading
-  if (r != len) {
-    free(json_body);
-    return ESP_FAIL;
+  int total_read = 0;
+  int data_read;
+
+  // Try to read all data at once first (common case after perform)
+  data_read =
+      esp_http_client_read_response(client, json_body, max_response_size);
+  if (data_read > 0) {
+    total_read = data_read;
+    ESP_LOGI(TAG, "Read %d bytes in single read", total_read);
+  } else {
+    // Fall back to chunked reading
+    ESP_LOGI(TAG, "Single read returned %d, trying chunked reading", data_read);
+    while (total_read < max_response_size) {
+      data_read = esp_http_client_read_response(client, json_body + total_read,
+                                                max_response_size - total_read);
+      ESP_LOGD(TAG, "Read %d bytes in this iteration, total: %d", data_read,
+               total_read);
+
+      if (data_read < 0) {
+        ESP_LOGE(TAG, "Error reading response data");
+        break;
+      }
+      if (data_read == 0) {
+        // No more data available
+        ESP_LOGI(TAG, "No more data to read, total read: %d bytes", total_read);
+        break;
+      }
+      total_read += data_read;
+    }
   }
-  json_body[len] = '\0';
+
+  esp_http_client_cleanup(client);
+
+  if (total_read <= 0) {
+    ESP_LOGE(TAG, "No data received from server");
+    free(json_body);
+    return ESP_ERR_INVALID_RESPONSE;
+  }
+
+  json_body[total_read] = '\0';
+  ESP_LOGI(TAG, "Received %d bytes of weather data", total_read);
 
   out_body = json_body; // Set the output body to the caller
   return ESP_OK;
