@@ -7,14 +7,9 @@
 #include <esp_check.h>
 #include <esp_err.h>
 #include <esp_http_client.h>
+#include <esp_crt_bundle.h>
 
 #define MAX_HTTP_BUFFER 1024 * 5
-
-// Forward declaration for certificate bundle
-// FIXME: can i remove this?
-extern "C" {
-esp_err_t esp_crt_bundle_attach(void *conf);
-}
 
 static const char *TAG = "weather";
 
@@ -84,6 +79,7 @@ esp_err_t event_handler(esp_http_client_event_t *evt) {
     }
 
     break;
+
   case HTTP_EVENT_ON_FINISH:
     ESP_LOGD(TAG, "HTTP_EVENT_ON_FINISH");
     if (output_buffer != NULL) {
@@ -92,6 +88,7 @@ esp_err_t event_handler(esp_http_client_event_t *evt) {
     }
     output_len = 0;
     break;
+
   case HTTP_EVENT_DISCONNECTED: {
     ESP_LOGI(TAG, "HTTP_EVENT_DISCONNECTED");
     int mbedtls_err = 0;
@@ -111,8 +108,6 @@ esp_err_t event_handler(esp_http_client_event_t *evt) {
 
   case HTTP_EVENT_REDIRECT: {
     ESP_LOGD(TAG, "HTTP_EVENT_REDIRECT");
-    esp_http_client_set_header(evt->client, "From", "user@example.com");
-    esp_http_client_set_header(evt->client, "Accept", "text/html");
     esp_http_client_set_redirection(evt->client);
     break;
   }
