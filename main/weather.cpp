@@ -26,17 +26,20 @@ void WeatherData::print() const {
 
 // the caller needs to free the body (when successful)
 static esp_err_t request_weather_data(const char *url, char *&out_body) {
-  esp_http_client_config_t cfg;
+  esp_http_client_config_t cfg = {};
   cfg.url = url;
   cfg.timeout_ms = 8000;
   cfg.method = HTTP_METHOD_GET;
 
   esp_http_client_handle_t cli = esp_http_client_init(&cfg);
-  if (!cli)
+  if (!cli) {
+    ESP_LOGE(TAG, "Failed to initialize HTTP client");
     return ESP_ERR_NO_MEM;
+  }
 
   esp_err_t err = esp_http_client_perform(cli);
   if (err != ESP_OK) {
+    ESP_LOGE(TAG, "HTTP request failed: %s", esp_err_to_name(err));
     esp_http_client_cleanup(cli);
     return err;
   }
@@ -63,6 +66,7 @@ static esp_err_t request_weather_data(const char *url, char *&out_body) {
 
   char *json_body = (char *)malloc(len + 1);
   if (!json_body) {
+    ESP_LOGE(TAG, "Failed to allocate memory for response body");
     esp_http_client_cleanup(cli);
     return ESP_ERR_NO_MEM;
   }
@@ -161,7 +165,7 @@ esp_err_t fetch_weather(float latitude, float longitude, WeatherData &data) {
   ESP_RETURN_ON_ERROR(request_weather_data(url, json_body), TAG,
                       "Failed to fetch weather data");
 
-  // 3. Parse JSON
+  // 3. Parse JSON (will free the json body string)
   ESP_RETURN_ON_ERROR(parse_weather_data(json_body, data), TAG,
                       "Failed to parse weather data");
 

@@ -77,6 +77,8 @@ extern "C" void app_main() {
   panel_init(&panel_config);
   panel_timer_start();
 
+  vTaskDelay(pdMS_TO_TICKS(15000)); // init delay!! FIXME: remove
+
   // TEST PANEL
   ESP_LOGI(TAG, "Testing panel display");
   panel_clear();
