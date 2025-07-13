@@ -3,6 +3,7 @@
 #include <string>
 
 // trying to use the names consistent between this struct and json
+// TODO: in the future consider a modular approach where each scene or other plugin can add its own settings.
 struct Settings {
   uint8_t brightness_day, brightness_night;
   uint32_t off_hours; // bit mask of 24 bits, each bit represents an hour of the

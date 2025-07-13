@@ -1,9 +1,10 @@
+#include "esp_err.h"
 #include <driver/gpio.h>
 
 constexpr gpio_num_t BUTTON_PIN = GPIO_NUM_20;
 
 // basic device initialization (NVS, event loop)
-void device_init();
+esp_err_t device_init();
 
 // start captive portal if needed, otherwise connect to Wi-Fi
 void wifi_init();

@@ -1,4 +1,5 @@
 #include "server.h"
+
 #include "esp_http_server.h"
 #include "esp_log.h"
 #include <sys/stat.h>
@@ -115,12 +116,18 @@ static const httpd_uri_t panel_get = {.uri = "/panel",
                                       .method = HTTP_GET,
                                       .handler = panel_get_handler,
                                       .user_ctx = NULL};
+static const httpd_uri_t root_get = {.uri = "/",
+                                     .method = HTTP_GET,
+                                     .handler = root_get_handler,
+                                     .user_ctx = NULL}; // Root handler
 
 ///////////////
 //// Other Stuff
 ////////////////
 
-httpd_handle_t start_webserver() {
+httpd_handle_t g_server;
+
+static httpd_handle_t init_webserver() {
   httpd_handle_t server = NULL;
   httpd_config_t config = HTTPD_DEFAULT_CONFIG();
 
@@ -134,5 +141,15 @@ httpd_handle_t start_webserver() {
 }
 
 static void register_routes(httpd_handle_t &server) {
+  httpd_register_uri_handler(server, &root_get); // Register root handler
   httpd_register_uri_handler(server, &settings_get);
+  httpd_register_uri_handler(server, &settings_post);
+  httpd_register_uri_handler(server, &settings_delete);
+  httpd_register_uri_handler(server, &scene_post);
+  httpd_register_uri_handler(server, &panel_post);
+  httpd_register_uri_handler(server, &panel_get);
 }
+
+void start_webserver() { g_server = init_webserver(); }
+
+void stop_webserver() { httpd_stop(g_server); }

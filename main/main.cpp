@@ -9,6 +9,7 @@
 #include "clock.h"
 #include "device.h"
 #include "ikea-obegransad-panel.h"
+#include "nvs_flash.h"
 #include "weather.h"
 
 static const char *TAG = "main";
@@ -61,12 +62,12 @@ void advance_state_machine() {
 extern "C" void app_main() {
   ESP_LOGI(TAG, "Startup");
 
-  device_init();
-
+  ESP_ERROR_CHECK(nvs_flash_init());
+  ESP_ERROR_CHECK(esp_netif_init());
+  ESP_ERROR_CHECK(esp_event_loop_create_default());
+  ESP_ERROR_CHECK(device_init());
   button_init();
-
   wifi_init();
-
   clock_init("CET-1CEST,M3.5.0,M10.5.0/3");
 
   static panel_config_t panel_config = {

@@ -1,6 +1,7 @@
 #include "device.h"
 
 // ESP-IDF core dependencies
+#include "esp_check.h"
 #include "esp_err.h"   // for esp_err_t and ESP_ERROR_CHECK
 #include "esp_event.h" // for esp_event_loop_create_default()
 #include "nvs_flash.h" // for nvs_flash_init()
@@ -11,18 +12,22 @@
 #include "wifi_configuration_ap.h" // WifiConfigurationAp::GetInstance()
 #include "wifi_station.h"          // WifiStation::GetInstance()
 
-void device_init() {
+static const char *TAG = "device";
+
+esp_err_t device_init() {
   // Initialize the default event loop
-  ESP_ERROR_CHECK(esp_event_loop_create_default());
+  ESP_RETURN_ON_ERROR(esp_event_loop_create_default(), TAG,
+                      "Failed to create default event loop");
 
   // Initialize NVS flash for Wi-Fi configuration
   esp_err_t ret = nvs_flash_init();
   if (ret == ESP_ERR_NVS_NO_FREE_PAGES ||
       ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-    ESP_ERROR_CHECK(nvs_flash_erase());
+    ESP_RETURN_ON_ERROR(nvs_flash_erase(), TAG,
+                        "Failed to erase NVS flash, retrying init");
     ret = nvs_flash_init();
   }
-  ESP_ERROR_CHECK(ret);
+  ESP_RETURN_ON_ERROR(ret, TAG, "Failed to initialize NVS flash");
 }
 
 void wifi_clear_credentials() {
