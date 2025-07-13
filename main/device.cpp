@@ -15,11 +15,14 @@
 static const char *TAG = "device";
 
 esp_err_t device_init() {
-  // Initialize the default event loop
+  // network stack
+  ESP_RETURN_ON_ERROR(esp_netif_init(), TAG, "Failed to initialize netif");
+
+  // default event loop needed for wifi
   ESP_RETURN_ON_ERROR(esp_event_loop_create_default(), TAG,
                       "Failed to create default event loop");
 
-  // Initialize NVS flash for Wi-Fi configuration
+  // Initialize NVS flash (e.g. to store wifi creds)
   esp_err_t ret = nvs_flash_init();
   if (ret == ESP_ERR_NVS_NO_FREE_PAGES ||
       ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -28,6 +31,8 @@ esp_err_t device_init() {
     ret = nvs_flash_init();
   }
   ESP_RETURN_ON_ERROR(ret, TAG, "Failed to initialize NVS flash");
+
+  return ESP_OK;
 }
 
 void wifi_clear_credentials() {
