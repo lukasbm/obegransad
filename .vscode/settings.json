@@ -27,6 +27,7 @@
   },
   "cSpell.words": [
     "gptimer",
+    "littlefs",
     "SRCS"
   ],
   "clangd.path": "/home/lukas/.espressif/tools/esp-clang/esp-18.1.2_20240912/esp-clang/bin/clangd",

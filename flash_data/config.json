@@ -1,0 +1,13 @@
+{
+  "device_name": "Obegransad Weather Display",
+  "timezone": "CET-1CEST,M3.5.0,M10.5.0/3",
+  "weather": {
+    "latitude": 49.0,
+    "longitude": 11.0,
+    "update_interval_minutes": 30
+  },
+  "display": {
+    "brightness": 2,
+    "auto_brightness": true
+  }
+}
