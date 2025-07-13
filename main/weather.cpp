@@ -23,19 +23,24 @@ esp_err_t event_handler(esp_http_client_event_t *evt) {
                               // event handler
   static int output_len;      // Stores number of bytes read
   switch (evt->event_id) {
+
   case HTTP_EVENT_ERROR:
     ESP_LOGD(TAG, "HTTP_EVENT_ERROR");
     break;
+
   case HTTP_EVENT_ON_CONNECTED:
     ESP_LOGD(TAG, "HTTP_EVENT_ON_CONNECTED");
     break;
+
   case HTTP_EVENT_HEADER_SENT:
     ESP_LOGD(TAG, "HTTP_EVENT_HEADER_SENT");
     break;
+
   case HTTP_EVENT_ON_HEADER:
     ESP_LOGD(TAG, "HTTP_EVENT_ON_HEADER, key=%s, value=%s", evt->header_key,
              evt->header_value);
     break;
+
   case HTTP_EVENT_ON_DATA:
     ESP_LOGD(TAG, "HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
     // Clean the buffer in case of a new request
