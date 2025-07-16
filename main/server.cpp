@@ -118,6 +118,22 @@ static esp_err_t settings_post_handler(httpd_req_t *req) {
   return ESP_OK;
 }
 
+static esp_err_t sleep_start_handler(httpd_req_t *req) {
+  // Handle POST request to start sleep mode
+  ESP_LOGI(TAG, "Starting light sleep mode");
+
+  // Set up light sleep (e.g., enable wakeup sources)
+  // esp_sleep_enable_ext0_wakeup(GPIO_NUM_0, 1); // Example for GPIO wakeup
+
+  // TODO: Enter light sleep
+  // esp_light_sleep_start();
+
+  const char *response = "{\"status\":\"ok\"}";
+  httpd_resp_set_type(req, "application/json");
+  httpd_resp_send(req, response, strlen(response));
+  return ESP_OK;
+}
+
 static esp_err_t settings_delete_handler(httpd_req_t *req) {
   // Handle DELETE request for settings
   // Here you would typically reset settings to defaults
@@ -210,6 +226,10 @@ static const httpd_uri_t root_get = {.uri = "/",
                                      .method = HTTP_GET,
                                      .handler = root_get_handler,
                                      .user_ctx = NULL}; // Root handler
+static const httpd_uri_t sleep_post = {.uri = "/sleep",
+                                       .method = HTTP_POST,
+                                       .handler = sleep_start_handler,
+                                       .user_ctx = NULL};
 
 ///////////////
 //// Actual Server Setup

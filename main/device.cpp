@@ -2,9 +2,9 @@
 
 // ESP-IDF core dependencies
 #include "esp_check.h"
-#include "esp_err.h"   // for esp_err_t and ESP_ERROR_CHECK
-#include "esp_event.h" // for esp_event_loop_create_default()
-#include "nvs_flash.h" // for nvs_flash_init()
+#include "esp_err.h"
+#include "esp_event.h"
+#include "nvs_flash.h"
 #include <esp_log.h>
 #include <esp_sleep.h>
 #include <esp_system.h>
@@ -24,10 +24,11 @@ esp_err_t device_init() {
   ESP_RETURN_ON_ERROR(esp_event_loop_create_default(), TAG,
                       "Failed to create default event loop");
 
-  // Initialize NVS flash (e.g. to store wifi creds)
+  // Initialize NVS flash (e.g. to store wifi creds and config)
   esp_err_t ret = nvs_flash_init();
   if (ret == ESP_ERR_NVS_NO_FREE_PAGES ||
       ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+    // NVS partition was truncated and needs to be erased
     ESP_RETURN_ON_ERROR(nvs_flash_erase(), TAG,
                         "Failed to erase NVS flash, retrying init");
     ret = nvs_flash_init();
