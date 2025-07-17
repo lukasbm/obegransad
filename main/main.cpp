@@ -9,6 +9,7 @@
 #include "clock.h"
 #include "device.h"
 #include "ikea-obegransad-panel.h"
+#include "server.h"
 #include "weather.h"
 
 static const char *TAG = "main";
@@ -77,22 +78,31 @@ extern "C" void app_main() {
   panel_init(&panel_config);
   panel_timer_start();
 
-  vTaskDelay(pdMS_TO_TICKS(15000)); // init delay!! FIXME: remove
-
   // TEST PANEL
   ESP_LOGI(TAG, "Testing panel display");
   panel_clear();
   panel_setPixel(8, 8, PANEL_BRIGHTNESS_2);
 
-  // TEST WEATHER
-  ESP_LOGI(TAG, "Fetching weather data");
-  WeatherData weather_data;
-  esp_err_t ret = fetch_weather(49, 11, weather_data);
-  if (ret == ESP_OK) {
-    weather_data.print();
+  vTaskDelay(pdMS_TO_TICKS(15000)); // init delay!! FIXME: remove
+
+  // START SERVER
+  esp_err_t ret = start_webserver();
+  if (ret != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to start web server: %s", esp_err_to_name(ret));
+    return;
   } else {
-    ESP_LOGE(TAG, "Failed to fetch weather: %s", esp_err_to_name(ret));
+    ESP_LOGI(TAG, "Web server started successfully");
   }
+
+  // TEST WEATHER
+  // ESP_LOGI(TAG, "Fetching weather data");
+  // WeatherData weather_data;
+  // ret = fetch_weather(49, 11, weather_data);
+  // if (ret == ESP_OK) {
+  //   weather_data.print();
+  // } else {
+  //   ESP_LOGE(TAG, "Failed to fetch weather: %s", esp_err_to_name(ret));
+  // }
 
   // main loop
   while (true) {

@@ -28,7 +28,7 @@ functions of standard C api (POSIX)):
   adjustments)
 */
 
-const char *TAG = "clock";
+static const char *TAG = "clock";
 
 constexpr time_t MIN_VALID_TIME = 1577836800; // 2020-01-01 00:00:00 UTC
 

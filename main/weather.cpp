@@ -172,7 +172,8 @@ static esp_err_t parse_weather_data(char *json_body, WeatherData &out) {
     return ESP_ERR_INVALID_RESPONSE;
   }
 
-  // FIXME: is this parsing for timestamps correct?
+  // TODO: need to validate 
+
   out.requestTime = static_cast<time_t>(
       cJSON_GetObjectItem(current_weather, "time")->valueint);
   out.temperature = static_cast<float>(

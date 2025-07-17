@@ -3,5 +3,5 @@ idf_component_register(
     INCLUDE_DIRS "."
     REQUIRES esp_http_client esp_http_server json button esp-wifi-connect ikea-obegransad-panel
     PRIV_REQUIRES esp-tls mbedtls nvs_flash
-    EMBED_FILES ""
+    # EMBED_FILES ""
 )
