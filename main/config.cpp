@@ -9,7 +9,7 @@
 #include <sys/stat.h>
 
 static const char *NVS_NAMESPACE = "obegransad"; // NVS namespace
-static const char *TAG = "NvsSettings";
+static const char *TAG = "settings";
 
 /*
 integer types: uint8_t, int8_t, uint16_t, int16_t, uint32_t, int32_t, uint64_t,
@@ -68,8 +68,9 @@ esp_err_t nvs_write_settings(const Settings &config) {
 // serialize settings struct into json string using cJson
 // Caller has to free output buffer after use
 esp_err_t serialize_settings_json(char *output, const Settings &settings) {
-  if (output == nullptr && output != nullptr) {
-    // this just needs to be here to avoid a warning
+  if (output != nullptr) {
+    ESP_LOGE(TAG, "Output buffer should be null");
+    return ESP_ERR_INVALID_ARG;
   }
 
   cJSON *root = cJSON_CreateObject();

@@ -274,6 +274,7 @@ esp_err_t start_webserver() {
     ESP_LOGI(TAG, "Web server already running");
     return ESP_OK; // Server already started
   }
+  
   httpd_handle_t server;
   httpd_config_t config = HTTPD_DEFAULT_CONFIG();
   ESP_RETURN_ON_ERROR(httpd_start(&server, &config), TAG,

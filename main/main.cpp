@@ -7,6 +7,7 @@
 #include <iot_button.h>
 
 #include "clock.h"
+#include "config.h"
 #include "device.h"
 #include "ikea-obegransad-panel.h"
 #include "server.h"
@@ -65,7 +66,7 @@ extern "C" void app_main() {
   ESP_ERROR_CHECK(device_init());
   button_init();
   wifi_init();
-  clock_init("CET-1CEST,M3.5.0,M10.5.0/3");
+  clock_init("CET-1CEST,M3.5.0,M10.5.0/3"); // FIXME: get from config!
 
   static panel_config_t panel_config = {
       .latch_pin = (gpio_num_t)3,
@@ -83,16 +84,52 @@ extern "C" void app_main() {
   panel_clear();
   panel_setPixel(8, 8, PANEL_BRIGHTNESS_2);
 
-  vTaskDelay(pdMS_TO_TICKS(15000)); // init delay!! FIXME: remove
+  // TEST CONFIG (serialize and parse)
+  Settings settings_full = {
+      .brightness_day = 100,
+      .brightness_night = 50,
+      .off_hours = 0b00000000000000000000001111111111, // Off during night
+      .weather_latitude = 49.0,
+      .weather_longitude = 11.0,
+      .timezone = "CET-1CEST,M3.5.0,M10.5.0/3",
+      .anniversary_day = 14,
+      .anniversary_month = 2};
+  Settings settings_empty = {};
+
+  char *serialized = nullptr;
+
+  // test serialize settings to JSON
+  ESP_LOGI(TAG, "Serializing settings");
+  serialize_settings_json(serialized, settings_full);
+  if (serialized == nullptr) {
+    ESP_LOGE(TAG, "Failed to serialize settings");
+    return;
+  }
+  ESP_LOGI(TAG, "Serialized settings: %s", serialized);
+  free(serialized);     // Free the serialized string after use
+  serialized = nullptr; // Reset pointer to avoid dangling pointer
+
+  // test serialize empty settings to JSON
+  serialize_settings_json(serialized, settings_empty);
+  if (serialized == nullptr) {
+    ESP_LOGE(TAG, "Failed to serialize empty settings");
+    return;
+  }
+  ESP_LOGI(TAG, "Serialized empty settings: %s", serialized);
+  free(serialized);
+
+  // TODO: test read settings from NVS
+
+  // vTaskDelay(pdMS_TO_TICKS(15000)); // init delay!! FIXME: remove
 
   // START SERVER
-  esp_err_t ret = start_webserver();
-  if (ret != ESP_OK) {
-    ESP_LOGE(TAG, "Failed to start web server: %s", esp_err_to_name(ret));
-    return;
-  } else {
-    ESP_LOGI(TAG, "Web server started successfully");
-  }
+  // esp_err_t ret = start_webserver();
+  // if (ret != ESP_OK) {
+  //   ESP_LOGE(TAG, "Failed to start web server: %s",
+  //   esp_err_to_name(ret)); return;
+  // } else {
+  //   ESP_LOGI(TAG, "Web server started successfully");
+  // }
 
   // TEST WEATHER
   // ESP_LOGI(TAG, "Fetching weather data");
