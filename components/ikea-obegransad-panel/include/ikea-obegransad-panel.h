@@ -32,9 +32,9 @@ typedef struct {
 
 esp_err_t panel_init(const panel_config_t *config);
 
-void panel_timer_start(void);
+esp_err_t panel_timer_start(void);
 
-void panel_timer_stop(void);
+esp_err_t panel_timer_stop(void);
 
 void panel_setPixel(uint8_t row, uint8_t col, Brightness brightness);
 

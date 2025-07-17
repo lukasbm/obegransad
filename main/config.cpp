@@ -25,6 +25,7 @@ https://www.reddit.com/r/esp32/comments/vjv87u/can_i_prevent_espidf_from_updatin
 esp_err_t nvs_read_settings(Settings &config) {
   nvs_handle_t nvs_handle;
 
+  // namespace is create if it does not exist
   ESP_RETURN_ON_ERROR(nvs_open(NVS_NAMESPACE, NVS_READONLY, &nvs_handle), TAG,
                       "Could not open NVS handle");
 
@@ -67,8 +68,8 @@ esp_err_t nvs_write_settings(const Settings &config) {
 
 // Serializes the settings struct into a JSON string using cJSON.
 // The caller must provide a pre-allocated output buffer with sufficient size.
-// The function copies the JSON string into the output buffer and ensures null termination.
-// Returns ESP_OK on success, or an error code on failure.
+// The function copies the JSON string into the output buffer and ensures null
+// termination. Returns ESP_OK on success, or an error code on failure.
 esp_err_t serialize_settings_json(char *output, const Settings &settings) {
   if (output == nullptr) {
     ESP_LOGE(TAG, "Output buffer is null");

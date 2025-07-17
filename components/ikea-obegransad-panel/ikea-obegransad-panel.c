@@ -121,15 +121,15 @@ esp_err_t panel_init(const panel_config_t *config) {
  * @brief Start the ESP timer for 500Hz display refresh
  * Must be called after panel_init() to begin automatic display updates
  */
-void panel_timer_start(void) {
-  esp_timer_start_periodic(g_refresh_timer, FRAME_PERIOD_US);
+esp_err_t panel_timer_start(void) {
+  return esp_timer_start_periodic(g_refresh_timer, FRAME_PERIOD_US);
 }
 
 /**
  * @brief Stop the ESP timer to halt display refresh
  * LEDs will remain in their current state until timer is restarted
  */
-void panel_timer_stop(void) { esp_timer_stop(g_refresh_timer); }
+esp_err_t panel_timer_stop(void) { return esp_timer_stop(g_refresh_timer); }
 
 /**
  * @brief Set individual pixel brightness using logical coordinates

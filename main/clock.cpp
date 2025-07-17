@@ -32,7 +32,7 @@ static const char *TAG = "clock";
 
 constexpr time_t MIN_VALID_TIME = 1577836800; // 2020-01-01 00:00:00 UTC
 
-void clock_init(const char *tz) {
+esp_err_t clock_init(const char *tz) {
   // for timezones see
   // Explanation
   // https://www.gnu.org/software/libc/manual/html_node/TZ-Variable.html Db:
@@ -50,11 +50,12 @@ void clock_init(const char *tz) {
   esp_err_t ret = esp_netif_sntp_init(&config);
   if (ret != ESP_OK) {
     ESP_LOGE(TAG, "Failed to initialize SNTP: %s", esp_err_to_name(ret));
-    return;
+    return ret;
+  } else {
+    // Wait for initial sync with timeout
+    clock_force_sync();
+    return ESP_OK;
   }
-
-  // Wait for initial sync with timeout
-  clock_force_sync();
 }
 
 // TODO: implement!
@@ -64,7 +65,6 @@ void clock_init(const char *tz) {
 //     if (now < 1577836800) {  // 2020-01-01 00:00:00 UTC
 //         return false;
 //     }
-
 //     // Check if sync is too old (more than 24 hours)
 //     int64_t now_us = esp_timer_get_time();
 //     if (last_sync_time > 0 && (now_us - last_sync_time) > (24 * 3600 *
@@ -72,7 +72,6 @@ void clock_init(const char *tz) {
 //         ESP_LOGW(TAG, "Time sync is stale (>24h old)");
 //         return false;
 //     }
-
 //     return true;
 // }
 
@@ -82,10 +81,8 @@ void clock_force_sync() {
     ESP_LOGD(TAG, "Sync already in progress, skipping");
     return;
   }
-
   time_sync_in_progress = true;
   ESP_LOGI(TAG, "Forcing immediate NTP sync");
-
   esp_err_t ret = esp_netif_sntp_sync_wait(pdMS_TO_TICKS(5000));
   if (ret == ESP_OK) {
     ESP_LOGI(TAG, "Force sync successful");
