@@ -25,13 +25,17 @@ https://www.reddit.com/r/esp32/comments/vjv87u/can_i_prevent_espidf_from_updatin
 esp_err_t nvs_read_settings(Settings &config) {
   nvs_handle_t nvs_handle;
 
-  // namespace is create if it does not exist
-  ESP_RETURN_ON_ERROR(nvs_open(NVS_NAMESPACE, NVS_READONLY, &nvs_handle), TAG,
-                      "Could not open NVS handle");
+  // namespace is create if it does not exist (hence R/W mode!)
+  esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "Could not open NVS handle for reading: %s",
+             esp_err_to_name(err));
+    return err;
+  }
 
   Settings out = {};
   size_t required_size = sizeof(out);
-  esp_err_t err = nvs_get_blob(nvs_handle, "settings", &out, &required_size);
+  err = nvs_get_blob(nvs_handle, "settings", &out, &required_size);
   if (err == ESP_ERR_NVS_NOT_FOUND) {
     ESP_LOGW(TAG, "Settings not found, using default values");
     // If settings are not found, we can initialize with default values
@@ -43,6 +47,7 @@ esp_err_t nvs_read_settings(Settings &config) {
     snprintf(out.timezone, sizeof(out.timezone), "UTC"); // Default timezone
     out.anniversary_day = 1;   // Default anniversary day
     out.anniversary_month = 1; // Default anniversary month
+    err = ESP_OK;
   }
   nvs_close(nvs_handle);
   config = out;
