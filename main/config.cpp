@@ -65,11 +65,13 @@ esp_err_t nvs_write_settings(const Settings &config) {
   return ESP_OK;
 }
 
-// serialize settings struct into json string using cJson
-// Caller has to free output buffer after use
+// Serializes the settings struct into a JSON string using cJSON.
+// The caller must provide a pre-allocated output buffer with sufficient size.
+// The function copies the JSON string into the output buffer and ensures null termination.
+// Returns ESP_OK on success, or an error code on failure.
 esp_err_t serialize_settings_json(char *output, const Settings &settings) {
-  if (output != nullptr) {
-    ESP_LOGE(TAG, "Output buffer should be null");
+  if (output == nullptr) {
+    ESP_LOGE(TAG, "Output buffer is null");
     return ESP_ERR_INVALID_ARG;
   }
 
@@ -78,7 +80,6 @@ esp_err_t serialize_settings_json(char *output, const Settings &settings) {
     ESP_LOGE(TAG, "Failed to create JSON object");
     return ESP_ERR_NO_MEM;
   }
-
   // brightness day
   if (!cJSON_AddNumberToObject(root, "brightness_day",
                                settings.brightness_day)) {
@@ -86,7 +87,6 @@ esp_err_t serialize_settings_json(char *output, const Settings &settings) {
     cJSON_Delete(root);
     return ESP_ERR_NO_MEM;
   }
-
   // brightness night
   if (!cJSON_AddNumberToObject(root, "brightness_night",
                                settings.brightness_night)) {
@@ -94,7 +94,6 @@ esp_err_t serialize_settings_json(char *output, const Settings &settings) {
     cJSON_Delete(root);
     return ESP_ERR_NO_MEM;
   }
-
   // off hours
   cJSON *off_hours_array = cJSON_CreateArray();
   if (!off_hours_array) {
@@ -117,7 +116,6 @@ esp_err_t serialize_settings_json(char *output, const Settings &settings) {
     cJSON_Delete(root);
     return ESP_ERR_NO_MEM;
   }
-
   // weather latitude
   if (!cJSON_AddNumberToObject(root, "weather_latitude",
                                settings.weather_latitude)) {
@@ -125,7 +123,6 @@ esp_err_t serialize_settings_json(char *output, const Settings &settings) {
     cJSON_Delete(root);
     return ESP_ERR_NO_MEM;
   }
-
   // weather longitude
   if (!cJSON_AddNumberToObject(root, "weather_longitude",
                                settings.weather_longitude)) {
@@ -133,17 +130,14 @@ esp_err_t serialize_settings_json(char *output, const Settings &settings) {
     cJSON_Delete(root);
     return ESP_ERR_NO_MEM;
   }
-
   // timezone
   if (!cJSON_AddStringToObject(root, "timezone", settings.timezone)) {
     ESP_LOGE(TAG, "Failed to add 'timezone' to JSON");
     cJSON_Delete(root);
     return ESP_ERR_NO_MEM;
   }
-
   // anniversary day
   cJSON_AddNumberToObject(root, "anniversary_day", settings.anniversary_day);
-
   // anniversary month
   cJSON_AddNumberToObject(root, "anniversary_month",
                           settings.anniversary_month);
@@ -154,6 +148,13 @@ esp_err_t serialize_settings_json(char *output, const Settings &settings) {
     cJSON_Delete(root);
     return ESP_ERR_NO_MEM;
   }
+
+  // Copy the JSON string to the output buffer, including null terminator
+  size_t json_len = strlen(json_string);
+  strncpy(output, json_string, json_len + 1); // include null terminator
+
+  cJSON_free(json_string);
+  cJSON_Delete(root);
 
   return ESP_OK;
 }

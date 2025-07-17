@@ -96,27 +96,24 @@ extern "C" void app_main() {
       .anniversary_month = 2};
   Settings settings_empty = {};
 
-  char *serialized = nullptr;
-
   // test serialize settings to JSON
   ESP_LOGI(TAG, "Serializing settings");
-  serialize_settings_json(serialized, settings_full);
-  if (serialized == nullptr) {
-    ESP_LOGE(TAG, "Failed to serialize settings");
+  char serialized[1000]; // Pre-allocated buffer for serialized JSON
+  esp_err_t err = serialize_settings_json(serialized, settings_full);
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to serialize settings: %s", esp_err_to_name(err));
     return;
   }
   ESP_LOGI(TAG, "Serialized settings: %s", serialized);
-  free(serialized);     // Free the serialized string after use
-  serialized = nullptr; // Reset pointer to avoid dangling pointer
 
   // test serialize empty settings to JSON
-  serialize_settings_json(serialized, settings_empty);
-  if (serialized == nullptr) {
-    ESP_LOGE(TAG, "Failed to serialize empty settings");
-    return;
-  }
-  ESP_LOGI(TAG, "Serialized empty settings: %s", serialized);
-  free(serialized);
+  // serialize_settings_json(serialized, settings_empty);
+  // if (serialized == nullptr) {
+  //   ESP_LOGE(TAG, "Failed to serialize empty settings");
+  //   return;
+  // }
+  // ESP_LOGI(TAG, "Serialized empty settings: %s", serialized);
+  // free(serialized);
 
   // TODO: test read settings from NVS
 

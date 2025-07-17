@@ -89,15 +89,15 @@ esp_err_t register_error_handlers(httpd_handle_t server) {
 // Handle GET request for settings
 static esp_err_t settings_get_handler(httpd_req_t *req) {
   Settings settings = {}; // TODO: get from global object!
-  char *response = nullptr;
-  esp_err_t err = serialize_settings_json(response, settings);
-  if (err != ESP_OK || response == nullptr) {
+  char serialized_buffer[1000];
+  esp_err_t err = serialize_settings_json(serialized_buffer, settings);
+  if (err != ESP_OK) {
     ESP_LOGE(TAG, "Failed to serialize settings to JSON");
     return send_json_error_message(req, "Failed to serialize settings",
                                    HTTPD_500_INTERNAL_SERVER_ERROR);
   } else {
     httpd_resp_set_type(req, "application/json");
-    httpd_resp_send(req, response, strlen(response));
+    httpd_resp_send(req, serialized_buffer, strlen(serialized_buffer));
     return ESP_OK;
   }
 }
@@ -274,7 +274,7 @@ esp_err_t start_webserver() {
     ESP_LOGI(TAG, "Web server already running");
     return ESP_OK; // Server already started
   }
-  
+
   httpd_handle_t server;
   httpd_config_t config = HTTPD_DEFAULT_CONFIG();
   ESP_RETURN_ON_ERROR(httpd_start(&server, &config), TAG,
