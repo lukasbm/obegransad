@@ -24,6 +24,8 @@ esp_err_t serialize_settings_json(char *, const Settings &);
 esp_err_t nvs_read_settings(Settings &settings);
 esp_err_t nvs_write_settings(const Settings &settings);
 
+extern Settings g_settings; // global config object
+
 // TODO: in the future consider a modular approach where each scene or other
 // plugin can add its own settings.
 // Possible object oriented structure for config:

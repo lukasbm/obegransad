@@ -88,9 +88,8 @@ esp_err_t register_error_handlers(httpd_handle_t server) {
 
 // Handle GET request for settings
 static esp_err_t settings_get_handler(httpd_req_t *req) {
-  Settings settings = {}; // TODO: get from global object!
   char serialized_buffer[1000];
-  esp_err_t err = serialize_settings_json(serialized_buffer, settings);
+  esp_err_t err = serialize_settings_json(serialized_buffer, g_settings);
   if (err != ESP_OK) {
     ESP_LOGE(TAG, "Failed to serialize settings to JSON");
     return send_json_error_message(req, "Failed to serialize settings",

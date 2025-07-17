@@ -11,6 +11,8 @@
 static const char *NVS_NAMESPACE = "obegransad"; // NVS namespace
 static const char *TAG = "settings";
 
+Settings g_settings; // global settings object, initialized with default values
+
 /*
 integer types: uint8_t, int8_t, uint16_t, int16_t, uint32_t, int32_t, uint64_t,
 int64_t zero-terminated string (4000 bytes max) variable length binary data

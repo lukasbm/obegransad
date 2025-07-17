@@ -64,12 +64,23 @@ void advance_state_machine() {
 extern "C" void app_main() {
   ESP_LOGI(TAG, "Startup");
 
+  // nvs, event loop, networking
   ESP_ERROR_CHECK(device_init());
+
+  // load initial NVS settings
+  ESP_ERROR_CHECK(nvs_read_settings(g_settings));
+
+  // the only button
   ESP_ERROR_CHECK(button_init());
+
+  // start captive portal if no Wi-Fi credentials are stored
   wifi_init();
+
+  // set up sntp and time zone
   ESP_ERROR_CHECK(
       clock_init("CET-1CEST,M3.5.0,M10.5.0/3")); // FIXME: get from config!
 
+  // setup and start panel
   static panel_config_t panel_config = {
       .latch_pin = (gpio_num_t)3,
       .clk_pin = (gpio_num_t)4,
@@ -86,26 +97,14 @@ extern "C" void app_main() {
   panel_clear();
   panel_setPixel(8, 8, PANEL_BRIGHTNESS_2);
 
-  // TEST CONFIG (serialize and parse)
-
-  // TODO: test read settings from NVS
-  ESP_LOGI(TAG, "Reading settings from NVS");
-  Settings settings;
-  ESP_ERROR_CHECK(nvs_read_settings(settings));
-  char buffer[1000];
-  ESP_ERROR_CHECK(serialize_settings_json(buffer, settings));
-  ESP_LOGI(TAG, "Serialized settings: %s", buffer);
-
-  // vTaskDelay(pdMS_TO_TICKS(15000)); // init delay!! FIXME: remove
-
   // START SERVER
-  // esp_err_t ret = start_webserver();
-  // if (ret != ESP_OK) {
-  //   ESP_LOGE(TAG, "Failed to start web server: %s",
-  //   esp_err_to_name(ret)); return;
-  // } else {
-  //   ESP_LOGI(TAG, "Web server started successfully");
-  // }
+  esp_err_t ret = start_webserver();
+  if (ret != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to start web server: %s", esp_err_to_name(ret));
+    return;
+  } else {
+    ESP_LOGI(TAG, "Web server started successfully");
+  }
 
   // TEST WEATHER
   // ESP_LOGI(TAG, "Fetching weather data");
@@ -122,14 +121,14 @@ extern "C" void app_main() {
     advance_state_machine();
 
     // TEST TIME
-    struct tm timeinfo;
-    if (get_local_time(timeinfo)) {
-      char time_str[32];
-      strftime(time_str, sizeof(time_str), "%H:%M", &timeinfo);
-      ESP_LOGI(TAG, "Current time: %s", time_str);
-    } else {
-      ESP_LOGW(TAG, "Failed to get local time");
-    }
+    // struct tm timeinfo;
+    // if (get_local_time(timeinfo)) {
+    //   char time_str[32];
+    //   strftime(time_str, sizeof(time_str), "%H:%M", &timeinfo);
+    //   ESP_LOGI(TAG, "Current time: %s", time_str);
+    // } else {
+    //   ESP_LOGW(TAG, "Failed to get local time");
+    // }
 
     vTaskDelay(pdMS_TO_TICKS(2000)); // Delay for scheduler
   }
