@@ -53,22 +53,20 @@ static esp_err_t send_json_error_message(httpd_req_t *req,
 // timeout, route not found, etc.) They are called automatically
 ///////////////
 
-// Catch-all handler for not found routes
-static esp_err_t not_found_handler(httpd_req_t *req, httpd_err_code_t error) {
-  ESP_LOGE(TAG, "Not found handler called for URI: %s", req->uri);
-
-  if (strstr(req->uri, "/api/")) {
-    // api endpoints
-    return send_json_error_message(req, "Endpoint not found",
-                                   HTTPD_404_NOT_FOUND);
-  } else {
-    // regular endpoints
-    return httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Not Found");
-  }
+static char *get_error_message(const httpd_err_code_t error_code) {
+  return "HI";
 }
 
-// Catch-all handler for method not allowed
-// TODO:
+<template httpd_err_code_t ErrorCode> static esp_err_t
+not_found_handler(httpd_req_t *req) {
+  char *message = get_error_message(ErrorCode);
+  ESP_LOGW(TAG, "Not found: %s", req->uri);
+  if (strstr(req->uri, "/api/")) {
+    return send_json_error_message(req, message, ErrorCode);
+  } else {
+    return httpd_resp_send_err(req, ErrorCode, message);
+  }
+}
 
 esp_err_t register_error_handlers(httpd_handle_t server) {
   // Register not found handler
