@@ -14,37 +14,45 @@ static const char *TAG = "server";
 /// Embedded files
 ///////////////
 
-// extern const uint8_t index_html_start[] asm("_binary_index_html_start");
-// extern const uint8_t index_html_end[] asm("_binary_index_html_end");
-// extern const uint8_t style_css_start[] asm("_binary_style_css_start");
-// extern const uint8_t style_css_end[] asm("_binary_style_css_end");
-// extern const uint8_t script_js_start[] asm("_binary_script_js_start");
-// extern const uint8_t script_js_end[] asm("_binary_script_js_end");
+struct EmbeddedFile {
+  const uint8_t *start;
+  const uint8_t *end;
+  const char *content_type;
+};
 
-static esp_err_t serve_embedded_file(httpd_req_t *req, const uint8_t *start,
-                                     const uint8_t *end,
-                                     const char *content_type) {
-  const size_t file_size = end - start;
+extern const uint8_t index_html_start[] asm("_binary_index_html_start");
+extern const uint8_t index_html_end[] asm("_binary_index_html_end");
+extern const uint8_t style_css_start[] asm("_binary_style_css_start");
+extern const uint8_t style_css_end[] asm("_binary_style_css_end");
+extern const uint8_t script_js_start[] asm("_binary_script_js_start");
+extern const uint8_t script_js_end[] asm("_binary_script_js_end");
+
+// Define the embedded files
+static const EmbeddedFile indexHtml = {.start = index_html_start,
+                                       .end = index_html_end,
+                                       .content_type = "text/html"};
+
+// The caller has to set the http status
+// start and end refer to the asm pointers of the embedded files
+static esp_err_t serve_embedded_file(httpd_req_t *req,
+                                     const EmbeddedFile &file) {
+  const size_t file_size = file.end - file.start;
 
   // Set content type
-  httpd_resp_set_type(req, content_type);
+  esp_err_t err = httpd_resp_set_type(req, file.content_type);
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to set content type: %s", esp_err_to_name(err));
+    return err;
+  }
 
   // Send file
-  return httpd_resp_send(req, (const char *)start, file_size);
-}
-
-static esp_err_t send_json_error_message(httpd_req_t *req,
-                                         const char *error_message,
-                                         const httpd_err_code_t status) {
-  char response[128];
-  int written = snprintf(response, sizeof(response), "{\"message\":\"%s\"}",
-                         error_message);
-  if (written < 0 || written >= (int)sizeof(response)) {
-    ESP_LOGE(TAG, "Failed to create JSON error response");
-    return ESP_ERR_NO_MEM; // Not enough memory to create response
+  err = httpd_resp_send(req, (const char *)file.start, file_size);
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to send embedded file: %s", esp_err_to_name(err));
+    return err;
   }
-  httpd_resp_set_type(req, "application/json");
-  return httpd_resp_send_err(req, status, response);
+
+  return ESP_OK; // Return success if everything went well
 }
 
 //////////////
@@ -52,6 +60,37 @@ static esp_err_t send_json_error_message(httpd_req_t *req,
 // These are only for the integrated error cases (e.g. Method not allowed,
 // timeout, route not found, etc.) They are called automatically
 ///////////////
+
+// Default function to send a general JSON error message of the form
+// {"message":"<error_message>"}
+// This is used for API endpoints that expect JSON responses
+static esp_err_t send_json_error_message(httpd_req_t *req,
+                                         const char *error_message,
+                                         const httpd_err_code_t status) {
+  char response[256]; // Max 256 bytes for JSON response
+  int written = snprintf(response, sizeof(response), "{\"message\":\"%s\"}",
+                         error_message);
+  if (written < 0 || written >= (int)sizeof(response)) {
+    ESP_LOGE(TAG, "Failed to create JSON error response");
+    return ESP_ERR_NO_MEM; // Not enough memory to create response
+  }
+
+  // set content type of the response to JSON
+  esp_err_t err = httpd_resp_set_type(req, "application/json");
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to set response type: %s", esp_err_to_name(err));
+    return err;
+  }
+
+  // Set the HTTP status code and send the response
+  err = httpd_resp_send_err(req, status, response);
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to send error response: %s", esp_err_to_name(err));
+    return err;
+  }
+
+  return ESP_OK;
+}
 
 static char *get_error_message(const httpd_err_code_t error_code) {
   return "HI";
@@ -291,7 +330,12 @@ esp_err_t stop_webserver() {
     return ESP_OK; // Server not started
   }
 
-  httpd_stop(g_server);
-  g_server = nullptr; // Reset server handle
-  return ESP_OK;
+  esp_err_t err = httpd_stop(g_server);
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to stop web server: %s", esp_err_to_name(err));
+    return err; // Error stopping server
+  } else {
+    g_server = nullptr; // Reset server handle
+    return ESP_OK;
+  }
 }

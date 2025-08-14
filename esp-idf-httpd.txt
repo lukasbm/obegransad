@@ -1,0 +1,37 @@
+Default Response Codes
+Only Errors
+
+HTTPD_500_INTERNAL_SERVER_ERROR
+HTTPD_501_METHOD_NOT_IMPLEMENTED
+HTTPD_505_VERSION_NOT_SUPPORTED
+HTTPD_400_BAD_REQUEST
+HTTPD_401_UNAUTHORIZED
+HTTPD_403_FORBIDDEN
+HTTPD_404_NOT_FOUND
+HTTPD_405_METHOD_NOT_ALLOWED
+HTTPD_408_REQ_TIMEOUT
+HTTPD_411_LENGTH_REQUIRED
+HTTPD_413_CONTENT_TOO_LARGE
+HTTPD_414_URI_TOO_LONG
+HTTPD_431_REQ_HDR_FIELDS_TOO_LARGE
+
+Status
+
+- httpd_resp_set_hdr(char* field, char* value) : Sets a header
+- httpd_resp_set_status(char* status) : Sets the status code
+- httpd_resp_set_type(char* type) : Sets the content type
+- httpd_resp_send(const char *buf, ssize_t buf_len) : Sends a response
+- httpd_resp_send_chunk(const char *buf, ssize_t buf_len) : Sends a chunk of data
+- httpd_resp_send_err(httpd_err_code_t status, char* message) : Sends an error response
+- httpd_resp_send_custom_err(const char *status, const char *msg) : 
+- httpd_resp_sendstr(const char *str) : Sends a string (more convenient than regular send if it is a null terminated string.)
+There are also helper functions like httpd_resp_send_xxx
+
+
+Other helpers: 
+- bool httpd_uri_match_wildcard(const char *uri_template, const char *uri_to_match, size_t match_upto) : Seee doc
+
+Operations on the request:
+- httpd_req_get_cookie_val
+- httpd_query_key_value
+- httpd_req_get_url_query_str
