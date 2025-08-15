@@ -19,7 +19,7 @@ struct Settings {
 } __attribute__((packed));
 
 esp_err_t parse_settings_json(const char *, Settings &);
-esp_err_t serialize_settings_json(char *, const Settings &);
+char *serialize_settings_json(const Settings &);
 
 esp_err_t nvs_read_settings(Settings &settings);
 esp_err_t nvs_write_settings(const Settings &settings);

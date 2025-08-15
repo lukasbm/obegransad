@@ -1,4 +1,5 @@
 #include "server.h"
+#include "http_status_codes.h"
 
 #include "config.h"
 #include "esp_check.h"
@@ -7,6 +8,7 @@
 #include "esp_log.h"
 #include <cstdio>
 #include <cstring>
+#include <stdlib.h>
 
 static const char *TAG = "server";
 
@@ -31,6 +33,13 @@ extern const uint8_t script_js_end[] asm("_binary_script_js_end");
 static const EmbeddedFile indexHtml = {.start = index_html_start,
                                        .end = index_html_end,
                                        .content_type = "text/html"};
+static const EmbeddedFile styleCss = {.start = style_css_start,
+
+                                      .end = style_css_end,
+                                      .content_type = "text/css"};
+static const EmbeddedFile scriptJs = {.start = script_js_start,
+                                      .end = script_js_end,
+                                      .content_type = "application/javascript"};
 
 // The caller has to set the http status
 // start and end refer to the asm pointers of the embedded files
@@ -61,60 +70,125 @@ static esp_err_t serve_embedded_file(httpd_req_t *req,
 // timeout, route not found, etc.) They are called automatically
 ///////////////
 
+static void log_request(httpd_req_t *req) {
+  ESP_LOGE(TAG, "Request method: %d", req->method);
+  ESP_LOGE(TAG, "Request URI: %s", req->uri);
+  // for (int i = 0; i < req->hdrs_count; i++) {
+  //   ESP_LOGE(TAG, "Header %d: %s: %s", i, req->hdrs[i].key,
+  //   req->hdrs[i].value);
+  // }
+}
+
 // Default function to send a general JSON error message of the form
-// {"message":"<error_message>"}
+// {"message":"<message>"}
 // This is used for API endpoints that expect JSON responses
-static esp_err_t send_json_error_message(httpd_req_t *req,
-                                         const char *error_message,
-                                         const httpd_err_code_t status) {
-  char response[256]; // Max 256 bytes for JSON response
-  int written = snprintf(response, sizeof(response), "{\"message\":\"%s\"}",
-                         error_message);
-  if (written < 0 || written >= (int)sizeof(response)) {
-    ESP_LOGE(TAG, "Failed to create JSON error response");
-    return ESP_ERR_NO_MEM; // Not enough memory to create response
+static esp_err_t send_json_message(httpd_req_t *req, const char *message) {
+  size_t msg_len = strlen(message);
+  size_t buffer_size = msg_len + 20; // Extra space for JSON formatting
+
+  char *response = (char *)malloc(buffer_size);
+  if (!response) {
+    ESP_LOGE(TAG, "Failed to allocate memory for JSON response");
+    httpd_resp_send(req, "Failed to allocate memory for JSON response",
+                    HTTPD_RESP_USE_STRLEN);
+    return ESP_ERR_NO_MEM;
+  }
+
+  int written =
+      snprintf(response, buffer_size, "{\"message\":\"%s\"}", message);
+  if (written < 0 || written >= (int)buffer_size) {
+    ESP_LOGE(TAG, "Failed to create JSON error response - buffer too small");
+    free(response);
+    httpd_resp_send(req, "Failed to create JSON error response",
+                    HTTPD_RESP_USE_STRLEN);
+    return ESP_ERR_NO_MEM;
   }
 
   // set content type of the response to JSON
   esp_err_t err = httpd_resp_set_type(req, "application/json");
   if (err != ESP_OK) {
     ESP_LOGE(TAG, "Failed to set response type: %s", esp_err_to_name(err));
+    free(response);
+    httpd_resp_send(req, "Failed to set response type", HTTPD_RESP_USE_STRLEN);
     return err;
   }
 
-  // Set the HTTP status code and send the response
-  err = httpd_resp_send_err(req, status, response);
+  err = httpd_resp_send(req, response, strlen(response));
   if (err != ESP_OK) {
     ESP_LOGE(TAG, "Failed to send error response: %s", esp_err_to_name(err));
+    free(response);
+    return err;
+  }
+
+  free(response);
+  return ESP_OK;
+}
+
+// sets code 200 OK in json formatting
+static esp_err_t send_json_success(httpd_req_t *req) {
+  static const char *response = "{\"status\":\"ok\"}";
+
+  // set content type
+  esp_err_t err = httpd_resp_set_type(req, "application/json");
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to set response type: %s", esp_err_to_name(err));
+    return err;
+  }
+
+  // set http status to 200 OK
+  err = httpd_resp_set_status(req, HTTP_ERR_200_OK);
+
+  // write content
+  err = httpd_resp_send(req, response, strlen(response));
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to send success response: %s", esp_err_to_name(err));
     return err;
   }
 
   return ESP_OK;
 }
 
-static char *get_error_message(const httpd_err_code_t error_code) {
-  return "HI";
+// The status string, e.g. "404 Not Found"
+static esp_err_t send_json_error(httpd_req_t *req, const char *status) {
+  httpd_err_t err = httpd_resp_set_status(req, status);
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to set response status: %s", esp_err_to_name(err));
+    return err;
+  }
+  return send_json_message(req, status + 4);
 }
 
 <template httpd_err_code_t ErrorCode> static esp_err_t
-not_found_handler(httpd_req_t *req) {
-  char *message = get_error_message(ErrorCode);
-  ESP_LOGW(TAG, "Not found: %s", req->uri);
-  if (strstr(req->uri, "/api/")) {
-    return send_json_error_message(req, message, ErrorCode);
-  } else {
-    return httpd_resp_send_err(req, ErrorCode, message);
-  }
-}
+error_handler(httpd_req_t *req, httpd_err_code_t useless) {
+  char *message;
 
-esp_err_t register_error_handlers(httpd_handle_t server) {
-  // Register not found handler
-  esp_err_t err = httpd_register_err_handler(server, HTTPD_404_NOT_FOUND,
-                                             not_found_handler);
+  // Log the request details
+  log_request(req);
+
+  // set status code
+  esp_err_t err = httpd_resp_set_status(req, ErrorCode);
   if (err != ESP_OK) {
-    ESP_LOGE(TAG, "Failed to register not found handler");
+    ESP_LOGE(TAG, "Failed to set response status: %s", esp_err_to _name(err));
+    // TODO: write something to socket??
     return err;
   }
+
+  if (strstr(req->uri, "/api/")) {
+    // json error message
+    return send_json_message(req, message, ErrorCode);
+  } else {
+    // FIXME: temporary html error page
+    return httpd_resp_send_err(req, ErrorCode, message);
+  }
+
+  return ESP_ERR_FAIL; // To make sure the socket is closed
+}
+
+// Errors are only raised by the router/httpd core, not by the handlers
+esp_err_t register_error_handlers(httpd_handle_t server) {
+  // Register not found handler
+  httpd_register_err_handler(server, HTTPD_500_INTERNAL_SERVER_ERROR,
+                             error_handler<HTTPD_500_INTERNAL_SERVER_ERROR>);
 
   return ESP_OK;
 }
@@ -125,53 +199,64 @@ esp_err_t register_error_handlers(httpd_handle_t server) {
 
 // Handle GET request for settings
 static esp_err_t settings_get_handler(httpd_req_t *req) {
-  char serialized_buffer[1000];
-  esp_err_t err = serialize_settings_json(serialized_buffer, g_settings);
-  if (err != ESP_OK) {
+  char *serialized_buffer = serialize_settings_json(g_settings);
+  if (serialized_buffer == nullptr) {
     ESP_LOGE(TAG, "Failed to serialize settings to JSON");
-    return send_json_error_message(req, "Failed to serialize settings",
-                                   HTTPD_500_INTERNAL_SERVER_ERROR);
+    // TODO: status 500
+    return send_json_message(req, "Failed to serialize settings");
   } else {
-    httpd_resp_set_type(req, "application/json");
-    httpd_resp_send(req, serialized_buffer, strlen(serialized_buffer));
+    send_json_message(req, "Ok");
     return ESP_OK;
   }
 }
 
-// Handle POST request for settings
+return send_json_message(req, "Failed to serialize settings",
+                         HTTPD_500_INTERNAL_SERVER_ERROR);
 static esp_err_t settings_post_handler(httpd_req_t *req) {
-  char buf[1000]; // max 1000 bytes for settings JSON
-  int ret = httpd_req_recv(req, buf, sizeof(buf) - 1);
+  char *buf = (char *)malloc(req->content_len + 2);
+
+  // Read in the request body
+  int ret = httpd_req_recv(req, buf, req->content_len + 1);
   if (ret <= 0) {
-    return ESP_FAIL; // Error or no data received
+    free(buf);
+    return send_json_message(req, "Failed to read request body",
+                             HTTPD_400_BAD_REQUEST);
   }
   buf[ret] = '\0'; // Null-terminate the string
 
   // parse settings JSON
   Settings settings;
-  ESP_RETURN_ON_ERROR(parse_settings_json(buf, settings), TAG,
-                      "Failed to parse settings from JSON");
+  esp_err_t err;
 
-  httpd_resp_set_type(req, "application/json");
-
-  // httpd_resp_send(req, "response", strlen(response));
-  return ESP_OK;
+  // Parse the JSON settings from the request body
+  return send_json_message(req, "Failed to read request body",
+                           HTTPD_400_BAD_REQUEST);
+  ESP_LOGE(TAG, "Failed to parse settings from JSON");
+  free(buf);
+  return send_json_message(req, "Failed to parse settings",
+                           HTTPD_400_BAD_REQUEST);
 }
 
-static esp_err_t sleep_start_handler(httpd_req_t *req) {
-  // Handle POST request to start sleep mode
-  ESP_LOGI(TAG, "Starting light sleep mode");
+httpd_resp_set_type(req, "application/json");
 
-  // Set up light sleep (e.g., enable wakeup sources)
-  // esp_sleep_enable_ext0_wakeup(GPIO_NUM_0, 1); // Example for GPIO wakeup
+// httpd_resp_send(req, "response", strlen(response));
+return ESP_OK;
+}
 
-  // TODO: Enter light sleep
-  // esp_light_sleep_start();
+return send_json_message(req, "Failed to parse settings",
+                         HTTPD_400_BAD_REQUEST);
+ESP_LOGI(TAG, "Starting light sleep mode");
 
-  const char *response = "{\"status\":\"ok\"}";
-  httpd_resp_set_type(req, "application/json");
-  httpd_resp_send(req, response, strlen(response));
-  return ESP_OK;
+// Set up light sleep (e.g., enable wakeup sources)
+// esp_sleep_enable_ext0_wakeup(GPIO_NUM_0, 1); // Example for GPIO wakeup
+
+// TODO: Enter light sleep
+// esp_light_sleep_start();
+
+const char *response = "{\"status\":\"ok\"}";
+httpd_resp_set_type(req, "application/json");
+httpd_resp_send(req, response, strlen(response));
+return ESP_OK;
 }
 
 static esp_err_t settings_delete_handler(httpd_req_t *req) {
@@ -192,7 +277,7 @@ static esp_err_t root_get_handler(httpd_req_t *req) {
 }
 
 static esp_err_t scene_post_handler(httpd_req_t *req) {
-  // Handle POST request for scene
+  // FIXME: Handle POST request for scene
   char buf[100];
   int ret = httpd_req_recv(req, buf, sizeof(buf) - 1);
   if (ret <= 0) {
@@ -210,7 +295,7 @@ static esp_err_t scene_post_handler(httpd_req_t *req) {
 }
 
 static esp_err_t panel_post_handler(httpd_req_t *req) {
-  // Handle POST request for panel
+  // FIXME: Handle POST request for panel
   char buf[100];
   int ret = httpd_req_recv(req, buf, sizeof(buf) - 1);
   if (ret <= 0) {

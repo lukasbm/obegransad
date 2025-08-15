@@ -77,37 +77,32 @@ esp_err_t nvs_write_settings(const Settings &config) {
 // The caller must provide a pre-allocated output buffer with sufficient size.
 // The function copies the JSON string into the output buffer and ensures null
 // termination. Returns ESP_OK on success, or an error code on failure.
-esp_err_t serialize_settings_json(char *output, const Settings &settings) {
-  if (output == nullptr) {
-    ESP_LOGE(TAG, "Output buffer is null");
-    return ESP_ERR_INVALID_ARG;
-  }
-
+char *serialize_settings_json(const Settings &settings) {
   cJSON *root = cJSON_CreateObject();
   if (!root) {
     ESP_LOGE(TAG, "Failed to create JSON object");
-    return ESP_ERR_NO_MEM;
+    return nullptr;
   }
   // brightness day
   if (!cJSON_AddNumberToObject(root, "brightness_day",
                                settings.brightness_day)) {
     ESP_LOGE(TAG, "Failed to add 'brightness_day' to JSON");
     cJSON_Delete(root);
-    return ESP_ERR_NO_MEM;
+    return nullptr;
   }
   // brightness night
   if (!cJSON_AddNumberToObject(root, "brightness_night",
                                settings.brightness_night)) {
     ESP_LOGE(TAG, "Failed to add 'brightness_night' to JSON");
     cJSON_Delete(root);
-    return ESP_ERR_NO_MEM;
+    return nullptr;
   }
   // off hours
   cJSON *off_hours_array = cJSON_CreateArray();
   if (!off_hours_array) {
     ESP_LOGE(TAG, "Failed to create off_hours array");
     cJSON_Delete(root);
-    return ESP_ERR_NO_MEM;
+    return nullptr;
   }
   for (int i = 0; i < 24; ++i) {
     if (!cJSON_AddItemToArray(
@@ -115,34 +110,34 @@ esp_err_t serialize_settings_json(char *output, const Settings &settings) {
       ESP_LOGE(TAG, "Failed to add item to 'off_hours' array");
       cJSON_Delete(off_hours_array);
       cJSON_Delete(root);
-      return ESP_ERR_NO_MEM;
+      return nullptr;
     }
   }
   if (!cJSON_AddItemToObject(root, "off_hours", off_hours_array)) {
     ESP_LOGE(TAG, "Failed to add 'off_hours' array to JSON");
     cJSON_Delete(off_hours_array);
     cJSON_Delete(root);
-    return ESP_ERR_NO_MEM;
+    return nullptr;
   }
   // weather latitude
   if (!cJSON_AddNumberToObject(root, "weather_latitude",
                                settings.weather_latitude)) {
     ESP_LOGE(TAG, "Failed to add 'weather_latitude' to JSON");
     cJSON_Delete(root);
-    return ESP_ERR_NO_MEM;
+    return nullptr;
   }
   // weather longitude
   if (!cJSON_AddNumberToObject(root, "weather_longitude",
                                settings.weather_longitude)) {
     ESP_LOGE(TAG, "Failed to add 'weather_longitude' to JSON");
     cJSON_Delete(root);
-    return ESP_ERR_NO_MEM;
+    return nullptr;
   }
   // timezone
   if (!cJSON_AddStringToObject(root, "timezone", settings.timezone)) {
     ESP_LOGE(TAG, "Failed to add 'timezone' to JSON");
     cJSON_Delete(root);
-    return ESP_ERR_NO_MEM;
+    return nullptr;
   }
   // anniversary day
   cJSON_AddNumberToObject(root, "anniversary_day", settings.anniversary_day);
@@ -150,21 +145,29 @@ esp_err_t serialize_settings_json(char *output, const Settings &settings) {
   cJSON_AddNumberToObject(root, "anniversary_month",
                           settings.anniversary_month);
 
+  // Print the JSON object to a string
   char *json_string = cJSON_Print(root);
   if (!json_string) {
     ESP_LOGE(TAG, "Failed to print JSON to string");
     cJSON_Delete(root);
-    return ESP_ERR_NO_MEM;
+    return nullptr;
   }
 
   // Copy the JSON string to the output buffer, including null terminator
   size_t json_len = strlen(json_string);
+  char *output = (char *)malloc(json_len + 2);
+  if (!output) {
+    ESP_LOGE(TAG, "Failed to allocate memory for JSON output");
+    cJSON_free(json_string);
+    cJSON_Delete(root);
+    return nullptr;
+  }
   strncpy(output, json_string, json_len + 1); // include null terminator
 
   cJSON_free(json_string);
   cJSON_Delete(root);
 
-  return ESP_OK;
+  return output;
 }
 
 // parse setting from json string into settings struct using cJson
