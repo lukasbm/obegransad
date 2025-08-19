@@ -232,6 +232,7 @@ esp_err_t register_error_handlers(httpd_handle_t server) {
 ///////////////
 
 // Handle GET request for settings
+// This function returns the current settings in JSON format
 static esp_err_t settings_get_handler(httpd_req_t *req) {
   char *serialized_buffer = serialize_settings_json(g_settings);
   if (serialized_buffer == nullptr) {
@@ -239,11 +240,14 @@ static esp_err_t settings_get_handler(httpd_req_t *req) {
     httpd_resp_set_status(req, HTTP_ERR_500_INTERNAL_SERVER_ERROR);
     return send_json_message(req, "Failed to serialize settings");
   } else {
-    send_json_message(req, "Ok");
-    return ESP_OK;
+    // send out buffer
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_send(req, serialized_buffer, strlen(serialized_buffer));
   }
 }
 
+// Handle POST request for settings
+// This function expects a JSON body with the new settings
 static esp_err_t settings_post_handler(httpd_req_t *req) {
   char *buf = (char *)malloc(req->content_len + 2);
 
@@ -251,110 +255,42 @@ static esp_err_t settings_post_handler(httpd_req_t *req) {
   int ret = httpd_req_recv(req, buf, req->content_len + 1);
   if (ret <= 0) {
     free(buf);
-    return send_json_message(req, "Failed to read request body",
-                             HTTPD_400_BAD_REQUEST);
+    httpd_resp_set_status(req, HTTP_ERR_400_BAD_REQUEST);
+    return send_json_message(req, "Failed to read request body");
   }
   buf[ret] = '\0'; // Null-terminate the string
 
   // parse settings JSON
   Settings settings;
-  esp_err_t err;
 
-  // Parse the JSON settings from the request body
-  return send_json_message(req, "Failed to read request body",
-                           HTTPD_400_BAD_REQUEST);
-  ESP_LOGE(TAG, "Failed to parse settings from JSON");
+  esp_err_t err = parse_settings_json(buf, settings);
+  if (err != ESP_OK) {
+    httpd_resp_set_status(req, HTTP_ERR_400_BAD_REQUEST);
+    free(buf);
+    return send_json_message(req, "Failed to parse settings JSON");
+  }
+
+  // Update global settings
+  g_settings = settings;
+  ESP_LOGI(TAG, "Settings updated successfully");
   free(buf);
-  return send_json_message(req, "Failed to parse settings",
-                           HTTPD_400_BAD_REQUEST);
+  return send_json_message(req, "Settings updated successfully");
 }
 
-httpd_resp_set_type(req, "application/json");
-
-// httpd_resp_send(req, "response", strlen(response));
-return ESP_OK;
-}
-
-return send_json_message(req, "Failed to parse settings",
-                         HTTPD_400_BAD_REQUEST);
-ESP_LOGI(TAG, "Starting light sleep mode");
-
-// Set up light sleep (e.g., enable wakeup sources)
-// esp_sleep_enable_ext0_wakeup(GPIO_NUM_0, 1); // Example for GPIO wakeup
-
-// TODO: Enter light sleep
-// esp_light_sleep_start();
-
-const char *response = "{\"status\":\"ok\"}";
-httpd_resp_set_type(req, "application/json");
-httpd_resp_send(req, response, strlen(response));
-return ESP_OK;
-}
-
+// Handle DELETE request for settings
+// This function resets the settings to defaults
 static esp_err_t settings_delete_handler(httpd_req_t *req) {
-  // Handle DELETE request for settings
-  // Here you would typically reset settings to defaults
-  ESP_LOGI(TAG, "Settings reset to defaults");
-
-  const char *response = "{\"status\":\"ok\"}";
-  httpd_resp_set_type(req, "application/json");
-  httpd_resp_send(req, response, strlen(response));
-  return ESP_OK;
-}
-
-static esp_err_t root_get_handler(httpd_req_t *req) {
-  // return serve_embedded_file(req, index_html_start, index_html_end,
-  //  "text/html");
-  return ESP_OK;
-}
-
-static esp_err_t scene_post_handler(httpd_req_t *req) {
-  // FIXME: Handle POST request for scene
-  char buf[100];
-  int ret = httpd_req_recv(req, buf, sizeof(buf) - 1);
-  if (ret <= 0) {
-    return ESP_FAIL; // Error or no data received
-  }
-  buf[ret] = '\0'; // Null-terminate the string
-
-  // Process the received data (e.g., apply scene)
-  ESP_LOGI(TAG, "Received scene: %s", buf);
-
-  const char *response = "{\"status\":\"ok\"}";
-  httpd_resp_set_type(req, "application/json");
-  httpd_resp_send(req, response, strlen(response));
-  return ESP_OK;
-}
-
-static esp_err_t panel_post_handler(httpd_req_t *req) {
-  // FIXME: Handle POST request for panel
-  char buf[100];
-  int ret = httpd_req_recv(req, buf, sizeof(buf) - 1);
-  if (ret <= 0) {
-    return ESP_FAIL; // Error or no data received
-  }
-  buf[ret] = '\0'; // Null-terminate the string
-
-  // Process the received data (e.g., update panel)
-  ESP_LOGI(TAG, "Received panel data: %s", buf);
-
-  const char *response = "{\"status\":\"ok\"}";
-  httpd_resp_set_type(req, "application/json");
-  httpd_resp_send(req, response, strlen(response));
-  return ESP_OK;
-}
-
-static esp_err_t panel_get_handler(httpd_req_t *req) {
-  // Handle GET request for panel
-  const char *response = "{\"status\":\"ok\"}";
-  httpd_resp_set_type(req, "application/json");
-  httpd_resp_send(req, response, strlen(response));
-  return ESP_OK;
+httpd_resp_set_status(req, HTTP_ERR_501_NOT_IMPLEMENTED);
+  return send_json_message(req, "Settings reset not implemented yet");
 }
 
 ///////////////
 //// Define Routes
 ////////////////
+
+static esp_err_t catch_all_handler(httpd_req_t *req) {
+  return send_json_status(req, HTTP_ERR_404_NOT_FOUND);
+}
 
 static const httpd_uri_t settings_get = {.uri = "/api/settings",
                                          .method = HTTP_GET,
@@ -368,54 +304,28 @@ static const httpd_uri_t settings_delete = {.uri = "/settings",
                                             .method = HTTP_DELETE,
                                             .handler = settings_delete_handler,
                                             .user_ctx = NULL};
-static const httpd_uri_t scene_post = {.uri = "/scene",
-                                       .method = HTTP_POST,
-                                       .handler = scene_post_handler,
-                                       .user_ctx = NULL};
-static const httpd_uri_t panel_post = {.uri = "/panel",
-                                       .method = HTTP_POST,
-                                       .handler = panel_post_handler,
-                                       .user_ctx = NULL};
-static const httpd_uri_t panel_get = {.uri = "/panel",
-                                      .method = HTTP_GET,
-                                      .handler = panel_get_handler,
-                                      .user_ctx = NULL};
-static const httpd_uri_t root_get = {.uri = "/",
-                                     .method = HTTP_GET,
-                                     .handler = root_get_handler,
-                                     .user_ctx = NULL}; // Root handler
-static const httpd_uri_t sleep_post = {.uri = "/sleep",
-                                       .method = HTTP_POST,
-                                       .handler = sleep_start_handler,
-                                       .user_ctx = NULL};
+
+static const httpd_uri_t catch_all = {
+    .uri = "/*",        // Catch all routes
+    .method = HTTP_GET, // FIXME: make this work for all methods
+    .handler = catch_all_handler,
+    .user_ctx = NULL};
 
 ///////////////
 //// Actual Server Setup
 ////////////////
 
 static esp_err_t register_routes(httpd_handle_t &server) {
-  // ESP_RETURN_ON_ERROR(httpd_register_uri_handler(server, &root_get), TAG,
-  //                     "Failed to register root handler");
   ESP_RETURN_ON_ERROR(httpd_register_uri_handler(server, &settings_get), TAG,
                       "Failed to register settings GET handler");
-  // ESP_RETURN_ON_ERROR(httpd_register_uri_handler(server, &settings_post),
-  // TAG,
-  //                     "Failed to register settings POST handler");
-  // ESP_RETURN_ON_ERROR(httpd_register_uri_handler(server, &settings_delete),
-  // TAG,
-  //                     "Failed to register settings DELETE handler");
-  // ESP_RETURN_ON_ERROR(httpd_register_uri_handler(server, &scene_post), TAG,
-  //                     "Failed to register scene POST handler");
-  // ESP_RETURN_ON_ERROR(httpd_register_uri_handler(server, &panel_post), TAG,
-  //                     "Failed to register panel POST handler");
-  // ESP_RETURN_ON_ERROR(httpd_register_uri_handler(server, &panel_get), TAG,
-  //                     "Failed to register panel GET handler");
-  // ESP_RETURN_ON_ERROR(httpd_register_uri_handler(server, &not_found_handler),
-  //                     TAG, "Failed to register not found handler");
+  ESP_RETURN_ON_ERROR(httpd_register_uri_handler(server, &settings_post), TAG,
+                      "Failed to register settings POST handler");
+  ESP_RETURN_ON_ERROR(httpd_register_uri_handler(server, &settings_delete), TAG,
+                      "Failed to register settings DELETE handler");
 
   // Register catch-all handler last
-  // ESP_RETURN_ON_ERROR(httpd_register_uri_handler(server, &catch_all), TAG,
-  //                     "Failed to register catch-all handler");
+  ESP_RETURN_ON_ERROR(httpd_register_uri_handler(server, &catch_all), TAG,
+                      "Failed to register catch-all handler");
 
   return ESP_OK;
 }

@@ -61,7 +61,7 @@
   "451 Unavailable For Legal Reasons"
 #define HTTP_ERR_499_CLIENT_CLOSED_REQUEST "499 Client Closed Request"
 
-#define HTTP_ERR_500_INTERNAL_SERVER_ERR_OR "500 Internal Server ERR_or"
+#define HTTP_ERR_500_INTERNAL_SERVER_ERROR "500 Internal Server Error"
 #define HTTP_ERR_501_NOT_IMPLEMENTED "501 Not Implemented"
 #define HTTP_ERR_502_BAD_GATEWAY "502 Bad Gateway"
 #define HTTP_ERR_503_SERVICE_UNAVAILABLE "503 Service Unavailable"
@@ -80,7 +80,7 @@
 inline const char *convert_httpd_err_code_to_string(httpd_err_code_t err_code) {
   switch (err_code) {
   case HTTPD_500_INTERNAL_SERVER_ERROR:
-    return HTTP_ERR_500_INTERNAL_SERVER_ERR_OR;
+    return HTTP_ERR_500_INTERNAL_SERVER_ERROR;
 
   case HTTPD_501_METHOD_NOT_IMPLEMENTED:
     return HTTP_ERR_501_NOT_IMPLEMENTED;
