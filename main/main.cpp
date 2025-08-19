@@ -54,12 +54,7 @@ esp_err_t button_init() {
   return ESP_OK;
 }
 
-void advance_state_machine() {
-  // This function would contain the logic to advance the state machine.
-  // For now, it does nothing.
-  // You can implement your state machine logic here.
-  // For example, you might check button states or Wi-Fi connection status.
-}
+void advance_state_machine() {}
 
 extern "C" void app_main() {
   ESP_LOGI(TAG, "Startup");
@@ -77,8 +72,8 @@ extern "C" void app_main() {
   wifi_init();
 
   // set up sntp and time zone
-  ESP_ERROR_CHECK(
-      clock_init("CET-1CEST,M3.5.0,M10.5.0/3")); // FIXME: get from config!
+  // FIXME: get from config!
+  ESP_ERROR_CHECK(clock_init("CET-1CEST,M3.5.0,M10.5.0/3"));
 
   // setup and start panel
   static panel_config_t panel_config = {
@@ -95,7 +90,9 @@ extern "C" void app_main() {
   // TEST PANEL
   ESP_LOGI(TAG, "Testing panel display");
   panel_clear();
+  panel_setPixel(8, 10, PANEL_BRIGHTNESS_1);
   panel_setPixel(8, 8, PANEL_BRIGHTNESS_2);
+  panel_setPixel(8, 6, PANEL_BRIGHTNESS_3);
 
   // START SERVER
   esp_err_t ret = start_webserver();
