@@ -150,7 +150,7 @@ static esp_err_t send_json_success(httpd_req_t *req) {
 
 // The status string, e.g. "404 Not Found"
 static esp_err_t send_json_error(httpd_req_t *req, const char *status) {
-  httpd_err_t err = httpd_resp_set_status(req, status);
+  esp_err_t err = httpd_resp_set_status(req, status);
   if (err != ESP_OK) {
     ESP_LOGE(TAG, "Failed to set response status: %s", esp_err_to_name(err));
     return err;
@@ -158,39 +158,53 @@ static esp_err_t send_json_error(httpd_req_t *req, const char *status) {
   return send_json_message(req, status + 4);
 }
 
-<template httpd_err_code_t ErrorCode> static esp_err_t
-error_handler(httpd_req_t *req, httpd_err_code_t useless) {
+static esp_err_t error_handler(httpd_req_t *req, httpd_err_code_t err_code) {
   char *message;
 
   // Log the request details
   log_request(req);
 
-  // set status code
-  esp_err_t err = httpd_resp_set_status(req, ErrorCode);
-  if (err != ESP_OK) {
-    ESP_LOGE(TAG, "Failed to set response status: %s", esp_err_to _name(err));
-    // TODO: write something to socket??
-    return err;
-  }
-
-  if (strstr(req->uri, "/api/")) {
-    // json error message
-    return send_json_message(req, message, ErrorCode);
-  } else {
-    // FIXME: temporary html error page
-    return httpd_resp_send_err(req, ErrorCode, message);
-  }
-
-  return ESP_ERR_FAIL; // To make sure the socket is closed
+  // TODO:???
+  httpd_resp_send_custom_err(httpd_req_t * req, const char *status,
+                             const char *msg)
 }
 
 // Errors are only raised by the router/httpd core, not by the handlers
 esp_err_t register_error_handlers(httpd_handle_t server) {
+  esp_err_t err = ESP_OK;
   // Register not found handler
-  httpd_register_err_handler(server, HTTPD_500_INTERNAL_SERVER_ERROR,
-                             error_handler<HTTPD_500_INTERNAL_SERVER_ERROR>);
+  err += httpd_register_err_handler(server, HTTPD_500_INTERNAL_SERVER_ERROR,
+                                    error_handler);
+  err += httpd_register_err_handler(server, HTTPD_501_METHOD_NOT_IMPLEMENTED,
+                                    error_handler);
+  err += httpd_register_err_handler(server, HTTPD_505_VERSION_NOT_SUPPORTED,
+                                    error_handler);
+  err +=
+      httpd_register_err_handler(server, HTTPD_400_BAD_REQUEST, error_handler);
+  err +=
+      httpd_register_err_handler(server, HTTPD_401_UNAUTHORIZED, error_handler);
+  err += httpd_register_err_handler(server, HTTPD_403_FORBIDDEN, error_handler);
+  err += httpd_register_err_handler(server, HTTPD_404_NOT_FOUND, error_handler);
+  err += httpd_register_err_handler(server, HTTPD_405_METHOD_NOT_ALLOWED,
+                                    error_handler);
+  err +=
+      httpd_register_err_handler(server, HTTPD_408_REQ_TIMEOUT, error_handler);
+  err += httpd_register_err_handler(server, HTTPD_411_LENGTH_REQUIRED,
+                                    error_handler);
+  err += httpd_register_err_handler(server, HTTPD_413_CONTENT_TOO_LARGE,
+                                    error_handler);
+  err +=
+      httpd_register_err_handler(server, HTTPD_414_URI_TOO_LONG, error_handler);
+  err += httpd_register_err_handler(server, HTTPD_431_REQ_HDR_FIELDS_TOO_LARGE,
+                                    error_handler);
 
-  return ESP_OK;
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to register error handlers");
+    return ESP_FAIL;
+  } else {
+    ESP_LOGI(TAG, "Error handlers registered successfully");
+    return ESP_OK;
+  }
 }
 
 ///////////////
@@ -202,7 +216,7 @@ static esp_err_t settings_get_handler(httpd_req_t *req) {
   char *serialized_buffer = serialize_settings_json(g_settings);
   if (serialized_buffer == nullptr) {
     ESP_LOGE(TAG, "Failed to serialize settings to JSON");
-    // TODO: status 500
+    httpd_resp_set_status(req, HTTP_ERR_500_INTERNAL_SERVER_ERROR);
     return send_json_message(req, "Failed to serialize settings");
   } else {
     send_json_message(req, "Ok");
