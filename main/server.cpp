@@ -83,14 +83,13 @@ static void log_request(httpd_req_t *req) {
 // {"message":"<message>"}
 // This is used for API endpoints that expect JSON responses
 static esp_err_t send_json_message(httpd_req_t *req, const char *message) {
-  size_t msg_len = strlen(message);
-  size_t buffer_size = msg_len + 20; // Extra space for JSON formatting
-
+  size_t buffer_size = strlen(message) + 20; // Extra space for JSON formatting
   char *response = (char *)malloc(buffer_size);
   if (!response) {
     ESP_LOGE(TAG, "Failed to allocate memory for JSON response");
-    httpd_resp_send(req, "Failed to allocate memory for JSON response",
-                    HTTPD_RESP_USE_STRLEN);
+    httpd_resp_send(
+        req, "{\"message\":\"Failed to allocate memory for JSON response\"}",
+        HTTPD_RESP_USE_STRLEN);
     return ESP_ERR_NO_MEM;
   }
 
@@ -99,7 +98,8 @@ static esp_err_t send_json_message(httpd_req_t *req, const char *message) {
   if (written < 0 || written >= (int)buffer_size) {
     ESP_LOGE(TAG, "Failed to create JSON error response - buffer too small");
     free(response);
-    httpd_resp_send(req, "Failed to create JSON error response",
+    httpd_resp_send(req,
+                    "{\"message\":\"Failed to create JSON error response\"}",
                     HTTPD_RESP_USE_STRLEN);
     return ESP_ERR_NO_MEM;
   }
@@ -109,7 +109,8 @@ static esp_err_t send_json_message(httpd_req_t *req, const char *message) {
   if (err != ESP_OK) {
     ESP_LOGE(TAG, "Failed to set response type: %s", esp_err_to_name(err));
     free(response);
-    httpd_resp_send(req, "Failed to set response type", HTTPD_RESP_USE_STRLEN);
+    httpd_resp_send(req, "{\"message\":\"Failed to set response type\"}",
+                    HTTPD_RESP_USE_STRLEN);
     return err;
   }
 
@@ -124,87 +125,106 @@ static esp_err_t send_json_message(httpd_req_t *req, const char *message) {
   return ESP_OK;
 }
 
-// sets code 200 OK in json formatting
-static esp_err_t send_json_success(httpd_req_t *req) {
-  static const char *response = "{\"status\":\"ok\"}";
-
-  // set content type
-  esp_err_t err = httpd_resp_set_type(req, "application/json");
-  if (err != ESP_OK) {
-    ESP_LOGE(TAG, "Failed to set response type: %s", esp_err_to_name(err));
-    return err;
-  }
-
-  // set http status to 200 OK
-  err = httpd_resp_set_status(req, HTTP_ERR_200_OK);
-
-  // write content
-  err = httpd_resp_send(req, response, strlen(response));
-  if (err != ESP_OK) {
-    ESP_LOGE(TAG, "Failed to send success response: %s", esp_err_to_name(err));
-    return err;
-  }
-
-  return ESP_OK;
-}
-
 // The status string, e.g. "404 Not Found"
-static esp_err_t send_json_error(httpd_req_t *req, const char *status) {
+static esp_err_t send_json_status(httpd_req_t *req, const char *status) {
+  // set status message
   esp_err_t err = httpd_resp_set_status(req, status);
   if (err != ESP_OK) {
     ESP_LOGE(TAG, "Failed to set response status: %s", esp_err_to_name(err));
+    // FIXME: send something?
     return err;
   }
+
+  // send with correct content type
   return send_json_message(req, status + 4);
 }
 
+// generic handler for all errors
+// only raised by the router/httpd core, not by the handlers
 static esp_err_t error_handler(httpd_req_t *req, httpd_err_code_t err_code) {
-  char *message;
-
-  // Log the request details
-  log_request(req);
-
-  // TODO:???
-  httpd_resp_send_custom_err(httpd_req_t * req, const char *status,
-                             const char *msg)
+  if (strstr(req->uri, "/api/") != nullptr) {
+    // For API endpoints, send JSON error response
+    const char *message = convert_httpd_err_code_to_string(err_code);
+    return send_json_status(req, message);
+  } else {
+    // For non-API endpoints, send HTML error response
+    return httpd_resp_send_err(req, err_code, nullptr);
+  }
 }
 
 // Errors are only raised by the router/httpd core, not by the handlers
+// registering all avaiable in httpd_err_code_t
 esp_err_t register_error_handlers(httpd_handle_t server) {
-  esp_err_t err = ESP_OK;
-  // Register not found handler
-  err += httpd_register_err_handler(server, HTTPD_500_INTERNAL_SERVER_ERROR,
-                                    error_handler);
-  err += httpd_register_err_handler(server, HTTPD_501_METHOD_NOT_IMPLEMENTED,
-                                    error_handler);
-  err += httpd_register_err_handler(server, HTTPD_505_VERSION_NOT_SUPPORTED,
-                                    error_handler);
-  err +=
-      httpd_register_err_handler(server, HTTPD_400_BAD_REQUEST, error_handler);
-  err +=
-      httpd_register_err_handler(server, HTTPD_401_UNAUTHORIZED, error_handler);
-  err += httpd_register_err_handler(server, HTTPD_403_FORBIDDEN, error_handler);
-  err += httpd_register_err_handler(server, HTTPD_404_NOT_FOUND, error_handler);
-  err += httpd_register_err_handler(server, HTTPD_405_METHOD_NOT_ALLOWED,
-                                    error_handler);
-  err +=
-      httpd_register_err_handler(server, HTTPD_408_REQ_TIMEOUT, error_handler);
-  err += httpd_register_err_handler(server, HTTPD_411_LENGTH_REQUIRED,
-                                    error_handler);
-  err += httpd_register_err_handler(server, HTTPD_413_CONTENT_TOO_LARGE,
-                                    error_handler);
-  err +=
-      httpd_register_err_handler(server, HTTPD_414_URI_TOO_LONG, error_handler);
-  err += httpd_register_err_handler(server, HTTPD_431_REQ_HDR_FIELDS_TOO_LARGE,
-                                    error_handler);
+  // 500
+  ESP_RETURN_ON_ERROR(
+      httpd_register_err_handler(server, HTTPD_500_INTERNAL_SERVER_ERROR,
+                                 error_handler),
+      TAG, "Failed to register 500 error handler");
 
-  if (err != ESP_OK) {
-    ESP_LOGE(TAG, "Failed to register error handlers");
-    return ESP_FAIL;
-  } else {
-    ESP_LOGI(TAG, "Error handlers registered successfully");
-    return ESP_OK;
-  }
+  // 501
+  ESP_RETURN_ON_ERROR(
+      httpd_register_err_handler(server, HTTPD_501_METHOD_NOT_IMPLEMENTED,
+                                 error_handler),
+      TAG, "Failed to register 501 error handler");
+
+  // 505
+  ESP_RETURN_ON_ERROR(
+      httpd_register_err_handler(server, HTTPD_505_VERSION_NOT_SUPPORTED,
+                                 error_handler),
+      TAG, "Failed to register 505 error handler");
+
+  // 400
+  ESP_RETURN_ON_ERROR(
+      httpd_register_err_handler(server, HTTPD_400_BAD_REQUEST, error_handler),
+      TAG, "Failed to register 400 error handler");
+
+  // 401
+  ESP_RETURN_ON_ERROR(
+      httpd_register_err_handler(server, HTTPD_401_UNAUTHORIZED, error_handler),
+      TAG, "Failed to register 401 error handler");
+
+  // 403
+  ESP_RETURN_ON_ERROR(
+      httpd_register_err_handler(server, HTTPD_403_FORBIDDEN, error_handler),
+      TAG, "Failed to register 403 error handler");
+
+  // 404
+  ESP_RETURN_ON_ERROR(
+      httpd_register_err_handler(server, HTTPD_404_NOT_FOUND, error_handler),
+      TAG, "Failed to register 404 error handler");
+
+  // 405
+  ESP_RETURN_ON_ERROR(httpd_register_err_handler(
+                          server, HTTPD_405_METHOD_NOT_ALLOWED, error_handler),
+                      TAG, "Failed to register 405 error handler");
+
+  // 408
+  ESP_RETURN_ON_ERROR(
+      httpd_register_err_handler(server, HTTPD_408_REQ_TIMEOUT, error_handler),
+      TAG, "Failed to register 408 error handler");
+
+  // 411
+  ESP_RETURN_ON_ERROR(httpd_register_err_handler(
+                          server, HTTPD_411_LENGTH_REQUIRED, error_handler),
+                      TAG, "Failed to register 411 error handler");
+
+  // 413
+  ESP_RETURN_ON_ERROR(httpd_register_err_handler(
+                          server, HTTPD_413_CONTENT_TOO_LARGE, error_handler),
+                      TAG, "Failed to register 413 error handler");
+
+  // 414
+  ESP_RETURN_ON_ERROR(
+      httpd_register_err_handler(server, HTTPD_414_URI_TOO_LONG, error_handler),
+      TAG, "Failed to register 414 error handler");
+
+  // 431
+  ESP_RETURN_ON_ERROR(
+      httpd_register_err_handler(server, HTTPD_431_REQ_HDR_FIELDS_TOO_LARGE,
+                                 error_handler),
+      TAG, "Failed to register 431 error handler");
+
+  return ESP_OK;
 }
 
 ///////////////
@@ -224,8 +244,6 @@ static esp_err_t settings_get_handler(httpd_req_t *req) {
   }
 }
 
-return send_json_message(req, "Failed to serialize settings",
-                         HTTPD_500_INTERNAL_SERVER_ERROR);
 static esp_err_t settings_post_handler(httpd_req_t *req) {
   char *buf = (char *)malloc(req->content_len + 2);
 

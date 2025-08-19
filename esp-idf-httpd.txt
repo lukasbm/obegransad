@@ -35,3 +35,11 @@ Operations on the request:
 - httpd_req_get_cookie_val
 - httpd_query_key_value
 - httpd_req_get_url_query_str
+
+
+ESP macros:
+ESP_RETURN_ON_ERROR
+ESP_RETURN_VOID_ON_ERROR
+ESP_GOTO_ON_ERROR
+ESP_GOTO_ON_ERROR_ISR
+ESP_RETURN_ON_FALSE
