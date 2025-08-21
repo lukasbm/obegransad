@@ -63,15 +63,15 @@ extern "C" void app_main() {
   button_init();
   // wifi_init();
 
-  static panel_config_t panel_config = {
+  panel_config_t panel_config = {
       .latch_pin = (gpio_num_t)3,
       .clk_pin = (gpio_num_t)4,
       .di_pin = (gpio_num_t)5,
       .oe_pin = (gpio_num_t)6,
       .spi_host = SPI2_HOST,                 // Use SPI2 for better performance
       .spi_clock_speed_hz = 3 * 1000 * 1000, // 1 MHz SPI clock speed
-  };
-  panel_init(&panel_config);
+      .gamma = 2.2};
+  panel_init(panel_config);
   panel_timer_start();
 
   // set up some example image
@@ -83,7 +83,6 @@ extern "C" void app_main() {
     }
   }
   panel_set_global_brightness(100);
-  panel_commit();
   uint8_t b = 0;
   while (true) {
     // advance_state_machine();
