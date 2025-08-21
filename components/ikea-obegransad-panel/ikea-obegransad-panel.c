@@ -10,6 +10,7 @@
 #include "esp_timer.h"
 #include "freertos/task.h"
 #include "soc/gpio_struct.h"
+#include <math.h>
 #include <string.h>
 
 // Timing constants for BCM (Bit Code Modulation)
@@ -59,9 +60,9 @@ static const uint8_t lut[16][16] = {
     {232, 233, 234, 235, 236, 237, 238, 239, 248, 249, 250, 251, 252, 253, 254,
      255}};
 
-uint8_t gBright = 255; // global brightness (0-255)
-
 // Driver state - hardware handles and configuration
+static uint8_t g_brightness_panel = 255;
+static uint8_t g_brightness_user = 255;
 static panel_config_t g_config;
 static spi_device_handle_t g_spi;
 static rmt_channel_handle_t g_rmt_oe;
@@ -106,9 +107,9 @@ static inline void IRAM_ATTR latch_pulse(void) {
   esp_rom_delay_us(1); // 1µs hold time
 }
 
-esp_err_t panel_init(const panel_config_t *config) {
+esp_err_t panel_init(panel_config_t config) {
   ESP_LOGI(TAG, "Initializing IKEA Obegränsad panel driver");
-  g_config = *config;
+  g_config = config;
 
   // FIXME: does not work?
   esp_log_level_set(TAG, ESP_LOG_DEBUG); // Set debug level for this component
@@ -174,8 +175,20 @@ void panel_commit(void) { g_refresh_needed = true; }
  * @param brightness Global brightness (0-255), applied to all pixels
  */
 void panel_set_global_brightness(uint8_t brightness) {
-  // TODO: add a negative gamma curve, as it is not linear
-  gBright = brightness;
+  g_brightness_user = brightness;
+
+  // Apply gamma correction
+  float brightness_f = (float)brightness / 255.0f;
+  brightness = (uint8_t)(pow(brightness_f, g_config.gamma) * 255.0f +
+                         0.1f); // +0.5f for rounding
+  // Clamp to valid range
+  if (brightness > 255)
+    brightness = 255;
+
+  if (brightness < 0)
+    brightness = 0; // Ensure non-negative
+
+  g_brightness_panel = brightness;
   g_refresh_needed = true; // Trigger refresh with new brightness
 }
 
@@ -183,7 +196,7 @@ void panel_set_global_brightness(uint8_t brightness) {
  * @brief Get current global brightness scaling factor
  * @return Current global brightness (0-255)
  */
-uint8_t panel_get_global_brightness(void) { return gBright; }
+uint8_t panel_get_global_brightness(void) { return g_brightness_user; }
 
 /**
  * @brief ESP Timer callback - triggers display refresh
@@ -383,7 +396,7 @@ static void display_bitplane(uint8_t plane) {
   // Step 3: Enable LED output for precise duration using RMT
   // Shorter duration for LSB plane (fine brightness), longer for MSB plane
   // (coarse brightness)
-  rmt_send_oe_pulse((plane_times_us[plane] * gBright) / 255);
+  rmt_send_oe_pulse((plane_times_us[plane] * g_brightness_panel) / 255);
 }
 
 /**
