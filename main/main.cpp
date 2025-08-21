@@ -82,17 +82,11 @@ extern "C" void app_main() {
       .di_pin = (gpio_num_t)5,
       .oe_pin = (gpio_num_t)6,
       .spi_host = SPI2_HOST,                 // Use SPI2 for better performance
-      .spi_clock_speed_hz = 2 * 1000 * 1000, // 10 MHz
-  };
-  ESP_ERROR_CHECK(panel_init(&panel_config));
-  ESP_ERROR_CHECK(panel_timer_start());
+      .spi_clock_speed_hz = 3 * 1000 * 1000, // 1 MHz SPI clock speed
+      .gamma = 2.2};
 
-  // TEST PANEL
-  ESP_LOGI(TAG, "Testing panel display");
-  panel_clear();
-  panel_setPixel(8, 10, PANEL_BRIGHTNESS_1);
-  panel_setPixel(8, 8, PANEL_BRIGHTNESS_2);
-  panel_setPixel(8, 6, PANEL_BRIGHTNESS_3);
+  ESP_ERROR_CHECK(panel_init(panel_config));
+  ESP_ERROR_CHECK(panel_timer_start());
 
   // START SERVER
   esp_err_t ret = start_webserver();
@@ -113,20 +107,22 @@ extern "C" void app_main() {
   //   ESP_LOGE(TAG, "Failed to fetch weather: %s", esp_err_to_name(ret));
   // }
 
-  // main loop
+  // TEST PANEL
+  panel_clear();
+  for (int i = 0; i < 16; i++) {
+    for (int j = 0; j < 16; j++) {
+      panel_setPixel(j, i,
+                     brightness_levels[j % 4]); // Set a checkerboard pattern }
+    }
+  }
+  uint8_t b = 0;
+
   while (true) {
-    advance_state_machine();
+    // advance_state_machine();
 
-    // TEST TIME
-    // struct tm timeinfo;
-    // if (get_local_time(timeinfo)) {
-    //   char time_str[32];
-    //   strftime(time_str, sizeof(time_str), "%H:%M", &timeinfo);
-    //   ESP_LOGI(TAG, "Current time: %s", time_str);
-    // } else {
-    //   ESP_LOGW(TAG, "Failed to get local time");
-    // }
+    panel_set_global_brightness(b);
+    b++;
 
-    vTaskDelay(pdMS_TO_TICKS(2000)); // Delay for scheduler
+    vTaskDelay(pdMS_TO_TICKS(10)); // Sleep for 100ms
   }
 }

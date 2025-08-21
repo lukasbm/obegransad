@@ -1,5 +1,6 @@
 #include "ikea-obegransad-panel.h"
 
+#include "driver/gpio.h"
 #include "driver/rmt_tx.h"
 #include "driver/spi_master.h"
 #include "esp_attr.h"
@@ -9,19 +10,23 @@
 #include "esp_timer.h"
 #include "freertos/task.h"
 #include "soc/gpio_struct.h"
+#include <math.h>
 #include <string.h>
 
 // Timing constants for BCM (Bit Code Modulation)
-// TODO: make configurable in panel_config_t
-#define PLANE0_ON_US 100
-#define PLANE1_ON_US 200
-#define PLANE2_ON_US 400
-#define PLANE3_ON_US 800
-// TODO: make sure that the sum of all plane times is less than
-// FRAME_PERIOD_US - (some buffer for spi, scheduler, etc. overhead)
 #define FRAME_PERIOD_US 2000 // 500Hz refresh rate = 2000µs period total
+//  make sure that the sum of all plane times is less than
+// FRAME_PERIOD_US - (some buffer for spi, scheduler, etc. overhead)
+#define PLANE0_ON_US 50
+#define PLANE1_ON_US 100
+#define PLANE2_ON_US 200
+#define PLANE3_ON_US 400
 
 static const char *TAG = "panel";
+
+const Brightness brightness_levels[] = {PANEL_BRIGHTNESS_OFF,
+                                        PANEL_BRIGHTNESS_1, PANEL_BRIGHTNESS_2,
+                                        PANEL_BRIGHTNESS_3};
 
 // Each bitplane requires 32 bytes (256 LEDs / 8 bits per byte)
 #define BITPLANE_SIZE_BYTES ((PANEL_WIDTH * PANEL_HEIGHT) / 8)
@@ -55,9 +60,9 @@ static const uint8_t lut[16][16] = {
     {232, 233, 234, 235, 236, 237, 238, 239, 248, 249, 250, 251, 252, 253, 254,
      255}};
 
-uint8_t gBright = 255; // global brightness (0-255)
-
 // Driver state - hardware handles and configuration
+static uint8_t g_brightness_panel = 255;
+static uint8_t g_brightness_user = 255;
 static panel_config_t g_config;
 static spi_device_handle_t g_spi;
 static rmt_channel_handle_t g_rmt_oe;
@@ -92,13 +97,19 @@ static void rmt_send_oe_pulse(uint32_t duration_us);
 
 // Latch pulse: High->Low transition to capture shift register data into output
 static inline void IRAM_ATTR latch_pulse(void) {
-  GPIO.out_w1ts.val = (1 << g_config.latch_pin); // Set high
-  GPIO.out_w1tc.val = (1 << g_config.latch_pin); // Set low
+  // Ensure setup time after SPI clock stops
+  esp_rom_delay_us(1); // 1µs setup time
+  // Latch pulse: High for sufficient duration
+  GPIO.out_w1ts.val = (1 << g_config.latch_pin); // Latch high
+  esp_rom_delay_us(2); // 2µs latch pulse width - critical for reliable capture
+  GPIO.out_w1tc.val = (1 << g_config.latch_pin); // Latch low
+  // Hold time before next operation
+  esp_rom_delay_us(1); // 1µs hold time
 }
 
-esp_err_t panel_init(const panel_config_t *config) {
+esp_err_t panel_init(panel_config_t config) {
   ESP_LOGI(TAG, "Initializing IKEA Obegränsad panel driver");
-  g_config = *config;
+  g_config = config;
 
   // FIXME: does not work?
   esp_log_level_set(TAG, ESP_LOG_DEBUG); // Set debug level for this component
@@ -164,7 +175,20 @@ void panel_commit(void) { g_refresh_needed = true; }
  * @param brightness Global brightness (0-255), applied to all pixels
  */
 void panel_set_global_brightness(uint8_t brightness) {
-  gBright = brightness;
+  g_brightness_user = brightness;
+
+  // Apply gamma correction
+  float brightness_f = (float)brightness / 255.0f;
+  brightness = (uint8_t)(pow(brightness_f, g_config.gamma) * 255.0f +
+                         0.1f); // +0.5f for rounding
+  // Clamp to valid range
+  if (brightness > 255)
+    brightness = 255;
+
+  if (brightness < 0)
+    brightness = 0; // Ensure non-negative
+
+  g_brightness_panel = brightness;
   g_refresh_needed = true; // Trigger refresh with new brightness
 }
 
@@ -172,7 +196,7 @@ void panel_set_global_brightness(uint8_t brightness) {
  * @brief Get current global brightness scaling factor
  * @return Current global brightness (0-255)
  */
-uint8_t panel_get_global_brightness(void) { return gBright; }
+uint8_t panel_get_global_brightness(void) { return g_brightness_user; }
 
 /**
  * @brief ESP Timer callback - triggers display refresh
@@ -255,8 +279,10 @@ static void prepare_bitplane(uint8_t plane) {
   for (int y = 0; y < PANEL_HEIGHT; y++) {
     for (int x = 0; x < PANEL_WIDTH; x++) {
       uint8_t pixel_brightness = g_framebuffer[y][x]; // 0 to 2^BIT_DEPTH-1
+
       // Check if this bit plane should be lit for this pixel in the plane
-      if (pixel_brightness & (1 << plane)) {
+      // by thresholding against the current bit value
+      if (pixel_brightness >= (1 << plane)) {
         // Map logical pixel position to physical LED using the wiring LUT
         uint8_t physical_led = lut[y][x];
         uint8_t byte_idx = physical_led / 8;
@@ -266,6 +292,25 @@ static void prepare_bitplane(uint8_t plane) {
       }
     }
   }
+}
+
+static esp_err_t configure_gpio_drive_strength(void) {
+  // Increase drive strength for SPI pins
+  ESP_RETURN_ON_ERROR(
+      gpio_set_drive_capability(g_config.clk_pin, GPIO_DRIVE_CAP_3), TAG,
+      "Failed to set CLK drive strength");
+  ESP_RETURN_ON_ERROR(
+      gpio_set_drive_capability(g_config.di_pin, GPIO_DRIVE_CAP_3), TAG,
+      "Failed to set DI drive strength");
+  ESP_RETURN_ON_ERROR(
+      gpio_set_drive_capability(g_config.latch_pin, GPIO_DRIVE_CAP_3), TAG,
+      "Failed to set LATCH drive strength");
+  ESP_RETURN_ON_ERROR(
+      gpio_set_drive_capability(g_config.oe_pin, GPIO_DRIVE_CAP_3), TAG,
+      "Failed to set OE drive strength");
+
+  ESP_LOGI(TAG, "GPIO drive strength increased to maximum");
+  return ESP_OK;
 }
 
 /**
@@ -312,14 +357,15 @@ static void rmt_send_oe_pulse(uint32_t duration_us) {
   };
 
   rmt_transmit_config_t tx_config = {
-      .loop_count = 0,     // do not repeat signal
-      .flags.eot_level = 1 // End of transmission level (1 = high)
+      .loop_count = 0,      // do not repeat signal
+      .flags.eot_level = 1, // End of transmission level (1 = high)
+      .flags.queue_nonblocking = 1,
   };
   rmt_transmit(g_rmt_oe, g_rmt_encoder, &oe_symbol, sizeof(oe_symbol),
                &tx_config);
 
   // Wait for transmission to complete before continuing
-  rmt_tx_wait_all_done(g_rmt_oe, portMAX_DELAY);
+  // rmt_tx_wait_all_done(g_rmt_oe, portMAX_DELAY);
 }
 
 /**
@@ -336,17 +382,21 @@ static void display_bitplane(uint8_t plane) {
       .tx_buffer = g_bitplanes[plane],        // Prepared bitplane data
   };
 
-  // active blocking SPI transfer (not in ISR)
+  // Step 1: active blocking SPI transfer (not in ISR)
   esp_err_t ret = spi_device_polling_transmit(g_spi, &trans);
-  if (ret == ESP_OK) {
-    // Step 2: Latch the data from shift registers to output registers
-    latch_pulse();
-
-    // Step 3: Enable LED output for precise duration using RMT
-    // Shorter duration for LSB plane (fine brightness), longer for MSB plane
-    // (coarse brightness)
-    rmt_send_oe_pulse((plane_times_us[plane] * gBright) / 255);
+  if (ret != ESP_OK) {
+    ESP_LOGE(TAG, "SPI transmission failed for plane %d: %s", plane,
+             esp_err_to_name(ret));
+    return;
   }
+
+  // Step 2: Latch the data from shift registers to output registers
+  latch_pulse();
+
+  // Step 3: Enable LED output for precise duration using RMT
+  // Shorter duration for LSB plane (fine brightness), longer for MSB plane
+  // (coarse brightness)
+  rmt_send_oe_pulse((plane_times_us[plane] * g_brightness_panel) / 255);
 }
 
 /**
@@ -365,6 +415,9 @@ static esp_err_t init_gpio_pins(void) {
 
   GPIO.out_w1tc.val = (1 << g_config.latch_pin); // Latch low (idle state)
   GPIO.out_w1ts.val = (1 << g_config.oe_pin);    // Set high (LEDs off)
+
+  configure_gpio_drive_strength(); // Increase drive strength for all relevant
+                                   // pins
 
   return ESP_OK;
 }
@@ -397,6 +450,10 @@ static esp_err_t init_spi_interface(void) {
       .spics_io_num = -1,           // No CS pin (manual latch control)
       .queue_size = 1,              // Single transaction queue
       .flags = SPI_DEVICE_NO_DUMMY, // No dummy cycles needed
+      // Add timing margins for shift register setup/hold times
+      .cs_ena_pretrans = 0,
+      .cs_ena_posttrans = 0,
+      .input_delay_ns = 0,
   };
 
   // Initialize SPI bus and add device
