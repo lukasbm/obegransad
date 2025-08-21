@@ -17,9 +17,11 @@ extern "C" {
 typedef enum : uint8_t {
   PANEL_BRIGHTNESS_OFF = 0,
   PANEL_BRIGHTNESS_1 = 1,
-  PANEL_BRIGHTNESS_2 = 5,
-  PANEL_BRIGHTNESS_3 = 16,
+  PANEL_BRIGHTNESS_2 = 3,
+  PANEL_BRIGHTNESS_3 = 15,
 } Brightness;
+
+extern const Brightness brightness_levels[];
 
 typedef struct {
   gpio_num_t latch_pin;

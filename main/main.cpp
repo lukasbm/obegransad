@@ -69,18 +69,26 @@ extern "C" void app_main() {
       .di_pin = (gpio_num_t)5,
       .oe_pin = (gpio_num_t)6,
       .spi_host = SPI2_HOST,                 // Use SPI2 for better performance
-      .spi_clock_speed_hz = 2 * 1000 * 1000, // 10 MHz
+      .spi_clock_speed_hz = 3 * 1000 * 1000, // 1 MHz SPI clock speed
   };
   panel_init(&panel_config);
   panel_timer_start();
+
   // set up some example image
   panel_clear();
-  uint8_t pix = 0;
+  for (int i = 0; i < 16; i++) {
+    for (int j = 0; j < 16; j++) {
+      panel_setPixel(j, i,
+                     brightness_levels[j % 4]); // Set a checkerboard pattern }
+    }
+  }
+  panel_set_global_brightness(100);
+  panel_commit();
+  uint8_t b = 0;
   while (true) {
     // advance_state_machine();
-    // ESP_LOGI(TAG, "State machine advanced");
-    vTaskDelay(pdMS_TO_TICKS(200)); // Delay for scheduler
-    panel_setPixel(pix / PANEL_WIDTH, pix % PANEL_WIDTH, Brightness(pix % 16));
-    pix = (pix + 1) % (PANEL_WIDTH * PANEL_HEIGHT);
+    vTaskDelay(pdMS_TO_TICKS(10)); // Sleep for 100ms
+    panel_set_global_brightness(b);
+    b++;
   }
 }
