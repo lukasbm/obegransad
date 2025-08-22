@@ -1,0 +1,89 @@
+#include "helper.hpp"
+#include "ikea-obegransad-panel.h"
+#include "scene.h"
+#include <cstring>
+#include <esp_random.h>
+#include <stdlib.h>
+
+class GameOfLifeScene : public Scene {
+private:
+  bool buffer[16][16];
+  bool back_buffer[16][16];
+
+  RenderTimer evol_timer;
+
+  void evolve() {
+    for (uint8_t y = 0; y < 16; ++y) {
+      for (uint8_t x = 0; x < 16; ++x) {
+        // Count alive neighbors
+        int alive_neighbors = 0;
+        for (int dy = -1; dy <= 1; ++dy) {
+          for (int dx = -1; dx <= 1; ++dx) {
+            if (dx == 0 && dy == 0)
+              continue; // Skip self
+            // torodial wrapping
+            int nx = (x + dx + 16) % 16;
+            int ny = (y + dy + 16) % 16;
+            if (buffer[ny][nx])
+              alive_neighbors++;
+          }
+        }
+
+        // Apply rules of life
+        if (buffer[y][x]) {
+          back_buffer[y][x] = (alive_neighbors == 2 || alive_neighbors == 3);
+        } else {
+          back_buffer[y][x] = (alive_neighbors == 3);
+        }
+      }
+    }
+
+    // Swap buffers
+    memcpy(buffer, back_buffer, sizeof(buffer));
+  }
+
+  void draw() {
+    for (uint8_t y = 0; y < 16; ++y) {
+      for (uint8_t x = 0; x < 16; ++x) {
+        if (buffer[y][x]) {
+          panel_setPixel(y, x, PANEL_BRIGHTNESS_3);
+        } else {
+          panel_setPixel(y, x, PANEL_BRIGHTNESS_OFF);
+        }
+      }
+      panel_commit();
+    }
+  }
+
+  void clear_buffers() {
+    memset(buffer, 0, sizeof(buffer));
+    memset(back_buffer, 0, sizeof(back_buffer));
+  }
+
+public:
+  GameOfLifeScene()
+      : evol_timer("game of life evolution timer", 500, [this]() {
+          this->evolve();
+          this->draw();
+        }) {
+    name = "Game of Life";
+  }
+
+  void activate() override {
+    evol_timer.start();
+
+    panel_clear();
+    clear_buffers();
+
+    // initialize a random pattern
+    // TODO: also allow user to set initial pattern via config (the web
+    // portal)
+    for (uint8_t y = 0; y < 16; ++y) {
+      for (uint8_t x = 0; x < 16; ++x) {
+        buffer[y][x] = esp_random() % 2; // Randomly set cells to alive or dead
+      }
+    }
+  }
+
+  void deactivate() override { evol_timer.stop(); }
+};

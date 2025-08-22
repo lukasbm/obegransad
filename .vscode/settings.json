@@ -26,6 +26,7 @@
     "regex": "cpp"
   },
   "cSpell.words": [
+    "evol",
     "gptimer",
     "littlefs",
     "SRCS"

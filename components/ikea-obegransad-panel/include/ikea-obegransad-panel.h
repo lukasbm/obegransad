@@ -96,6 +96,13 @@ void panel_set_global_brightness(uint8_t brightness);
  */
 uint8_t panel_get_global_brightness(void);
 
+/**
+ * @brief Commit changes to the framebuffer
+ * This marks the framebuffer as needing a refresh, so the next timer tick will
+ * apply the changes.
+ */
+void panel_commit(void);
+
 #ifdef __cplusplus
 }
 #endif
