@@ -65,9 +65,9 @@ public:
       : evol_timer("game of life evolution timer", 500, [this]() {
           this->evolve();
           this->draw();
-        }) {
-    name = "Game of Life";
-  }
+        }) {}
+
+  const char *get_scene_name() const override { return "Game of Life"; }
 
   void activate() override {
     evol_timer.start();

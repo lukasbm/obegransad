@@ -60,13 +60,13 @@ esp_err_t panel_timer_stop(void);
  * @brief Set the brightness of a specific pixel on the framebuffer
  * It will be applied on the next refresh cycle.
  */
-void panel_setPixel(uint8_t row, uint8_t col, Brightness brightness);
+void panel_setPixel(uint8_t row, uint8_t col, uint8_t brightness);
 
 /**
  * @brief Fill the entire framebuffer with a specific brightness level
  * It will be applied on the next refresh cycle.
  */
-void panel_fill(Brightness brightness);
+void panel_fill(uint8_t brightness);
 
 /**
  * @brief Clear the framebuffer by setting all pixels to off

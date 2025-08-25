@@ -71,7 +71,7 @@ static esp_timer_handle_t g_refresh_timer; // ESP Timer for precise 500Hz timing
 static uint8_t g_plane_idx = 0; // Current bit plane index for display
 
 // Buffers
-static Brightness g_framebuffer[PANEL_HEIGHT][PANEL_WIDTH];
+static uint8_t g_framebuffer[PANEL_HEIGHT][PANEL_WIDTH];
 static uint8_t g_bitplanes[BIT_DEPTH][BITPLANE_SIZE_BYTES];
 static volatile bool g_refresh_needed = false;
 
@@ -146,9 +146,9 @@ esp_err_t panel_timer_stop(void) { return esp_timer_stop(g_refresh_timer); }
  * @brief Set individual pixel brightness using logical coordinates
  * @param row Pixel row (0-15)
  * @param col Pixel column (0-15)
- * @param brightness Brightness level (0-3, see Brightness enum)
+ * @param brightness Brightness level (see Brightness enum)
  */
-void panel_setPixel(uint8_t row, uint8_t col, Brightness brightness) {
+void panel_setPixel(uint8_t row, uint8_t col, uint8_t brightness) {
   if (row >= PANEL_HEIGHT || col >= PANEL_WIDTH)
     return;
   g_framebuffer[row][col] = brightness;
@@ -157,9 +157,9 @@ void panel_setPixel(uint8_t row, uint8_t col, Brightness brightness) {
 
 /**
  * @brief Fill entire panel with uniform brightness
- * @param brightness Brightness level (0-3, see Brightness enum)
+ * @param brightness Brightness level (see Brightness enum)
  */
-void panel_fill(Brightness brightness) {
+void panel_fill(uint8_t brightness) {
   memset(g_framebuffer, (uint8_t)brightness, sizeof(g_framebuffer));
   g_refresh_needed = true;
 }
