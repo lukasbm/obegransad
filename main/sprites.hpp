@@ -62,8 +62,6 @@ inline void drawSprite(int8_t tlX, int8_t tlY, const uint8_t *data,
       size_t pixel_index = y * width + x;
       uint8_t pixel_brightness = data[pixel_index];
 
-      // FIXME: have to remap the brightness?
-
       panel_setPixel(targetY, targetX, pixel_brightness);
     }
   }
