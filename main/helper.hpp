@@ -87,6 +87,9 @@ public:
     if (timer) {
       esp_timer_start_periodic(timer, interval_us);
     }
+
+    // immediately trigger the callback once
+    // timer_callback(this);
   }
 
   void stop() {

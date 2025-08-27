@@ -1,3 +1,5 @@
+#pragma once
+
 #include "helper.hpp"
 #include "ikea-obegransad-panel.h"
 #include "scene.h"

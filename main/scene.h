@@ -4,7 +4,12 @@ class Scene {
 public:
   virtual const char *get_scene_name() const = 0;
 
-  virtual void activate() = 0;
-  virtual void deactivate() = 0;
-  virtual void update() = 0;
+  virtual void activate() {};
+  virtual void deactivate() {};
+  virtual void update() {};
+
+  // protected:
+  //   void log_scene_event(const char *event) const {
+  //     ESP_LOGI("scene", "%s: %s", get_scene_name(), event);
+  //   }
 };
