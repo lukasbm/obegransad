@@ -2,7 +2,6 @@
 out_dir="../../data/"
 mkdir -p "${out_dir}"
 
-python3 img2bwb.py small_test.bmp 4 4 > "${out_dir}/small_test.bwb"
 python3 img2bwb.py ThinGlyphs4x6.bmp 4 6 > "${out_dir}/thin_glyphs.bwb"
 python3 img2bwb.py BoldGlyphs6x7.bmp 6 7 > "${out_dir}/bold_glyphs.bwb"
 python3 img2bwb.py Sun.bmp 9 9 > "${out_dir}/sun.bwb"

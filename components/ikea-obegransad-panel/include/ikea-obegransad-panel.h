@@ -11,14 +11,13 @@ extern "C" {
 
 #define PANEL_WIDTH 16
 #define PANEL_HEIGHT 16
-#define BIT_DEPTH 4 // has to be between 1 and 8
 
 // provide a simple set of nice brightness levels (manually selected)
 typedef enum : uint8_t {
   PANEL_BRIGHTNESS_OFF = 0,
-  PANEL_BRIGHTNESS_1 = 1,
-  PANEL_BRIGHTNESS_2 = 3,
-  PANEL_BRIGHTNESS_3 = 15,
+  PANEL_BRIGHTNESS_1 = 3, // 17
+  PANEL_BRIGHTNESS_2 = 63,
+  PANEL_BRIGHTNESS_3 = 255,
 } Brightness;
 
 extern const Brightness brightness_levels[];

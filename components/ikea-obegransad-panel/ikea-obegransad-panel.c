@@ -17,6 +17,9 @@
 #define FRAME_PERIOD_US 2000 // 500Hz refresh rate = 2000µs period total
 //  make sure that the sum of all plane times is less than
 // FRAME_PERIOD_US - (some buffer for spi, scheduler, etc. overhead)
+
+// color depth settings
+#define BIT_DEPTH 4 // has to be between 1 and 8
 #define PLANE0_ON_US 50
 #define PLANE1_ON_US 100
 #define PLANE2_ON_US 200
@@ -107,6 +110,10 @@ static inline void IRAM_ATTR latch_pulse(void) {
   esp_rom_delay_us(1); // 1µs hold time
 }
 
+//////////////////////////////////
+// important API functions //
+//////////////////////////////////
+
 esp_err_t panel_init(panel_config_t config) {
   ESP_LOGI(TAG, "Initializing IKEA Obegränsad panel driver");
   g_config = config;
@@ -142,6 +149,32 @@ esp_err_t panel_timer_start(void) {
  */
 esp_err_t panel_timer_stop(void) { return esp_timer_stop(g_refresh_timer); }
 
+///////////////////////////////
+// Framebuffer manipulation API //
+///////////////////////////////
+
+static uint8_t map_value_generic(uint8_t value, uint8_t in_min, uint8_t in_max,
+                                 uint8_t out_min, uint8_t out_max) {
+  return (uint8_t)((value - in_min) * (out_max - out_min) / (in_max - in_min) +
+                   out_min);
+}
+
+/**
+ * @brief Maps a full 8 bit value (0-255) to the nearest supported brightness
+ * level based on BIT_DEPTH
+ */
+static uint8_t map_value(uint8_t value) {
+  if (value == 0) {
+    return 0;
+  } else if (value <= PANEL_BRIGHTNESS_1) {
+    return PANEL_BRIGHTNESS_1;
+  } else if (value <= PANEL_BRIGHTNESS_2) {
+    return PANEL_BRIGHTNESS_2;
+  } else {
+    return PANEL_BRIGHTNESS_3;
+  }
+}
+
 /**
  * @brief Set individual pixel brightness using logical coordinates
  * @param row Pixel row (0-15)
@@ -151,7 +184,7 @@ esp_err_t panel_timer_stop(void) { return esp_timer_stop(g_refresh_timer); }
 void panel_setPixel(uint8_t row, uint8_t col, uint8_t brightness) {
   if (row >= PANEL_HEIGHT || col >= PANEL_WIDTH)
     return;
-  g_framebuffer[row][col] = brightness;
+  g_framebuffer[row][col] = map_value(brightness);
   g_refresh_needed = true;
 }
 
@@ -160,7 +193,7 @@ void panel_setPixel(uint8_t row, uint8_t col, uint8_t brightness) {
  * @param brightness Brightness level (see Brightness enum)
  */
 void panel_fill(uint8_t brightness) {
-  memset(g_framebuffer, (uint8_t)brightness, sizeof(g_framebuffer));
+  memset(g_framebuffer, map_value(brightness), sizeof(g_framebuffer));
   g_refresh_needed = true;
 }
 
@@ -198,6 +231,10 @@ void panel_set_global_brightness(uint8_t brightness) {
  */
 uint8_t panel_get_global_brightness(void) { return g_brightness_user; }
 
+//////////////////////////
+// Actual Driver functions //
+//////////////////////////
+
 /**
  * @brief ESP Timer callback - triggers display refresh
  * This callback runs in ESP Timer task context and can safely do blocking
@@ -220,45 +257,6 @@ static void refresh_timer_callback(void *arg) {
   GPIO.out_w1ts.val = (1 << g_config.oe_pin); // LEDs off to avoid flickering!)
   display_bitplane(g_plane_idx);
   g_plane_idx = (g_plane_idx + 1) % BIT_DEPTH; // Increment plane index
-}
-
-static void print_bitplane(uint8_t plane) {
-  // print the newly prepared bitplane for debugging
-  ESP_LOGI(TAG, "Prepared bitplane %d: ", plane);
-
-  // 256 bits → 256 chars, +1 for NUL
-  char line[256 + 1];
-
-  // Fill in each bit
-  for (size_t i = 0; i < BITPLANE_SIZE_BYTES; ++i) {
-    for (int b = 0; b < 8; ++b) {
-      // bit 7 of byte i goes to position i*8 + 0, etc.
-      line[i * 8 + b] = (g_bitplanes[plane][i] & (1u << (7 - b))) ? '1' : '0';
-    }
-  }
-  line[BITPLANE_SIZE_BYTES * 8] = '\0';
-
-  // Single log call prints entire 256-bit string on one line
-  ESP_LOGI(TAG, "%s", line);
-}
-
-static void print_framebuffer(void) {
-  ESP_LOGI(TAG, "Current framebuffer state:");
-
-  for (int i = 0; i < PANEL_HEIGHT; i++) {
-    // Build one formatted line per row
-    // the 3 is for 3 digits (max 255) + space and a final null terminator
-    char line[4 * PANEL_WIDTH + 1] = {0};
-    int pos = 0;
-    for (int j = 0; j < PANEL_WIDTH; j++) {
-      pos +=
-          snprintf(line + pos, sizeof(line) - pos, "%3d ", g_framebuffer[i][j]);
-    }
-    // Ensure null-termination
-    line[sizeof(line) - 1] = '\0'; // Safety null-termination
-    // Log the formatted line
-    ESP_LOGI(TAG, "%s", line);
-  }
 }
 
 /**
@@ -292,54 +290,6 @@ static void prepare_bitplane(uint8_t plane) {
       }
     }
   }
-}
-
-static esp_err_t configure_gpio_drive_strength(void) {
-  // Increase drive strength for SPI pins
-  ESP_RETURN_ON_ERROR(
-      gpio_set_drive_capability(g_config.clk_pin, GPIO_DRIVE_CAP_3), TAG,
-      "Failed to set CLK drive strength");
-  ESP_RETURN_ON_ERROR(
-      gpio_set_drive_capability(g_config.di_pin, GPIO_DRIVE_CAP_3), TAG,
-      "Failed to set DI drive strength");
-  ESP_RETURN_ON_ERROR(
-      gpio_set_drive_capability(g_config.latch_pin, GPIO_DRIVE_CAP_3), TAG,
-      "Failed to set LATCH drive strength");
-  ESP_RETURN_ON_ERROR(
-      gpio_set_drive_capability(g_config.oe_pin, GPIO_DRIVE_CAP_3), TAG,
-      "Failed to set OE drive strength");
-
-  ESP_LOGI(TAG, "GPIO drive strength increased to maximum");
-  return ESP_OK;
-}
-
-/**
- * @brief Setup RMT channel for precise OE (Output Enable) timing control
- * RMT provides microsecond-precision timing needed for BCM brightness control
- * @return ESP_OK on success, error code on failure
- */
-static esp_err_t rmt_setup_oe_channel(void) {
-  // Configure RMT transmitter for OE pin control
-  rmt_tx_channel_config_t tx_config = {
-      .gpio_num = g_config.oe_pin,
-      .clk_src = RMT_CLK_SRC_DEFAULT,
-      .resolution_hz = 1000000, // 1MHz = 1µs resolution for precise timing
-      .mem_block_symbols = 64,
-      .trans_queue_depth = 1, // Single transaction at a time
-      .flags.with_dma = false,
-      .flags.invert_out = false,
-  };
-  ESP_RETURN_ON_ERROR(rmt_new_tx_channel(&tx_config, &g_rmt_oe), TAG,
-                      "Failed to create RMT TX channel");
-
-  // Create copy encoder for symbol transmission
-  rmt_copy_encoder_config_t encoder_config = {};
-  ESP_RETURN_ON_ERROR(rmt_new_copy_encoder(&encoder_config, &g_rmt_encoder),
-                      TAG, "Failed to create RMT encoder");
-
-  ESP_RETURN_ON_ERROR(rmt_enable(g_rmt_oe), TAG,
-                      "Failed to enable RMT channel");
-  return ESP_OK;
 }
 
 /**
@@ -397,6 +347,101 @@ static void display_bitplane(uint8_t plane) {
   // Shorter duration for LSB plane (fine brightness), longer for MSB plane
   // (coarse brightness)
   rmt_send_oe_pulse((plane_times_us[plane] * g_brightness_panel) / 255);
+}
+
+/////////////////////////
+// DEBUG functions //
+/////////////////////////
+
+static void print_bitplane(uint8_t plane) {
+  // print the newly prepared bitplane for debugging
+  ESP_LOGI(TAG, "Prepared bitplane %d: ", plane);
+
+  // 256 bits → 256 chars, +1 for NUL
+  char line[256 + 1];
+
+  // Fill in each bit
+  for (size_t i = 0; i < BITPLANE_SIZE_BYTES; ++i) {
+    for (int b = 0; b < 8; ++b) {
+      // bit 7 of byte i goes to position i*8 + 0, etc.
+      line[i * 8 + b] = (g_bitplanes[plane][i] & (1u << (7 - b))) ? '1' : '0';
+    }
+  }
+  line[BITPLANE_SIZE_BYTES * 8] = '\0';
+
+  // Single log call prints entire 256-bit string on one line
+  ESP_LOGI(TAG, "%s", line);
+}
+
+static void print_framebuffer(void) {
+  ESP_LOGI(TAG, "Current framebuffer state:");
+
+  for (int i = 0; i < PANEL_HEIGHT; i++) {
+    // Build one formatted line per row
+    // the 3 is for 3 digits (max 255) + space and a final null terminator
+    char line[4 * PANEL_WIDTH + 1] = {0};
+    int pos = 0;
+    for (int j = 0; j < PANEL_WIDTH; j++) {
+      pos +=
+          snprintf(line + pos, sizeof(line) - pos, "%3d ", g_framebuffer[i][j]);
+    }
+    // Ensure null-termination
+    line[sizeof(line) - 1] = '\0'; // Safety null-termination
+    // Log the formatted line
+    ESP_LOGI(TAG, "%s", line);
+  }
+}
+
+/////////////////////////////
+// Initialization helper functions //
+/////////////////////////////
+
+static esp_err_t configure_gpio_drive_strength(void) {
+  // Increase drive strength for SPI pins
+  ESP_RETURN_ON_ERROR(
+      gpio_set_drive_capability(g_config.clk_pin, GPIO_DRIVE_CAP_3), TAG,
+      "Failed to set CLK drive strength");
+  ESP_RETURN_ON_ERROR(
+      gpio_set_drive_capability(g_config.di_pin, GPIO_DRIVE_CAP_3), TAG,
+      "Failed to set DI drive strength");
+  ESP_RETURN_ON_ERROR(
+      gpio_set_drive_capability(g_config.latch_pin, GPIO_DRIVE_CAP_3), TAG,
+      "Failed to set LATCH drive strength");
+  ESP_RETURN_ON_ERROR(
+      gpio_set_drive_capability(g_config.oe_pin, GPIO_DRIVE_CAP_3), TAG,
+      "Failed to set OE drive strength");
+
+  ESP_LOGI(TAG, "GPIO drive strength increased to maximum");
+  return ESP_OK;
+}
+
+/**
+ * @brief Setup RMT channel for precise OE (Output Enable) timing control
+ * RMT provides microsecond-precision timing needed for BCM brightness control
+ * @return ESP_OK on success, error code on failure
+ */
+static esp_err_t rmt_setup_oe_channel(void) {
+  // Configure RMT transmitter for OE pin control
+  rmt_tx_channel_config_t tx_config = {
+      .gpio_num = g_config.oe_pin,
+      .clk_src = RMT_CLK_SRC_DEFAULT,
+      .resolution_hz = 1000000, // 1MHz = 1µs resolution for precise timing
+      .mem_block_symbols = 64,
+      .trans_queue_depth = 1, // Single transaction at a time
+      .flags.with_dma = false,
+      .flags.invert_out = false,
+  };
+  ESP_RETURN_ON_ERROR(rmt_new_tx_channel(&tx_config, &g_rmt_oe), TAG,
+                      "Failed to create RMT TX channel");
+
+  // Create copy encoder for symbol transmission
+  rmt_copy_encoder_config_t encoder_config = {};
+  ESP_RETURN_ON_ERROR(rmt_new_copy_encoder(&encoder_config, &g_rmt_encoder),
+                      TAG, "Failed to create RMT encoder");
+
+  ESP_RETURN_ON_ERROR(rmt_enable(g_rmt_oe), TAG,
+                      "Failed to enable RMT channel");
+  return ESP_OK;
 }
 
 /**
