@@ -4,14 +4,58 @@
 #include "esp_err.h"
 #include "esp_log.h"
 #include "nvs.h"
+#include <array>
 #include <cJSON.h>
+#include <cstdint>
 #include <cstring>
 #include <sys/stat.h>
 
 static const char *NVS_NAMESPACE = "obegransad"; // NVS namespace
 static const char *TAG = "settings";
 
+///////////////////////////////////
+// Global object and defaults //
+///////////////////////////////////
+
+static Settings create_default_settings() {
+  Settings settings = {};
+
+  // scalar defaults
+  settings.brightness_day = 200;
+  settings.brightness_night = 20;
+  settings.off_hours = 0;
+  settings.weather_latitude = 0.0;
+  settings.weather_longitude = 0.0;
+  std::strncpy(settings.timezone, "UTC", sizeof(settings.timezone));
+  settings.anniversary_day = 1;
+  settings.anniversary_month = 1;
+
+  // Initialize game_of_life_start with default pattern (Endless glider pattern)
+  settings.game_of_life_start[1][2] = true;
+  settings.game_of_life_start[2][3] = true;
+  settings.game_of_life_start[3][1] = true;
+  settings.game_of_life_start[3][2] = true;
+  settings.game_of_life_start[3][3] = true;
+
+  // default user image (simple smiley face pattern)
+  settings.user_image[4][4] = 255;
+  settings.user_image[4][11] = 255;
+  settings.user_image[10][5] = 255;
+  settings.user_image[10][6] = 255;
+  settings.user_image[10][9] = 255;
+  settings.user_image[10][10] = 255;
+  for (int i = 5; i <= 10; ++i) {
+    settings.user_image[12][i] = 255;
+  }
+
+  return settings;
+}
+
 Settings g_settings; // global settings object, initialized with default values
+
+///////////////////////////////////
+// NVS //
+///////////////////////////////////
 
 /*
 integer types: uint8_t, int8_t, uint16_t, int16_t, uint32_t, int32_t, uint64_t,
@@ -35,21 +79,15 @@ esp_err_t nvs_read_settings(Settings &config) {
     return err;
   }
 
-  Settings out = {};
+  Settings out = create_default_settings();
   size_t required_size = sizeof(out);
   err = nvs_get_blob(nvs_handle, "settings", &out, &required_size);
   if (err == ESP_ERR_NVS_NOT_FOUND) {
     ESP_LOGW(TAG, "Settings not found, using default values");
     // If settings are not found, we can initialize with default values
-    out.brightness_day = 200;    // Default brightness day
-    out.brightness_night = 20;   // Default brightness night
-    out.off_hours = 0;           // Default off hours
-    out.weather_latitude = 0.0;  // Default latitude
-    out.weather_longitude = 0.0; // Default longitude
-    snprintf(out.timezone, sizeof(out.timezone), "UTC"); // Default timezone
-    out.anniversary_day = 1;   // Default anniversary day
-    out.anniversary_month = 1; // Default anniversary month
     err = ESP_OK;
+  } else if (err != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to read settings from NVS: %s", esp_err_to_name(err));
   }
   nvs_close(nvs_handle);
   config = out;
@@ -72,6 +110,10 @@ esp_err_t nvs_write_settings(const Settings &config) {
   nvs_close(nvs_handle);
   return ESP_OK;
 }
+
+///////////////////////////////////
+// Parsing and Serializing //
+///////////////////////////////////
 
 // Serializes the settings struct into a JSON string using cJSON.
 // The caller must provide a pre-allocated output buffer with sufficient size.

@@ -118,9 +118,6 @@ esp_err_t panel_init(panel_config_t config) {
   ESP_LOGI(TAG, "Initializing IKEA Obegränsad panel driver");
   g_config = config;
 
-  // FIXME: does not work?
-  esp_log_level_set(TAG, ESP_LOG_DEBUG); // Set debug level for this component
-
   // Initialize framebuffer and bitplanes to zero (all LEDs off)
   memset(g_framebuffer, 0, sizeof(g_framebuffer));
   memset(g_bitplanes, 0, sizeof(g_bitplanes));
