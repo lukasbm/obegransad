@@ -28,12 +28,6 @@ def main(input_file: str, sprite_width: int, sprite_height: int):
     sys.stdout.buffer.write(bytearray([sprite_width, sprite_height]))
     sys.stdout.buffer.write(bytearray(pixels))
     sys.stdout.buffer.flush()
-    
-    # with open(Path(input_file).stem + ".bwb", "wb+") as f:
-    #     # write header
-    #     f.write(bytearray([sprite_width, sprite_height]))
-    #     # write file content
-    #     f.write(bytearray(pixels))
 
 
 if __name__ == "__main__":
