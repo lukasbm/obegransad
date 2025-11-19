@@ -89,13 +89,13 @@ extern "C" void app_main() {
   ESP_ERROR_CHECK(panel_timer_start());
 
   // START SERVER
-  esp_err_t ret = start_webserver();
-  if (ret != ESP_OK) {
-    ESP_LOGE(TAG, "Failed to start web server: %s", esp_err_to_name(ret));
-    return;
-  } else {
-    ESP_LOGI(TAG, "Web server started successfully");
-  }
+  // esp_err_t ret = start_webserver();
+  // if (ret != ESP_OK) {
+  //   ESP_LOGE(TAG, "Failed to start web server: %s", esp_err_to_name(ret));
+  //   return;
+  // } else {
+  //   ESP_LOGI(TAG, "Web server started successfully");
+  // }
 
   // TEST WEATHER
   // ESP_LOGI(TAG, "Fetching weather data");

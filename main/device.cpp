@@ -45,24 +45,45 @@ void wifi_clear_credentials() {
   stop_captive_portal();
 }
 
-// FIXME: check if already active??
+static bool captive_portal_active = false;
+
 void start_captive_portal() {
+  if (captive_portal_active) {
+    ESP_LOGW(TAG, "Captive portal already active, skipping start");
+    return;
+  }
+
+  // CRITICAL: Stop station mode first to prevent APSTA interference
+  // WifiConfigurationAp will set WIFI_MODE_APSTA internally, but we need
+  // to ensure the station netif and event handlers are cleaned up first
+  WifiStation::GetInstance().Stop();
+
   auto &ap = WifiConfigurationAp::GetInstance();
   ap.SetSsidPrefix("Obegransad");
   ap.Start();
+  captive_portal_active = true;
+  ESP_LOGI(TAG, "Captive portal started with SSID prefix: Obegransad");
 }
 
-// FIXME: check if already active??
 void stop_captive_portal() {
-  // Stop the captive portal
+  if (!captive_portal_active) {
+    ESP_LOGW(TAG, "Captive portal not active, skipping stop");
+    return;
+  }
+
   WifiConfigurationAp::GetInstance().Stop();
+  captive_portal_active = false;
+  ESP_LOGI(TAG, "Captive portal stopped");
 }
 
 void wifi_init() {
   auto &ssid_list = SsidManager::GetInstance().GetSsidList();
   if (ssid_list.empty()) {
+    ESP_LOGI(TAG, "No stored WiFi credentials, starting captive portal");
     start_captive_portal();
   } else {
+    ESP_LOGI(TAG, "Found %zu stored WiFi credential(s), starting station mode",
+             ssid_list.size());
     WifiStation::GetInstance().Start();
   }
 }

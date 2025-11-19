@@ -306,7 +306,7 @@ static void rmt_send_oe_pulse(uint32_t duration_us) {
   rmt_transmit_config_t tx_config = {
       .loop_count = 0,      // do not repeat signal
       .flags.eot_level = 1, // End of transmission level (1 = high)
-      .flags.queue_nonblocking = 0, // blocking mode
+      .flags.queue_nonblocking = 1, // non-blocking mode
   };
   esp_err_t err = rmt_transmit(g_rmt_oe, g_rmt_encoder, &oe_symbol, sizeof(oe_symbol),
                                &tx_config);
@@ -315,7 +315,8 @@ static void rmt_send_oe_pulse(uint32_t duration_us) {
     return;
   }
   // Block until transmission completes; prevents descriptor exhaustion log spam.
-  rmt_tx_wait_all_done(g_rmt_oe, portMAX_DELAY);
+  // Can not turn this on or we get the flickering ....
+  // rmt_tx_wait_all_done(g_rmt_oe, portMAX_DELAY);
 }
 
 /**
