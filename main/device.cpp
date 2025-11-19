@@ -43,23 +43,33 @@ esp_err_t device_init() {
 }
 
 void wifi_clear_credentials() {
+  ESP_LOGI(TAG, "=== wifi_clear_credentials() called ===");
   ESP_LOGI(TAG, "Clearing WiFi credentials from NVS");
 
   // Clear stored Wi-Fi credentials
   SsidManager::GetInstance().Clear();
+  ESP_LOGI(TAG, "SsidManager cleared");
 
   // Only stop station if it was started
   if (wifi_station_started) {
-    ESP_LOGI(TAG, "Stopping WifiStation");
+    ESP_LOGI(TAG, "Stopping WifiStation (was running)");
     WifiStation::GetInstance().Stop();
     wifi_station_started = false;
+    ESP_LOGI(TAG, "WifiStation stopped");
+  } else {
+    ESP_LOGI(TAG, "WifiStation was not running, skipping stop");
   }
 
   // Stop captive portal if active
   stop_captive_portal();
+  ESP_LOGI(TAG, "=== Credentials cleared ===");
 }
 
 void start_captive_portal() {
+  ESP_LOGI(TAG, "=== start_captive_portal() called ===");
+  ESP_LOGI(TAG, "  captive_portal_active: %s", captive_portal_active ? "YES" : "NO");
+  ESP_LOGI(TAG, "  wifi_station_started: %s", wifi_station_started ? "YES" : "NO");
+  
   if (captive_portal_active) {
     ESP_LOGW(TAG, "Captive portal already active, skipping start");
     return;
@@ -71,13 +81,21 @@ void start_captive_portal() {
     ESP_LOGI(TAG, "Stopping WifiStation before starting captive portal");
     WifiStation::GetInstance().Stop();
     wifi_station_started = false;
+    ESP_LOGI(TAG, "WifiStation stopped successfully");
+  } else {
+    ESP_LOGI(TAG, "WifiStation was not started, skipping stop");
   }
 
+  ESP_LOGI(TAG, "Initializing WifiConfigurationAp...");
   auto &ap = WifiConfigurationAp::GetInstance();
   ap.SetSsidPrefix("Obegransad");
+  
+  ESP_LOGI(TAG, "Starting WifiConfigurationAp (this will create AP network)...");
   ap.Start();
   captive_portal_active = true;
-  ESP_LOGI(TAG, "Captive portal started with SSID prefix: Obegransad");
+  
+  ESP_LOGI(TAG, "=== Captive portal started! Look for SSID: %s ===", 
+           ap.GetSsid().c_str());
 }
 
 void stop_captive_portal() {
@@ -92,16 +110,26 @@ void stop_captive_portal() {
 }
 
 void wifi_init() {
+  ESP_LOGI(TAG, "=== wifi_init() called ===");
   auto &ssid_list = SsidManager::GetInstance().GetSsidList();
+  ESP_LOGI(TAG, "Checking stored credentials...");
+  ESP_LOGI(TAG, "  Stored SSID count: %zu", ssid_list.size());
+  
   if (ssid_list.empty()) {
-    ESP_LOGI(TAG, "No stored WiFi credentials, starting captive portal");
+    ESP_LOGI(TAG, "No stored WiFi credentials found");
+    ESP_LOGI(TAG, "Decision: START CAPTIVE PORTAL");
     start_captive_portal();
   } else {
-    ESP_LOGI(TAG, "Found %zu stored WiFi credential(s), starting station mode",
-             ssid_list.size());
+    ESP_LOGI(TAG, "Found %zu stored WiFi credential(s):", ssid_list.size());
+    for (size_t i = 0; i < ssid_list.size(); i++) {
+      ESP_LOGI(TAG, "  [%zu] SSID: %s", i, ssid_list[i].ssid.c_str());
+    }
+    ESP_LOGI(TAG, "Decision: START STATION MODE");
     WifiStation::GetInstance().Start();
     wifi_station_started = true;
+    ESP_LOGI(TAG, "WifiStation started, will attempt connection");
   }
+  ESP_LOGI(TAG, "=== wifi_init() complete ===");
 }
 
 bool wifi_check() { return WifiStation::GetInstance().IsConnected(); }

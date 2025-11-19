@@ -78,12 +78,25 @@ extern "C" void app_main() {
 
   // TEMPORARY: Force clear WiFi credentials to test captive portal
   // Comment this out once captive portal is working
-  ESP_LOGW(TAG, "FORCE CLEARING WiFi credentials for captive portal testing");
+  ESP_LOGW(TAG, "");
+  ESP_LOGW(TAG, "╔════════════════════════════════════════════════════════╗");
+  ESP_LOGW(TAG, "║ FORCE CLEARING WiFi credentials (TEMPORARY TEST MODE) ║");
+  ESP_LOGW(TAG, "╚════════════════════════════════════════════════════════╝");
+  ESP_LOGW(TAG, "");
   wifi_clear_credentials();
   vTaskDelay(pdMS_TO_TICKS(500));
 
   // start captive portal if no Wi-Fi credentials are stored
+  ESP_LOGI(TAG, "");
+  ESP_LOGI(TAG, ">>> Initializing WiFi...");
   wifi_init();
+  ESP_LOGI(TAG, "");
+  ESP_LOGI(TAG, "╔════════════════════════════════════════════════════════╗");
+  ESP_LOGI(TAG, "║ WiFi initialization complete - check phone for SSID   ║");
+  ESP_LOGI(TAG, "║ Network name should be: Obegransad-XXXX                ║");
+  ESP_LOGI(TAG, "║ No password required - open network                    ║");
+  ESP_LOGI(TAG, "╚════════════════════════════════════════════════════════╝");
+  ESP_LOGI(TAG, "");
 
   // set up sntp and time zone
   // FIXME: get from config!
