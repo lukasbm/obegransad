@@ -1,8 +1,8 @@
 {
     "servers": {
-        "my-mcp-server-e6ebaa66": {
+        "espressiv mcp": {
             "type": "stdio",
-            "command": "idp.py",
+            "command": "~/.espidf/v5.5.1/esp-idf/tools/idf.py",
             "args": [
                 "build"
             ]

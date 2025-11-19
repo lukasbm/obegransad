@@ -31,11 +31,11 @@
     "littlefs",
     "SRCS"
   ],
-  "clangd.path": "/home/lukas/.espressif/tools/esp-clang/esp-18.1.2_20240912/esp-clang/bin/clangd",
+  "clangd.path": "/home/lukas/.espressif/tools/esp-clang/esp-19.1.2_20250312/esp-clang/bin/clangd",
   "clangd.arguments": [
     "--background-index",
     "--query-driver=/home/lukas/.espressif/tools/riscv32-esp-elf/esp-14.2.0_20241119/riscv32-esp-elf/bin/riscv32-esp-elf-gcc",
-    "--compile-commands-dir=/home/lukas/Documents/projects/obegransad-esp-idf/build"
+    "--compile-commands-dir=/home/lukas/Documents/obegransad/build"
   ],
   "idf.flashType": "UART"
 }
