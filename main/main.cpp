@@ -17,7 +17,10 @@
 static const char *TAG = "main";
 
 static void button_long_press(void *arg, void *usr_data) {
-  ESP_LOGI(TAG, "Button long press detected");
+  ESP_LOGI(TAG, "Button long press detected - clearing WiFi credentials and restarting");
+  wifi_clear_credentials();
+  vTaskDelay(pdMS_TO_TICKS(1000));
+  esp_restart();
 }
 
 static void button_short_press(void *arg, void *usr_data) {
@@ -59,6 +62,11 @@ void advance_state_machine() {}
 extern "C" void app_main() {
   ESP_LOGI(TAG, "Startup");
 
+  // Reduce WiFi debug spam before initialization
+  esp_log_level_set("wifi", ESP_LOG_WARN);
+  esp_log_level_set("WifiStation", ESP_LOG_INFO);
+  esp_log_level_set("WifiConfigurationAp", ESP_LOG_INFO);
+
   // nvs, event loop, networking
   ESP_ERROR_CHECK(device_init());
 
@@ -67,6 +75,12 @@ extern "C" void app_main() {
 
   // the only button
   ESP_ERROR_CHECK(button_init());
+
+  // TEMPORARY: Force clear WiFi credentials to test captive portal
+  // Comment this out once captive portal is working
+  ESP_LOGW(TAG, "FORCE CLEARING WiFi credentials for captive portal testing");
+  wifi_clear_credentials();
+  vTaskDelay(pdMS_TO_TICKS(500));
 
   // start captive portal if no Wi-Fi credentials are stored
   wifi_init();

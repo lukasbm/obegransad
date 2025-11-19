@@ -16,6 +16,10 @@
 
 static const char *TAG = "device";
 
+// state variables
+static bool captive_portal_active = false;
+static bool wifi_station_started = false;
+
 esp_err_t device_init() {
   // network stack
   ESP_RETURN_ON_ERROR(esp_netif_init(), TAG, "Failed to initialize netif");
@@ -39,13 +43,21 @@ esp_err_t device_init() {
 }
 
 void wifi_clear_credentials() {
+  ESP_LOGI(TAG, "Clearing WiFi credentials from NVS");
+
   // Clear stored Wi-Fi credentials
   SsidManager::GetInstance().Clear();
-  WifiStation::GetInstance().Stop();
+
+  // Only stop station if it was started
+  if (wifi_station_started) {
+    ESP_LOGI(TAG, "Stopping WifiStation");
+    WifiStation::GetInstance().Stop();
+    wifi_station_started = false;
+  }
+
+  // Stop captive portal if active
   stop_captive_portal();
 }
-
-static bool captive_portal_active = false;
 
 void start_captive_portal() {
   if (captive_portal_active) {
@@ -54,9 +66,12 @@ void start_captive_portal() {
   }
 
   // CRITICAL: Stop station mode first to prevent APSTA interference
-  // WifiConfigurationAp will set WIFI_MODE_APSTA internally, but we need
-  // to ensure the station netif and event handlers are cleaned up first
-  WifiStation::GetInstance().Stop();
+  // Only stop if it was actually started to avoid ESP_ERR_WIFI_NOT_INIT
+  if (wifi_station_started) {
+    ESP_LOGI(TAG, "Stopping WifiStation before starting captive portal");
+    WifiStation::GetInstance().Stop();
+    wifi_station_started = false;
+  }
 
   auto &ap = WifiConfigurationAp::GetInstance();
   ap.SetSsidPrefix("Obegransad");
@@ -85,6 +100,7 @@ void wifi_init() {
     ESP_LOGI(TAG, "Found %zu stored WiFi credential(s), starting station mode",
              ssid_list.size());
     WifiStation::GetInstance().Start();
+    wifi_station_started = true;
   }
 }
 
