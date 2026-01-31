@@ -43,59 +43,43 @@ esp_err_t device_init() {
 }
 
 void wifi_clear_credentials() {
-  ESP_LOGI(TAG, "=== wifi_clear_credentials() called ===");
   ESP_LOGI(TAG, "Clearing WiFi credentials from NVS");
 
   // Clear stored Wi-Fi credentials
   SsidManager::GetInstance().Clear();
-  ESP_LOGI(TAG, "SsidManager cleared");
 
   // Only stop station if it was started
   if (wifi_station_started) {
-    ESP_LOGI(TAG, "Stopping WifiStation (was running)");
+    ESP_LOGI(TAG, "Stopping WifiStation");
     WifiStation::GetInstance().Stop();
     wifi_station_started = false;
-    ESP_LOGI(TAG, "WifiStation stopped");
-  } else {
-    ESP_LOGI(TAG, "WifiStation was not running, skipping stop");
   }
 
   // Stop captive portal if active
   stop_captive_portal();
-  ESP_LOGI(TAG, "=== Credentials cleared ===");
 }
 
 void start_captive_portal() {
-  ESP_LOGI(TAG, "=== start_captive_portal() called ===");
-  ESP_LOGI(TAG, "  captive_portal_active: %s", captive_portal_active ? "YES" : "NO");
-  ESP_LOGI(TAG, "  wifi_station_started: %s", wifi_station_started ? "YES" : "NO");
-  
   if (captive_portal_active) {
     ESP_LOGW(TAG, "Captive portal already active, skipping start");
     return;
   }
 
-  // CRITICAL: Stop station mode first to prevent APSTA interference
+  // Stop station mode first to prevent APSTA interference
   // Only stop if it was actually started to avoid ESP_ERR_WIFI_NOT_INIT
   if (wifi_station_started) {
     ESP_LOGI(TAG, "Stopping WifiStation before starting captive portal");
     WifiStation::GetInstance().Stop();
     wifi_station_started = false;
-    ESP_LOGI(TAG, "WifiStation stopped successfully");
-  } else {
-    ESP_LOGI(TAG, "WifiStation was not started, skipping stop");
   }
 
-  ESP_LOGI(TAG, "Initializing WifiConfigurationAp...");
+  ESP_LOGI(TAG, "Starting captive portal...");
   auto &ap = WifiConfigurationAp::GetInstance();
   ap.SetSsidPrefix("Obegransad");
-  
-  ESP_LOGI(TAG, "Starting WifiConfigurationAp (this will create AP network)...");
   ap.Start();
   captive_portal_active = true;
   
-  ESP_LOGI(TAG, "=== Captive portal started! Look for SSID: %s ===", 
-           ap.GetSsid().c_str());
+  ESP_LOGI(TAG, "Captive portal started - SSID: %s", ap.GetSsid().c_str());
 }
 
 void stop_captive_portal() {
@@ -110,29 +94,48 @@ void stop_captive_portal() {
 }
 
 void wifi_init() {
-  ESP_LOGI(TAG, "=== wifi_init() called ===");
   auto &ssid_list = SsidManager::GetInstance().GetSsidList();
-  ESP_LOGI(TAG, "Checking stored credentials...");
-  ESP_LOGI(TAG, "  Stored SSID count: %zu", ssid_list.size());
   
   if (ssid_list.empty()) {
-    ESP_LOGI(TAG, "No stored WiFi credentials found");
-    ESP_LOGI(TAG, "Decision: START CAPTIVE PORTAL");
+    ESP_LOGI(TAG, "No stored WiFi credentials, starting captive portal");
     start_captive_portal();
   } else {
-    ESP_LOGI(TAG, "Found %zu stored WiFi credential(s):", ssid_list.size());
+    ESP_LOGI(TAG, "Found %zu stored WiFi credential(s), connecting...", ssid_list.size());
     for (size_t i = 0; i < ssid_list.size(); i++) {
       ESP_LOGI(TAG, "  [%zu] SSID: %s", i, ssid_list[i].ssid.c_str());
     }
-    ESP_LOGI(TAG, "Decision: START STATION MODE");
     WifiStation::GetInstance().Start();
     wifi_station_started = true;
-    ESP_LOGI(TAG, "WifiStation started, will attempt connection");
   }
-  ESP_LOGI(TAG, "=== wifi_init() complete ===");
 }
 
 bool wifi_check() { return WifiStation::GetInstance().IsConnected(); }
+
+bool wifi_wait_for_connection(uint32_t timeout_ms) {
+  ESP_LOGI(TAG, "Waiting for WiFi connection (timeout: %lu ms)...", timeout_ms);
+  
+  const uint32_t check_interval_ms = 500;
+  uint32_t elapsed_ms = 0;
+  
+  while (elapsed_ms < timeout_ms) {
+    if (wifi_check()) {
+      ESP_LOGI(TAG, "WiFi connected after %lu ms", elapsed_ms);
+      return true;
+    }
+    
+    vTaskDelay(pdMS_TO_TICKS(check_interval_ms));
+    elapsed_ms += check_interval_ms;
+    
+    // Log progress every 10 seconds
+    if (elapsed_ms % 10000 == 0) {
+      ESP_LOGI(TAG, "Still waiting for connection... (%lu/%lu ms)", 
+               elapsed_ms, timeout_ms);
+    }
+  }
+  
+  ESP_LOGW(TAG, "WiFi connection timeout after %lu ms", timeout_ms);
+  return false;
+}
 
 void enter_light_sleep() {
   // Enter light sleep mode

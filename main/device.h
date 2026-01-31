@@ -12,6 +12,10 @@ void wifi_init();
 // Check if Wi-Fi is connected
 bool wifi_check();
 
+// Wait for WiFi connection with timeout (in milliseconds)
+// Returns true if connected, false if timeout
+bool wifi_wait_for_connection(uint32_t timeout_ms);
+
 void wifi_clear_credentials();
 
 void start_captive_portal();

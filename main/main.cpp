@@ -76,27 +76,24 @@ extern "C" void app_main() {
   // the only button
   ESP_ERROR_CHECK(button_init());
 
-  // TEMPORARY: Force clear WiFi credentials to test captive portal
-  // Comment this out once captive portal is working
-  ESP_LOGW(TAG, "");
-  ESP_LOGW(TAG, "╔════════════════════════════════════════════════════════╗");
-  ESP_LOGW(TAG, "║ FORCE CLEARING WiFi credentials (TEMPORARY TEST MODE) ║");
-  ESP_LOGW(TAG, "╚════════════════════════════════════════════════════════╝");
-  ESP_LOGW(TAG, "");
-  wifi_clear_credentials();
-  vTaskDelay(pdMS_TO_TICKS(500));
-
-  // start captive portal if no Wi-Fi credentials are stored
-  ESP_LOGI(TAG, "");
-  ESP_LOGI(TAG, ">>> Initializing WiFi...");
+  // Initialize WiFi - starts captive portal if no credentials, otherwise connects
   wifi_init();
-  ESP_LOGI(TAG, "");
-  ESP_LOGI(TAG, "╔════════════════════════════════════════════════════════╗");
-  ESP_LOGI(TAG, "║ WiFi initialization complete - check phone for SSID   ║");
-  ESP_LOGI(TAG, "║ Network name should be: Obegransad-XXXX                ║");
-  ESP_LOGI(TAG, "║ No password required - open network                    ║");
-  ESP_LOGI(TAG, "╚════════════════════════════════════════════════════════╝");
-  ESP_LOGI(TAG, "");
+
+  // Wait for WiFi connection with timeout
+  if (!wifi_check()) {
+    ESP_LOGI(TAG, "Waiting up to 60 seconds for WiFi connection...");
+    bool connected = wifi_wait_for_connection(60000); // 60 second timeout
+    
+    if (!connected) {
+      ESP_LOGW(TAG, "Failed to connect to saved WiFi within 60 seconds");
+      ESP_LOGW(TAG, "Clearing credentials and starting captive portal...");
+      wifi_clear_credentials();
+      vTaskDelay(pdMS_TO_TICKS(500));
+      start_captive_portal();
+    } else {
+      ESP_LOGI(TAG, "Successfully connected to WiFi");
+    }
+  }
 
   // set up sntp and time zone
   // FIXME: get from config!
