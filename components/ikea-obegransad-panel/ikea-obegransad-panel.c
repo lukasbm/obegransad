@@ -72,6 +72,7 @@ static rmt_channel_handle_t g_rmt_oe;
 static rmt_encoder_handle_t g_rmt_encoder;
 static esp_timer_handle_t g_refresh_timer; // ESP Timer for precise 500Hz timing
 static uint8_t g_plane_idx = 0; // Current bit plane index for display
+static TaskHandle_t g_panel_task_handle = NULL; // High priority task for refresh
 
 // Buffers
 static uint8_t g_framebuffer[PANEL_HEIGHT][PANEL_WIDTH];
@@ -84,6 +85,7 @@ static const uint32_t plane_times_us[BIT_DEPTH] = {PLANE0_ON_US, PLANE1_ON_US,
 
 // Forward declarations
 static void refresh_timer_callback(void *arg);
+static void panel_task_func(void *arg);
 static void prepare_bitplane(uint8_t plane);
 static void display_bitplane(uint8_t plane);
 static void print_bitplane(uint8_t plane);
@@ -126,6 +128,12 @@ esp_err_t panel_init(panel_config_t config) {
   ESP_RETURN_ON_ERROR(init_gpio_pins(), TAG, "GPIO initialization failed");
   ESP_RETURN_ON_ERROR(rmt_setup_oe_channel(), TAG, "RMT setup failed");
   ESP_RETURN_ON_ERROR(init_spi_interface(), TAG, "SPI initialization failed");
+
+  // Create high priority task pinned to core 1 (app core)
+  // Stack size 4096 should be sufficient for SPI/RMT calls
+  xTaskCreatePinnedToCore(panel_task_func, "panel_task", 4096, NULL,
+                          configMAX_PRIORITIES - 1, &g_panel_task_handle, 1);
+
   ESP_RETURN_ON_ERROR(init_refresh_timer(), TAG, "Timer initialization failed");
 
   ESP_LOGI(TAG, "Panel driver initialized successfully - ready for refresh");
@@ -233,27 +241,41 @@ uint8_t panel_get_global_brightness(void) { return g_brightness_user; }
 //////////////////////////
 
 /**
- * @brief ESP Timer callback - triggers display refresh
- * This callback runs in ESP Timer task context and can safely do blocking
- * operations
+ * @brief ESP Timer callback - ISR context
+ * Triggers the high-priority task to perform the actual refresh
  * @param arg User-defined argument (unused)
  */
-static void refresh_timer_callback(void *arg) {
-  // Prepare bitplanes from framebuffer if changes were made
-  if (g_refresh_needed) {
-    // print_framebuffer();
-    for (int i = 0; i < BIT_DEPTH; i++) {
-      prepare_bitplane(i);
-      // print_bitplane(i); // Print each prepared bitplane for debugging
-    }
-    g_refresh_needed = false;
-  }
+static void IRAM_ATTR refresh_timer_callback(void *arg) {
+  BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+  vTaskNotifyGiveFromISR(g_panel_task_handle, &xHigherPriorityTaskWoken);
+  portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+}
 
-  // Display each bitplane with precise RMT-controlled timing
-  // This implements Bit Code Modulation (BCM) for brightness control
-  GPIO.out_w1ts.val = (1 << g_config.oe_pin); // LEDs off to avoid flickering!)
-  display_bitplane(g_plane_idx);
-  g_plane_idx = (g_plane_idx + 1) % BIT_DEPTH; // Increment plane index
+/**
+ * @brief Dedicated High Priority Task for Display Refresh
+ * waits for notification from ISR timer and executes refresh logic
+ */
+static void panel_task_func(void *arg) {
+  while (1) {
+    // Wait for notification from timer ISR
+    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+
+    // Prepare bitplanes from framebuffer if changes were made
+    if (g_refresh_needed) {
+      // print_framebuffer();
+      for (int i = 0; i < BIT_DEPTH; i++) {
+        prepare_bitplane(i);
+        // print_bitplane(i); // Print each prepared bitplane for debugging
+      }
+      g_refresh_needed = false;
+    }
+
+    // Display each bitplane with precise RMT-controlled timing
+    // This implements Bit Code Modulation (BCM) for brightness control
+    GPIO.out_w1ts.val = (1 << g_config.oe_pin); // LEDs off to avoid flickering!)
+    display_bitplane(g_plane_idx);
+    g_plane_idx = (g_plane_idx + 1) % BIT_DEPTH; // Increment plane index
+  }
 }
 
 /**
@@ -522,12 +544,11 @@ static esp_err_t init_refresh_timer(void) {
   ESP_LOGI(TAG, "Creating ESP timer for 500Hz refresh (%d µs period)",
            FRAME_PERIOD_US);
 
-  // ESP Timer configuration for task callback execution
+  // ESP Timer configuration for ISR callback execution
   esp_timer_create_args_t timer_args = {
       .callback = refresh_timer_callback,
       .name = "panel_refresh",
-      .dispatch_method = ESP_TIMER_TASK, // Run in timer task context (not ISR,
-                                         // safe for blocking ops)
+      .dispatch_method = ESP_TIMER_ISR, // Run in ISR context for low jitter
   };
 
   ESP_RETURN_ON_ERROR(esp_timer_create(&timer_args, &g_refresh_timer), TAG,
