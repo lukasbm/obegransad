@@ -48,6 +48,7 @@ Has to be non ISR, as currently implemented.
 
 There are many implementations of these already there. Each of them implements the three simple methods:
 activate, deactivate, update.
+It also implements `requires_wifi()` to indicate if it should be skipped when offline.
 These then get called by the scene switcher when appropriate.
 The only responsibility of a scene is to draw on the screen when updated.
 It should not care about the state of the system or consume internal data like wifi connectivity.
@@ -125,8 +126,8 @@ We have the following constraints and dependencies:
 - If Chip is On, Display will be On
 - If Wi-Fi is in Captive Portal, Config Server must be Off.
 - If Wi-Fi is in Captive Portal, Scene Switcher must be Off.
-- If Wi-Fi is in Captive Portal, Button presses are ignored.
-- If Wi-Fi is Disconnected or Connecting, Scene Switcher is off and Button presses are ignored.
+- If Wi-Fi is in Captive Portal, Button presses are ignored (Except Long Press for Reset).
+- If Wi-Fi is Disconnected or Connecting, Scene Switcher is off and Button presses are ignored (Except Long Press for Reset).
 - If Wi-Fi is Connected, Config Server is On and Scene Switcher is On.
 - Scene Switch can only be On if Chip and Display are on and Wifi is connected.
 
@@ -150,20 +151,20 @@ Considering the following dependencies above we can define the following main st
     - Nothing is drawn on the display
     - Short button press wakes up the chip (other types of button presses are ignored)
 - SETUP (Display On, Chip On, Wi-Fi Captive Portal, Server Off, Scene Switcher Off)
-    - A long button press restes the device (clears NVS and reboots)
+    - A long button press resets the device (clears NVS and reboots) - GLOBAL BEHAVIOR
     - A Wi-Fi symbol is drawn on the display to indicate setup mode
 - OPERATIONAL (Display On, Chip On, Wi-Fi Connected, Server On, Scene Switcher On)
-    - A long button press resets the device (clears NVS and reboots)
+    - A long button press resets the device (clears NVS and reboots) - GLOBAL BEHAVIOR
     - A short button press switches to the next scene
     - A double press jumps to the favorite scene
     - Regular display updates are done by the scene switcher
 - ERROR (Display On, Chip On, Wi-Fi Off, Server Off, Scene Switcher Off)
-    - A long button press resets the device (clears NVS and reboots)
+    - A long button press resets the device (clears NVS and reboots) - GLOBAL BEHAVIOR
     - An error symbol is drawn on the display to indicate error state.
     - A button press enters SETUP state
     - A double button press enters DEGRADED state
 - DEGRADED (Display On, Chip On, Wi-Fi Disconnected, Server Off, Scene Switcher On)
-    - A long button press resets the device (clears NVS and reboots)
+    - A long button press resets the device (clears NVS and reboots) - GLOBAL BEHAVIOR
     - A short button press switches to the next scene
     - A double press jumps to the favorite scene
     - A warning symbol (top right pixel is on) is drawn on the display to indicate degraded state.
@@ -179,6 +180,11 @@ That's why regular reconnect attempts are needd in that state.
 
 Error usually refers to an unrecoverable state, e.g. no Wi-Fi configuration is present but cannot be set up.
 Instead of bootlooping, we enter ERROR state and allow the user to enter SETUP mode via button press.
+
+**Refinements:**
+1. **Global Long Press:** The long press action (Reset/Clear NVS) is a global interrupt and functions in all states (except deep sleep where it might just wake the device).
+2. **Overlay Rendering:** Status icons (like the warning dot in DEGRADED mode) are drawn *after* the scene update but before the frame commit to ensure they overlay correctly and aren't overwritten by the scene.
+3. **Scene Filtering:** Scenes define if they `requires_wifi()`. The Scene Switcher skips these scenes when the device is in DEGRADED or SETUP modes.
 
 So most of the state transitions as well as input handling is rather trivial.
 The core application logic does not depend on any complex state interactions.

@@ -45,36 +45,35 @@ void StateMachine::update() {
             if (!wifi_check()) {
                 ESP_LOGW(TAG, "WiFi lost, entering DEGRADED state");
                 set_state(AppState::DEGRADED);
+                return;
             }
             tick(); // Update scenes
+            // No extra commit needed as scenes usually commit. 
+            // But to be safe if we add overlays later:
+            // panel_commit(); 
             break;
             
         case AppState::DEGRADED:
             if (wifi_check()) {
                 ESP_LOGI(TAG, "WiFi restored, entering OPERATIONAL state");
                 set_state(AppState::OPERATIONAL);
+                return;
             }
             tick(); // Update scenes
             
-            // Draw warning dot (Top Right Pixel)
+            // Draw warning dot (Top Right Pixel) - Overlay
             panel_setPixel(15, 0, PANEL_BRIGHTNESS_1);
+            panel_commit(); // Commit overlay
             break;
             
         case AppState::SETUP:
             // In SETUP, we show the WiFi icon
             panel_clear();
-            wifi_sprite.draw(0, 0); // centered? WiFi sprite is likely 16x16 or smaller
-            // If it's smaller we might need centering, but let's assume 0,0 for now
-            // Check if user configured wifi? 
-            // Usually CP will handle creds and we might need a reboot or check.
+            wifi_sprite.draw(0, 0); 
+            panel_commit();
+            
             if (wifi_has_credentials()) {
                  // If creds appeared, maybe user saved them. 
-                 // We could try to connect or just reboot.
-                 // Doc says "When setup succeeds, we enter OPERATIONAL state."
-                 // But typically we need to switch from AP to Station.
-                 // device.cpp wifi_init() handles this logic on boot.
-                 // Runtime switching might be complex. 
-                 // For now, let's just stay in SETUP until reboot or manual transition.
             }
             break;
 
@@ -82,6 +81,7 @@ void StateMachine::update() {
             panel_clear();
             // Draw '!'
             font_bold.draw_char(4, 4, '!'); 
+            panel_commit();
             break;
             
         case AppState::SLEEPING:
@@ -103,33 +103,34 @@ void StateMachine::set_state(AppState new_state) {
 void StateMachine::enter_state(AppState state) {
     switch (state) {
         case AppState::OPERATIONAL:
+            scene_switcher_set_wifi_available(true);
             // Ensure server is on (if implemented)
             start_webserver(); 
             // Ensure Station is active (it should be if we are here)
             break;
             
         case AppState::DEGRADED:
+            scene_switcher_set_wifi_available(false);
             // Stop server if needed
             stop_webserver();
             break;
             
         case AppState::SETUP:
+            scene_switcher_set_wifi_available(false);
             start_captive_portal();
             break;
             
         case AppState::ERROR:
+            scene_switcher_set_wifi_available(false);
             wifi_clear_credentials(); // Maybe? Or just stop trying.
             break;
             
         case AppState::SLEEPING:
+            scene_switcher_set_wifi_available(false);
             panel_clear();
             panel_commit(); // Ensure off
             enter_light_sleep();
             // After wake up:
-            // We need to decide where to go.
-            // For now, let's just reset to init logic or assume we wake up in previous intention?
-            // Usually reset triggers reboot or we wake up and continue.
-            // If we continue, we should probably go to DEGRADED or OPERATIONAL.
             set_state(AppState::DEGRADED); // Safe default?
             break;
     }

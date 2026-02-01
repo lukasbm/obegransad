@@ -40,3 +40,9 @@ void skipTo(size_t idx);
  * It calls the update method of the current scene.
  */
 void tick();
+
+/**
+ * @brief Sets the wifi availability status for scene filtering.
+ * If wifi is lost and the current scene requires it, it switches to the next valid scene.
+ */
+void scene_switcher_set_wifi_available(bool available);

@@ -22,6 +22,8 @@ private:
 public:
   const char *get_scene_name() const override { return "Daily Weather"; }
 
+  bool requires_wifi() const override { return true; }
+
   void update() override {
     static RenderTimer timer(20000); // ms timer for animations
 

@@ -10,6 +10,8 @@ public:
   virtual void deactivate() { log_scene_event("deactivated"); };
   virtual void update() {};
 
+  virtual bool requires_wifi() const { return false; }
+
 protected:
   void log_scene_event(const char *event) const {
     ESP_LOGI("scene", "%s: %s", get_scene_name(), event);

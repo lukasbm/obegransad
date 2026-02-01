@@ -56,6 +56,8 @@ private:
 public:
   const char *get_scene_name() const override { return "Current Weather"; }
 
+  bool requires_wifi() const override { return true; }
+
   void update() override {
     static RenderTimer timer(200); // 200 ms timer for animations
 

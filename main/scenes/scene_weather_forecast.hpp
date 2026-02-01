@@ -71,6 +71,8 @@ private:
 public:
   const char *get_scene_name() const override { return "Weather Forecast"; }
 
+  bool requires_wifi() const override { return true; }
+
   WeatherForecastScene()
       : weather_update_timer("weather update timer", 20000,
                              [this]() { fetch_and_draw(); }) {}
