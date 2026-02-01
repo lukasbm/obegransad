@@ -1,6 +1,6 @@
 # Project Purpose
 
-In this project I turn an old binary 16x16 display into a smart device.
+In this project I turn an old grayscale 16x16 display into a smart device.
 The user can program images and animations to be displayed on the screen via a web interface, as well as switching
 between scenes using the only hardware button available.
 For now all scenes are pre-programmed.
@@ -17,8 +17,12 @@ The first input has:
 - LAT (latch)
 - D (data)
 
-Although naturally a binary display, we can get pixel wise brightness control by using Binary Code Modulation (BCM).
-However, this requires strict timings otherwise flickering may occur.
+- The LED panel driver implements **Bit Code Modulation (BCM)** with precise timing:
+
+- **SPI**: High-speed data transfer to shift registers (`spi_device_polling_transmit`)
+- **RMT**: Microsecond-precision OE (Output Enable) timing control (`rmt_send_oe_pulse`)
+- **ESP Timer**: 500Hz refresh with `ESP_TIMER_TASK` dispatch (NOT ISR) for safe blocking operations
+- **Direct GPIO**: Fast latch pulses using `GPIO.out_w1ts.val` register access
 
 ## Chip
 
@@ -181,7 +185,62 @@ The core application logic does not depend on any complex state interactions.
 Only the scene manager / switcher should be aware if we are in OPERATIONAL or DEGRADED state,
 so that it can decide whether to display Wi-Fi dependent scenes or not.
 
-# Roadmap
+## Other considerations
+
+### C/C++ Mixed Language Convention
+
+- **C components**: LED driver in `components/` uses pure C with `extern "C"` blocks for C++ compatibility
+- **C++ application**: `main/` uses C++ with ESP-IDF C APIs via proper declarations
+- **HTTPS requires**: `extern "C" { esp_err_t esp_crt_bundle_attach(void *conf); }` forward declaration
+
+### ESP-IDF Component Dependencies
+
+```
+# main/CMakeLists.txt - Use REQUIRES vs PRIV_REQUIRES correctly
+REQUIRES ikea-obegransad-panel        # Public API exposed
+PRIV_REQUIRES esp-tls mbedtls        # Internal implementation only
+```
+
+### HTTPS Pattern (Essential for API calls)
+
+```cpp
+// Required for secure OpenMeteo API calls
+cfg.crt_bundle_attach = esp_crt_bundle_attach;  // Use cert bundle
+cfg.use_global_ca_store = false;                // Not global store
+cfg.event_handler = event_handler;              // Handle chunked responses
+```
+
+### LED Panel Timing Critical Sections
+
+- **Timer context**: Display refresh runs in ESP Timer task, NOT ISR (can use blocking SPI/RMT calls)
+- **BCM timing**: `PLANE0_ON_US=100, PLANE1_ON_US=200, PLANE2_ON_US=400, PLANE3_ON_US=800` for 4-bit depth
+
+## Development Workflow
+
+### Build Commands
+
+```bash
+idf.py build                    # Standard build
+idf.py flash monitor           # Flash and start serial monitor
+idf.py menuconfig              # Configure via GUI
+idf.py clean                   # Clean build artifacts
+```
+
+### Configuration Management
+
+- **`sdkconfig.defaults`**: Committed defaults (ESP32-C3 target, HTTPS certs, log levels)
+- **`sdkconfig`**: Generated file (gitignored), contains full config
+
+### Memory & Performance
+
+- LED framebuffer: Fixed `Brightness g_framebuffer[16][16]` array for real-time access
+- HTTP responses: 2KB buffer limit with overflow protection
+- HTTPS: Certificate bundle in flash (not RAM) for memory efficiency
+
+When modifying this codebase, understand that timing precision and memory efficiency are critical due to the real-time
+LED refresh requirements and embedded constraints.
+
+## Roadmap
 
 - [ ] Implement the state machine
 - [ ] Display is separate process
