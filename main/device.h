@@ -20,5 +20,8 @@ void wifi_clear_credentials();
 
 void start_captive_portal();
 void stop_captive_portal();
+bool is_captive_portal_active();
+
+bool wifi_has_credentials();
 
 void enter_light_sleep();

@@ -93,6 +93,12 @@ void stop_captive_portal() {
   ESP_LOGI(TAG, "Captive portal stopped");
 }
 
+bool is_captive_portal_active() { return captive_portal_active; }
+
+bool wifi_has_credentials() {
+  return !SsidManager::GetInstance().GetSsidList().empty();
+}
+
 void wifi_init() {
   auto &ssid_list = SsidManager::GetInstance().GetSsidList();
   
