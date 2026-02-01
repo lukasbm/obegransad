@@ -1,6 +1,13 @@
 # Obegransad
 
+## Get the proper C-Code for static analysis
+
 https://www.perplexity.ai/search/how-to-strip-the-c-c-code-by-r-JLu7mmGjRi.iywX2IPxX9Q
+
+## Develop
+
+See [[DEVELOPER.md]]
+
 
 ## TIPS
 

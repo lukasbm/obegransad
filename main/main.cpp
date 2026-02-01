@@ -13,18 +13,25 @@
 #include "ikea-obegransad-panel.h"
 #include "server.h"
 #include "weather.h"
+#include "state.h"
+#include "scenes/scene_test.hpp"
+#include "scenes/game_of_life.hpp"
+#include "scenes/scene_snake.hpp"
+#include "scenes/scene_weather.hpp"
+#include "scenes/scene_clock.hpp"
 
 static const char *TAG = "main";
 
 static void button_long_press(void *arg, void *usr_data) {
-  ESP_LOGI(TAG, "Button long press detected - clearing WiFi credentials and restarting");
-  wifi_clear_credentials();
-  vTaskDelay(pdMS_TO_TICKS(1000));
-  esp_restart();
+  StateMachine::instance().on_button_long_press();
 }
 
 static void button_short_press(void *arg, void *usr_data) {
-  ESP_LOGI(TAG, "Button short press detected");
+  StateMachine::instance().on_button_short_press();
+}
+
+static void button_double_press(void *arg, void *usr_data) {
+  StateMachine::instance().on_button_double_press();
 }
 
 esp_err_t button_init() {
@@ -32,8 +39,8 @@ esp_err_t button_init() {
   // https://docs.espressif.com/projects/esp-iot-solution/en/latest/input_device/button.html#low-power
 
   const button_config_t btn_cfg = {
-      .long_press_time = 5000, // 1 second for long press
-      .short_press_time = 50   // 50ms for short press
+      .long_press_time = 5000,  // ms
+      .short_press_time = 50   // ms
   };
   const button_gpio_config_t btn_gpio_cfg = {
       .gpio_num = BUTTON_PIN,
@@ -50,14 +57,22 @@ esp_err_t button_init() {
   ESP_RETURN_ON_ERROR(iot_button_register_cb(btn, BUTTON_SINGLE_CLICK, nullptr,
                                              button_short_press, nullptr),
                       TAG, "Failed to register short press callback");
-  ESP_RETURN_ON_ERROR(iot_button_register_cb(btn, BUTTON_LONG_PRESS_UP, nullptr,
+  ESP_RETURN_ON_ERROR(iot_button_register_cb(btn, BUTTON_LONG_PRESS_START, nullptr,
                                              button_long_press, nullptr),
                       TAG, "Failed to register long press callback");
+  ESP_RETURN_ON_ERROR(iot_button_register_cb(btn, BUTTON_DOUBLE_CLICK, nullptr,
+                                             button_double_press, nullptr),
+                      TAG, "Failed to register double press callback");
 
   return ESP_OK;
 }
 
-void advance_state_machine() {}
+// Global scene instances
+ClockScene clock_scene;
+WeatherScene weather_scene;
+GameOfLifeScene game_of_life_scene;
+SnakeScene snake_scene;
+SpriteTestScene test_scene;
 
 extern "C" void app_main() {
   ESP_LOGI(TAG, "Startup");
@@ -79,22 +94,6 @@ extern "C" void app_main() {
   // Initialize WiFi - starts captive portal if no credentials, otherwise connects
   wifi_init();
 
-  // Wait for WiFi connection with timeout
-  if (!wifi_check()) {
-    ESP_LOGI(TAG, "Waiting up to 60 seconds for WiFi connection...");
-    bool connected = wifi_wait_for_connection(60000); // 60 second timeout
-    
-    if (!connected) {
-      ESP_LOGW(TAG, "Failed to connect to saved WiFi within 60 seconds");
-      ESP_LOGW(TAG, "Clearing credentials and starting captive portal...");
-      wifi_clear_credentials();
-      vTaskDelay(pdMS_TO_TICKS(500));
-      start_captive_portal();
-    } else {
-      ESP_LOGI(TAG, "Successfully connected to WiFi");
-    }
-  }
-
   // set up sntp and time zone
   // FIXME: get from config!
   ESP_ERROR_CHECK(clock_init("CET-1CEST,M3.5.0,M10.5.0/3"));
@@ -111,42 +110,19 @@ extern "C" void app_main() {
 
   ESP_ERROR_CHECK(panel_init(panel_config));
   ESP_ERROR_CHECK(panel_timer_start());
+  
+  // Register scenes
+  register_scene(&clock_scene);
+  register_scene(&weather_scene);
+  register_scene(&game_of_life_scene);
+  register_scene(&snake_scene);
+  register_scene(&test_scene);
 
-  // START SERVER
-  // esp_err_t ret = start_webserver();
-  // if (ret != ESP_OK) {
-  //   ESP_LOGE(TAG, "Failed to start web server: %s", esp_err_to_name(ret));
-  //   return;
-  // } else {
-  //   ESP_LOGI(TAG, "Web server started successfully");
-  // }
-
-  // TEST WEATHER
-  // ESP_LOGI(TAG, "Fetching weather data");
-  // WeatherData weather_data;
-  // ret = fetch_weather(49, 11, weather_data);
-  // if (ret == ESP_OK) {
-  //   weather_data.print();
-  // } else {
-  //   ESP_LOGE(TAG, "Failed to fetch weather: %s", esp_err_to_name(ret));
-  // }
-
-  // TEST PANEL
-  panel_clear();
-  for (int i = 0; i < 16; i++) {
-    for (int j = 0; j < 16; j++) {
-      panel_setPixel(j, i,
-                     brightness_levels[j % 4]); // Set a checkerboard pattern }
-    }
-  }
-  uint8_t b = 0;
+  // Init State Machine
+  StateMachine::instance().init();
 
   while (true) {
-    // advance_state_machine();
-
-    panel_set_global_brightness(b);
-    b++;
-
-    vTaskDelay(pdMS_TO_TICKS(10)); // Sleep for 100ms
+    StateMachine::instance().update();
+    vTaskDelay(pdMS_TO_TICKS(100));
   }
 }
