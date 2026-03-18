@@ -1,7 +1,12 @@
+#pragma once
+
 #include "esp_err.h"
 #include <driver/gpio.h>
 
 constexpr gpio_num_t BUTTON_PIN = GPIO_NUM_20;
+constexpr gpio_num_t STATUS_LED_PIN = GPIO_NUM_10;
+
+typedef void (*wifi_connection_callback_t)(bool connected);
 
 // basic device initialization (NVS, event loop)
 esp_err_t device_init();
@@ -25,3 +30,6 @@ bool is_captive_portal_active();
 bool wifi_has_credentials();
 
 void enter_light_sleep();
+
+// Register a lightweight Wi-Fi connection callback. Invoked with true only when station has an IP.
+esp_err_t wifi_register_connection_callback(wifi_connection_callback_t callback);

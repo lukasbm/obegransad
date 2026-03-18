@@ -14,6 +14,7 @@
 #include "server.h"
 #include "weather.h"
 #include "state.h"
+#include "status_led.hpp"
 #include "scenes/scene_test.hpp"
 #include "scenes/game_of_life.hpp"
 #include "scenes/scene_snake.hpp"
@@ -82,8 +83,11 @@ extern "C" void app_main() {
   esp_log_level_set("WifiStation", ESP_LOG_INFO);
   esp_log_level_set("WifiConfigurationAp", ESP_LOG_INFO);
 
+  ESP_ERROR_CHECK(status_led_init());
+
   // nvs, event loop, networking
   ESP_ERROR_CHECK(device_init());
+  ESP_ERROR_CHECK(wifi_register_connection_callback(status_led_set_wifi_connected));
 
   // load initial NVS settings
   ESP_ERROR_CHECK(nvs_read_settings(g_settings));
