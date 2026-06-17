@@ -1,254 +1,291 @@
-# Project Purpose
+# Project Description (event-driven)
 
-In this project I turn an old grayscale 16x16 display into a smart device.
-The user can program images and animations to be displayed on the screen via a web interface, as well as switching
-between scenes using the only hardware button available.
-For now all scenes are pre-programmed.
+## Goal
 
-# Hardware
+Turn the 16×16 grayscale matrix into a resilient smart display with:
 
-## Display
+* deterministic 400–500 Hz refresh,
+* Wi-Fi provisioning via captive portal,
+* an embedded HTTP configuration server,
+* weather fetching when connected, and
+* a single physical button with context-dependent actions.
 
-The display is a 16x16 LED matrix driven by shift registers.
-The first input has:
+The system is implemented as cooperating tasks and an event bus rather than a single global loop state machine.
 
-- EN (enable)
-- CLK (clock)
-- LAT (latch)
-- D (data)
+---
 
-- The LED panel driver implements **Bit Code Modulation (BCM)** with precise timing:
+# High-level architecture (ASCII)
 
-- **SPI**: High-speed data transfer to shift registers (`spi_device_polling_transmit`)
-- **RMT**: Microsecond-precision OE (Output Enable) timing control (`rmt_send_oe_pulse`)
-- **ESP Timer**: 500Hz refresh with `ESP_TIMER_TASK` dispatch (NOT ISR) for safe blocking operations
-- **Direct GPIO**: Fast latch pulses using `GPIO.out_w1ts.val` register access
+```
+                    +-----------------------------+
+                    |   esp-idf / lwIP / Wi-Fi    |
+                    +-------------+---------------+
+                                  |
+       +--------------------------+-------------------------+
+       |                          |                         |
++------v------+         +---------v---------+      +--------v--------+
+| HTTP Server |         | Weather Client    |      | Wi-Fi Manager   |
+| (low prio)  |         | (periodic task)   |      | (esp_event posts)|
++-------------+         +-------------------+      +-----------------+
+                                  |
+                                  v
+                       +-------------------------+
+                       |   Application / UI      |
+                       |   (state machine task)  |
+                       +-----------+-------------+
+                                   |
+                    event queue / esp_event posts
+                                   |
+             +---------------------+---------------------+
+             |                                           |
++------------v------------+                 +------------v------------+
+| Display Task (HIGH)     |                 | Button Handler Task     |
+| - owns framebuffer      |                 | - ISR -> queue -> task  |
+| - triggered by esp_timer|                 | - debouncing, events    |
++------------+------------+                 +-------------------------+
+             ^
+             |
+     esp_timer ISR  (IRAM_ATTR)  -> vTaskNotifyGiveFromISR(panel_task)
+```
 
-## Chip
+---
 
-This runs on a Seeed Studio ESP32-C3 board. It is Wi-Fi and bluetooth enabled.
-Since I later want to add web configuration and home assistant integration, Wi-Fi is essential.
-For this a proper captive portal for setup is crucial!
+# Module responsibilities
 
-# Project Structure
+### Display (highest-determinism)
 
-## Components
+* Owns the framebuffer and the "commit" pipeline.
+* Receives a **task notification** from an `esp_timer` ISR at each refresh tick (use `ESP_TIMER_ISR` dispatch; ISR
+  should only notify).
+* Runs in a dedicated FreeRTOS task (non-ISR) so it can call blocking SPI/RMT calls safely.
+* Must be short and deterministic. No heap allocations, no filesystem, no network.
+* Overlay rendering (status icons) is composed in memory and blended just before `commit`.
 
-The components are implemented in `main/` and `components/`
+**Key API (example)**:
 
-### Display
+```cpp
+// ISR (IRAM_ATTR)
+static void IRAM_ATTR refresh_timer_callback(void *arg) {
+  BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+  vTaskNotifyGiveFromISR(g_panel_task_handle, &xHigherPriorityTaskWoken);
+  portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+}
 
-Is a standalone component that handles all display related tasks, including BCM timing, pixel setting and
-framebuffer management.
-Timing is critical so this runs in its own task with the highest priority.
-However since the callback of some of the display functions might be slow, this cannot happen in ISR context.
-Has to be non ISR, as currently implemented.
+// Display task
+void panel_task(void* _) {
+  while (true) {
+    ulTaskNotifyTake(pdTRUE, portMAX_DELAY); // wait for tick
+    refresh_display_frame();                 // deterministic, returns quickly
+  }
+}
+```
+
+(You already had this pattern — keep it.)
+
+---
+
+### Button handling
+
+* GPIO ISR (IRAM) must be minimal: push an event into an ISR-safe queue (or set an event group bit).
+* A *Button Handler Task* reads the queue, debounces, recognizes short/long/double presses and posts higher-level events
+  to the app event bus.
+
+### Wi-Fi Manager & Captive Portal
+
+* Uses `esp_event` to announce `WIFI_CONNECTED`, `WIFI_DISCONNECTED`, `CAPTIVE_PORTAL_STARTED`,
+  `CAPTIVE_PORTAL_STOPPED`.
+* Runs the AP + captive portal when there is no valid configuration.
+* Starts the HTTP server once connected (or when captive portal mode requires it).
+* Recover from disconnections automatically (exponential backoff).
+
+### HTTP Server (config UI)
+
+* Runs in its own task(s) (esp_http_server).
+* Low priority; must not block display operations.
+* Request handlers should be fast — long operations schedule work on the HTTP client / worker task.
+
+### Weather client
+
+* Periodic task or a worker spawned on demand.
+* Uses event-driven timers (FreeRTOS software timer or esp_event + delayed post).
+* Heavy network activity runs at normal task priority — do not run in display task.
 
 ### Scenes
 
-There are many implementations of these already there. Each of them implements the three simple methods:
-activate, deactivate, update.
-It also implements `requires_wifi()` to indicate if it should be skipped when offline.
-These then get called by the scene switcher when appropriate.
-The only responsibility of a scene is to draw on the screen when updated.
-It should not care about the state of the system or consume internal data like wifi connectivity.
-All error display and state machine handling is done by other modules.
-This one can assume flawless operation of the system.
+* Pure rendering logic: `activate()`, `deactivate()`, `update(dt)`, `requires_wifi()`.
+* Called by the Application/UI task. Scenes only draw pixels — they do not manage peripheral state or network.
 
-### Clock
+### Config / NVS
 
-The module that sets up NTP and keeps track of time.
-Requires Wi-Fi to be connected.
+* Central small API for get/set config values.
+* The Wi-Fi manager consumes config for connectivity.
 
-### Sprites
+### Clock / NTP
 
-A simple sprite engine that can load sprites from PROGMEM.
-If we use the asm embedding method, we can get very compact sprite storage and automatic PROGMEM handling.
-We allow for different sprites:
+* Runs when Wi-Fi is available; posts `TIME_SYNCED` event to the event bus.
 
-- Atlas (grid of sprites)
-- Single sprite
-- Animation Sheet (atlas with next frame indices)
-- Font Sheet (atlas with character mapping)
+---
 
-Each of them provides a function to draw themselves on the display at a given position.
+# Event-driven state model (replace the global state loop)
 
-### Config
+Use `esp_event` (ESP-IDF event loop) or a small internal event bus. Post named events instead of spinning in a loop.
 
-A simple configuration manager that can store and retrieve key-value pairs from NVS.
-This is used by other modules to store their configuration persistently, altough the config schema is staticly defined
-by this module for simplicity.
+**Core events (examples)**:
 
-### Device
+* `EVT_BOOT`
+* `EVT_WAKE`
+* `EVT_GO_TO_SLEEP`
+* `EVT_WIFI_CONNECTED`
+* `EVT_WIFI_DISCONNECTED`
+* `EVT_CAPTIVE_PORTAL_ACTIVE`
+* `EVT_BUTTON_SHORT`
+* `EVT_BUTTON_LONG`
+* `EVT_BUTTON_DOUBLE`
+* `EVT_WEATHER_DATA_READY`
+* `EVT_ERROR_OCCURED`
 
-Handles device wide operations like deep sleep, rebooting, Wi-Fi connectivity, captive portal, etc.
+**State examples** (application-level):
 
-### Main
+* `SLEEPING`
+* `SETUP` (captive portal)
+* `OPERATIONAL`
+* `DEGRADED`
+* `ERROR`
 
-The main module initializes all other modules and starts the main loop.
-Soon it will also handle the button presses and scene switching as well as everything else state machine related.
+**Transition principle**: The *Application Task* subscribes to events and updates a local state enum. State transitions
+can trigger actions (start/stop services) by posting control events to modules (e.g., `START_HTTP_SERVER`,
+`STOP_SCENE_SWITCHER`).
 
-### Scene Switcher
+---
 
-Handles switching between scenes based on button presses.
-Should only be active when the device is fully operational, i.e. not in captive portal or error state.
+# Timing, jitter and Wi-Fi CPU budget
 
-### Server
+* Keep display refresh short. Use DMA / non-blocking SPI where available (or short, deterministic polling SPI). Measure
+  the worst-case refresh duration.
+* Ensure display duty per tick << tick period. For 400 Hz, period = 2.5 ms. Aim for display work < ~400–600 µs to
+  preserve headroom for Wi-Fi.
+* Use `ESP_TIMER_ISR` + `vTaskNotifyGiveFromISR` for the most deterministic tick timing; the actual heavy work (SPI /
+  RMT) must be done in the display task (task context).
+* Do **not** call logging or `malloc` inside the display refresh path — these can block and cause Wi-Fi starvation.
+* If refresh ever needs more CPU than acceptable, move more to DMA or reduce bit-depth or split the refresh across
+  multiple ticks.
 
-A simple HTTP server that serves the configuration web interface.
-Should always be active when Wi-Fi is operational.
+---
 
-### Weather
+# Priorities & resource guidance (relative scheme)
 
-Fetches weather data from an online API and provides it to scenes that want to display weather information.
-Only works when Wi-Fi is operational.
+Use a relative priority scheme rather than absolute numbers when possible. Example ordering (higher == more important):
 
-## State machine
+1. `Display Task` — **Highest** (must preempt others briefly on refresh)
+2. `Wi-Fi / lwIP internal tasks` — **Very High** (ensures network runs correctly)
+3. `HTTP Server / Weather client` — **High**
+4. `Application / UI Task` — **Normal**
+5. `Button Handler / Background` — **Low**
+6. `Idle/Background` — **Lowest**
 
-Since the hardware button and display have to carry multiple purposes depending on context, a state machine is used to
-keep track of the current mode.
+If your `configMAX_PRIORITIES` is small, place Display at the top (max - 1), Wi-Fi slightly below it, etc. Tune by
+measuring `uxTaskGetSystemState()` and CPU usage.
 
-The following modules have the following states:
-(Note that the device module handles both the chip and Wi-Fi states)
+**Stack sizes**: measure, but typical starting points:
 
-- WiFi: Disconnected, Connected, CaptivePortal, Off
-- Chip itself: On, Sleeping
-- Display: On, Off
-- Button: ShortPress, LongPress, Hold
-- Config Server: Off, On
-- Scene Switcher: Off, On
+* Display task: 4096–8192 bytes (depends on local buffers).
+* HTTP server tasks: 6–12 KB (esp_http_server can be heavier).
+* UI task: 4096 bytes.
+* Button task: 2048 bytes.
 
-However, we do not need the full cross product of all these states to model the system.
-We have the following constraints and dependencies:
+Adjust after profiling.
 
-- If Chip is Sleeping, everything is Off, only a pre-set timer or a button press can wake it up
-- If Chip is On, Wi-Fi will not be Off, but can be in any other state
-- If Chip is On, Display will be On
-- If Wi-Fi is in Captive Portal, Config Server must be Off.
-- If Wi-Fi is in Captive Portal, Scene Switcher must be Off.
-- If Wi-Fi is in Captive Portal, Button presses are ignored (Except Long Press for Reset).
-- If Wi-Fi is Disconnected or Connecting, Scene Switcher is off and Button presses are ignored (Except Long Press for Reset).
-- If Wi-Fi is Connected, Config Server is On and Scene Switcher is On.
-- Scene Switch can only be On if Chip and Display are on and Wifi is connected.
+---
 
-## Implementation
+# Practical rules / coding guidelines
 
-Since most modules do not really handle button presses themselves,
-we can have a central state machine in `main/` that handles all state transitions and notifies other modules of state
-changes.
+* **ISRs** do the absolute minimum:
 
-The components like server and chip/device then provide methods like `turn_server_on()`, `connect_wifi()`, etc. in a
-simple functional way that a main state machine can call.
+    * `esp_timer` ISR: notify display task.
+    * GPIO ISR: push event to queue.
+* **Callbacks** on timer should be in IRAM and marked `IRAM_ATTR` if they run in ISR context.
+* **Display task** may call `spi_device_polling_transmit` if deterministic, or use queued DMA (
+  `spi_device_queue_transmit`) + `spi_device_get_trans_result`.
+* **Avoid** `vTaskDelay()` in display callbacks.
+* **Use event posting** for cross-module communication (esp_event).
+* **Scene design**: `update()` receives a timestamp or delta; scenes must be pure drawing functions (no side effects).
 
-The goal is essentially to have a big switch-case in the main loop that handles all possible states and transitions.
+---
 
-Design wise, every state has their own way of handling the button and drawing on display.
+# Captive portal + Web UI flow (suggested)
 
-Considering the following dependencies above we can define the following main states:
-(hope this is correct, I did not formally verify this)
+1. Boot -> Wi-Fi Manager loads NVS config. If no SSID => start AP + captive portal -> post `EVT_CAPTIVE_PORTAL_ACTIVE`.
+2. Captive portal starts HTTP server. User configures Wi-Fi.
+3. On successful connection -> `EVT_WIFI_CONNECTED` -> NTP sync, start HTTP server for device config, start scene
+   switcher.
+4. On Wi-Fi loss -> `EVT_WIFI_DISCONNECTED` -> move to `DEGRADED`: scene switcher may still run, but cloud-only scenes
+   filtered out.
 
-- SLEEPING (Display Off, Chip Sleeping, Wi-Fi Off, Server Off, Scene Switcher Off)
-    - Nothing is drawn on the display
-    - Short button press wakes up the chip (other types of button presses are ignored)
-- SETUP (Display On, Chip On, Wi-Fi Captive Portal, Server Off, Scene Switcher Off)
-    - A long button press resets the device (clears NVS and reboots) - GLOBAL BEHAVIOR
-    - A Wi-Fi symbol is drawn on the display to indicate setup mode
-- OPERATIONAL (Display On, Chip On, Wi-Fi Connected, Server On, Scene Switcher On)
-    - A long button press resets the device (clears NVS and reboots) - GLOBAL BEHAVIOR
-    - A short button press switches to the next scene
-    - A double press jumps to the favorite scene
-    - Regular display updates are done by the scene switcher
-- ERROR (Display On, Chip On, Wi-Fi Off, Server Off, Scene Switcher Off)
-    - A long button press resets the device (clears NVS and reboots) - GLOBAL BEHAVIOR
-    - An error symbol is drawn on the display to indicate error state.
-    - A button press enters SETUP state
-    - A double button press enters DEGRADED state
-- DEGRADED (Display On, Chip On, Wi-Fi Disconnected, Server Off, Scene Switcher On)
-    - A long button press resets the device (clears NVS and reboots) - GLOBAL BEHAVIOR
-    - A short button press switches to the next scene
-    - A double press jumps to the favorite scene
-    - A warning symbol (top right pixel is on) is drawn on the display to indicate degraded state.
-    - Regular display updates are done by the scene manager
+---
 
-The Setup phase handles Wi-Fi connectivity and is therefore run after boot and wake-up.
-When setup failes, we enter ERROR state.
-When setup succeeds, we enter OPERATIONAL state.
-In case Wi-Fi disconnects during OPERATIONAL state, we enter DEGRADED state.
-Degraded state works just like operational, except that the Wi-Fi is not connected.
-Ideally this is only temporary and Wi-Fi reconnects after some time.
-That's why regular reconnect attempts are needd in that state.
+# Overlay rendering & scene compositing
 
-Error usually refers to an unrecoverable state, e.g. no Wi-Fi configuration is present but cannot be set up.
-Instead of bootlooping, we enter ERROR state and allow the user to enter SETUP mode via button press.
+* Scenes draw to a shared framebuffer (or into an offscreen buffer).
+* After `scene.update()` completes, the Display Task composes overlays (status icons, battery, debug dot) then commits
+  the frame.
+* Overlays are small and fast; implement as a final write to the framebuffer immediately before the SPI/RMT commit.
 
-**Refinements:**
-1. **Global Long Press:** The long press action (Reset/Clear NVS) is a global interrupt and functions in all states (except deep sleep where it might just wake the device).
-2. **Overlay Rendering:** Status icons (like the warning dot in DEGRADED mode) are drawn *after* the scene update but before the frame commit to ensure they overlay correctly and aren't overwritten by the scene.
-3. **Scene Filtering:** Scenes define if they `requires_wifi()`. The Scene Switcher skips these scenes when the device is in DEGRADED or SETUP modes.
+---
 
-So most of the state transitions as well as input handling is rather trivial.
-The core application logic does not depend on any complex state interactions.
-Only the scene manager / switcher should be aware if we are in OPERATIONAL or DEGRADED state,
-so that it can decide whether to display Wi-Fi dependent scenes or not.
+# Debugging, testing & telemetry checklist
 
-## Other considerations
+* Measure refresh jitter (timestamp before ISR and at commit).
+* Measure worst-case refresh duration and CPU utilization.
+* Ensure Wi-Fi tasks get >=20% CPU during heavy network operations (simulate loads).
+* Test button debouncing and long/short/double detection under load.
+* Validate captive portal flow with network off at boot.
+* Use heap and stack monitoring (heap_caps_get_free_size, `uxTaskGetStackHighWaterMark`).
 
-### C/C++ Mixed Language Convention
+---
 
-- **C components**: LED driver in `components/` uses pure C with `extern "C"` blocks for C++ compatibility
-- **C++ application**: `main/` uses C++ with ESP-IDF C APIs via proper declarations
-- **HTTPS requires**: `extern "C" { esp_err_t esp_crt_bundle_attach(void *conf); }` forward declaration
+# Migration plan (practical step-by-step)
 
-### ESP-IDF Component Dependencies
+1. **Create an event bus** (use `esp_event`).
+2. **Extract Display Task** (if not already): make it a dedicated task that waits on task notifications.
+3. **Change esp_timer to ISR dispatch**: set `dispatch_method = ESP_TIMER_ISR` and in the ISR notify display task with
+   `vTaskNotifyGiveFromISR`.
 
-```
-# main/CMakeLists.txt - Use REQUIRES vs PRIV_REQUIRES correctly
-REQUIRES ikea-obegransad-panel        # Public API exposed
-PRIV_REQUIRES esp-tls mbedtls        # Internal implementation only
-```
+* If you must block in the refresh (e.g., polling SPI), do it in the display task, **not** in ISR.
 
-### HTTPS Pattern (Essential for API calls)
+4. **Replace global loop** with an `app_task` that subscribes to `esp_event` events and posts commands to modules (
+   start/stop server, switch scene, etc).
+5. **Implement button ISR -> queue -> button task** and publish `EVT_BUTTON_*` events.
+6. **Implement Wi-Fi manager** (AP + captive portal + auto reconnect) that posts events.
+7. **Refactor Scenes** to be pure drawing functions and ensure `requires_wifi()` is honored by the
+   app_task/scene_switcher.
+8. **Profile** and tune priorities/stack sizes.
+9. **Edge cases**: implement fallback degraded mode, and a global long-press handler (ISR -> event) that always triggers
+   reset behavior.
+
+---
+
+# Short example: esp_timer args (suggested)
 
 ```cpp
-// Required for secure OpenMeteo API calls
-cfg.crt_bundle_attach = esp_crt_bundle_attach;  // Use cert bundle
-cfg.use_global_ca_store = false;                // Not global store
-cfg.event_handler = event_handler;              // Handle chunked responses
+esp_timer_create_args_t timer_args = {
+    .callback = refresh_timer_callback,
+    .name = "panel_refresh",
+    .dispatch_method = ESP_TIMER_ISR, // call in ISR context (very low jitter)
+};
+esp_timer_handle_t refresh_timer;
+esp_timer_create(&timer_args, &refresh_timer);
+esp_timer_start_periodic(refresh_timer, 2500); // microseconds for 400Hz
 ```
 
-### LED Panel Timing Critical Sections
+(Then ISR only notifies; display task does the work.)
 
-- **Timer context**: Display refresh runs in ESP Timer task, NOT ISR (can use blocking SPI/RMT calls)
-- **BCM timing**: `PLANE0_ON_US=100, PLANE1_ON_US=200, PLANE2_ON_US=400, PLANE3_ON_US=800` for 4-bit depth
+---
 
-## Development Workflow
+# Final notes & tradeoffs
 
-### Build Commands
-
-```bash
-idf.py build                    # Standard build
-idf.py flash monitor           # Flash and start serial monitor
-idf.py menuconfig              # Configure via GUI
-idf.py clean                   # Clean build artifacts
-```
-
-### Configuration Management
-
-- **`sdkconfig.defaults`**: Committed defaults (ESP32-C3 target, HTTPS certs, log levels)
-- **`sdkconfig`**: Generated file (gitignored), contains full config
-
-### Memory & Performance
-
-- LED framebuffer: Fixed `Brightness g_framebuffer[16][16]` array for real-time access
-- HTTP responses: 2KB buffer limit with overflow protection
-- HTTPS: Certificate bundle in flash (not RAM) for memory efficiency
-
-When modifying this codebase, understand that timing precision and memory efficiency are critical due to the real-time
-LED refresh requirements and embedded constraints.
-
-## Roadmap
-
-- [ ] Implement the state machine
-- [ ] Display is separate process
-- [ ] Button handling is a state machine.
-
+* Your existing design pieces (framebuffer, RMT, SPI, scenes) are well structured — the biggest improvement is moving
+  from a monolithic loop to an event-driven, task-based design.
+* The key constraints to preserve: *no heavy work in ISRs* and *display refresh must be deterministic and short.* Use
+  the ISR→notify pattern you already implemented.
+* Tune the display task to be as short as possible (use DMA, partial refresh, or reduce depth if needed) so Wi-Fi has
+  its required CPU budget.
