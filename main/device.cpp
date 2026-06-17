@@ -6,8 +6,11 @@
 #include "esp_event.h"
 #include "nvs_flash.h"
 #include <esp_log.h>
+#include <esp_netif.h>
 #include <esp_sleep.h>
 #include <esp_system.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 // esp-wifi-connect headers
 #include "ssid_manager.h"          // SsidManager::GetInstance()
@@ -19,6 +22,27 @@ static const char *TAG = "device";
 // state variables
 static bool captive_portal_active = false;
 static bool wifi_station_started = false;
+static wifi_connection_callback_t wifi_connection_callback = nullptr;
+
+static void notify_wifi_connection_state(bool connected) {
+  if (wifi_connection_callback != nullptr) {
+    wifi_connection_callback(connected);
+  }
+}
+
+static void wifi_event_handler(void *arg, esp_event_base_t event_base,
+                               int32_t event_id, void *event_data) {
+  if (event_base == WIFI_EVENT) {
+    if (event_id == WIFI_EVENT_STA_DISCONNECTED) {
+      notify_wifi_connection_state(false);
+    }
+    return;
+  }
+
+  if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
+    notify_wifi_connection_state(true);
+  }
+}
 
 esp_err_t device_init() {
   // network stack
@@ -27,6 +51,15 @@ esp_err_t device_init() {
   // default event loop needed for wifi
   ESP_RETURN_ON_ERROR(esp_event_loop_create_default(), TAG,
                       "Failed to create default event loop");
+
+  ESP_RETURN_ON_ERROR(
+      esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID,
+                                 &wifi_event_handler, nullptr),
+      TAG, "Failed to register WiFi event handler");
+  ESP_RETURN_ON_ERROR(
+      esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP,
+                                 &wifi_event_handler, nullptr),
+      TAG, "Failed to register IP event handler");
 
   // Initialize NVS flash (e.g. to store wifi creds and config)
   esp_err_t ret = nvs_flash_init();
@@ -39,6 +72,12 @@ esp_err_t device_init() {
   }
   ESP_RETURN_ON_ERROR(ret, TAG, "Failed to initialize NVS flash");
 
+  return ESP_OK;
+}
+
+esp_err_t wifi_register_connection_callback(wifi_connection_callback_t callback) {
+  wifi_connection_callback = callback;
+  notify_wifi_connection_state(false);
   return ESP_OK;
 }
 
@@ -57,6 +96,7 @@ void wifi_clear_credentials() {
 
   // Stop captive portal if active
   stop_captive_portal();
+  notify_wifi_connection_state(false);
 }
 
 void start_captive_portal() {
@@ -78,7 +118,8 @@ void start_captive_portal() {
   ap.SetSsidPrefix("Obegransad");
   ap.Start();
   captive_portal_active = true;
-  
+  notify_wifi_connection_state(false);
+
   ESP_LOGI(TAG, "Captive portal started - SSID: %s", ap.GetSsid().c_str());
 }
 
@@ -112,6 +153,7 @@ void wifi_init() {
     }
     WifiStation::GetInstance().Start();
     wifi_station_started = true;
+    notify_wifi_connection_state(false);
   }
 }
 
