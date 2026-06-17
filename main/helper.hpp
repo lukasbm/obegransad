@@ -4,6 +4,11 @@
 #include <functional>
 #include <stdint.h>
 
+// Milliseconds since boot (Arduino-style helper used by scenes).
+inline unsigned long millis() {
+  return static_cast<unsigned long>(esp_timer_get_time() / 1000);
+}
+
 // pos is one of the 60 corner pixels. writes the x and y coordinates.
 // pos 0 is top left, moving clockwise
 inline void ring_coord(uint8_t pos, uint8_t &x, uint8_t &y) {

@@ -1,13 +1,17 @@
 #include "device.h"
 
+#include "app_events.h"
+
 // ESP-IDF core dependencies
 #include "esp_check.h"
 #include "esp_err.h"
 #include "esp_event.h"
 #include "nvs_flash.h"
 #include <esp_log.h>
+#include <esp_netif.h>
 #include <esp_sleep.h>
 #include <esp_system.h>
+#include <esp_wifi.h>
 
 // esp-wifi-connect headers
 #include "ssid_manager.h"          // SsidManager::GetInstance()
@@ -20,6 +24,17 @@ static const char *TAG = "device";
 static bool captive_portal_active = false;
 static bool wifi_station_started = false;
 
+// Translate low-level Wi-Fi/IP driver events into high-level app events so the
+// rest of the system can subscribe to connectivity changes without polling.
+static void wifi_event_handler(void * /*arg*/, esp_event_base_t event_base,
+                               int32_t event_id, void * /*event_data*/) {
+  if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+    app_post_event(APP_EVT_WIFI_DISCONNECTED);
+  } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
+    app_post_event(APP_EVT_WIFI_CONNECTED);
+  }
+}
+
 esp_err_t device_init() {
   // network stack
   ESP_RETURN_ON_ERROR(esp_netif_init(), TAG, "Failed to initialize netif");
@@ -27,6 +42,16 @@ esp_err_t device_init() {
   // default event loop needed for wifi
   ESP_RETURN_ON_ERROR(esp_event_loop_create_default(), TAG,
                       "Failed to create default event loop");
+
+  // Bridge driver events onto the application event bus.
+  ESP_RETURN_ON_ERROR(
+      esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED,
+                                 &wifi_event_handler, nullptr),
+      TAG, "Failed to register WiFi event handler");
+  ESP_RETURN_ON_ERROR(
+      esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP,
+                                 &wifi_event_handler, nullptr),
+      TAG, "Failed to register IP event handler");
 
   // Initialize NVS flash (e.g. to store wifi creds and config)
   esp_err_t ret = nvs_flash_init();
@@ -78,7 +103,8 @@ void start_captive_portal() {
   ap.SetSsidPrefix("Obegransad");
   ap.Start();
   captive_portal_active = true;
-  
+  app_post_event(APP_EVT_CAPTIVE_PORTAL_ACTIVE);
+
   ESP_LOGI(TAG, "Captive portal started - SSID: %s", ap.GetSsid().c_str());
 }
 

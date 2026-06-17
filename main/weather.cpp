@@ -98,6 +98,11 @@ esp_err_t event_handler(esp_http_client_event_t *evt) {
     esp_http_client_set_redirection(evt->client);
     break;
   }
+
+  default:
+    // Other events (e.g. HTTP_EVENT_ON_STATUS_CODE / ON_HEADERS_COMPLETE added
+    // in newer ESP-IDF) need no handling here.
+    break;
   }
   return ESP_OK;
 }
@@ -258,11 +263,20 @@ esp_err_t fetch_weather(float latitude, float longitude, WeatherData &data) {
   esp_err_t err = parse_weather_data(response_data, data);
   if (err != ESP_OK) {
     ESP_LOGE(TAG, "Failed to parse weather data: %s", esp_err_to_name(err));
+  } else {
+    weather_set(data); // publish to the cache scenes read from
   }
 
   free(response_data);
   return err;
 }
+
+// Cached snapshot of the most recently fetched weather. Read by scenes.
+static WeatherData g_cached_weather;
+
+WeatherData weather_get() { return g_cached_weather; }
+
+void weather_set(const WeatherData &data) { g_cached_weather = data; }
 
 void WeatherData::print() const {
   ESP_LOGI(TAG,

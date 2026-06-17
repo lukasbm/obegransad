@@ -1,3 +1,5 @@
+#pragma once
+
 #include "esp_err.h"
 #include <time.h>
 
@@ -9,6 +11,10 @@ bool get_local_time(struct tm &timeinfo);
 bool get_time_precise(struct timeval &tv);
 time_t get_unix_time(void);
 void clock_force_sync();
+
+// Convenience accessor for scenes: returns the current local time, or a
+// zero-initialized tm if the clock has not synced yet.
+struct tm time_get();
 
 // enum MoonPhase : uint8_t {
 //   NEW,

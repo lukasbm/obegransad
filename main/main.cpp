@@ -7,11 +7,14 @@
 #include <freertos/projdefs.h>
 #include <iot_button.h>
 
+#include "app_events.h"
 #include "clock.h"
 #include "config.h"
 #include "device.h"
 #include "ikea-obegransad-panel.h"
+#include "scene_switcher.h"
 #include "server.h"
+#include "status_led.hpp"
 #include "weather.h"
 #include "state.h"
 #include "scenes/scene_test.hpp"
@@ -23,15 +26,15 @@
 static const char *TAG = "main";
 
 static void button_long_press(void *arg, void *usr_data) {
-  StateMachine::instance().on_button_long_press();
+  app_post_event(APP_EVT_BUTTON_LONG);
 }
 
 static void button_short_press(void *arg, void *usr_data) {
-  StateMachine::instance().on_button_short_press();
+  app_post_event(APP_EVT_BUTTON_SHORT);
 }
 
 static void button_double_press(void *arg, void *usr_data) {
-  StateMachine::instance().on_button_double_press();
+  app_post_event(APP_EVT_BUTTON_DOUBLE);
 }
 
 esp_err_t button_init() {
@@ -82,8 +85,13 @@ extern "C" void app_main() {
   esp_log_level_set("WifiStation", ESP_LOG_INFO);
   esp_log_level_set("WifiConfigurationAp", ESP_LOG_INFO);
 
-  // nvs, event loop, networking
+  // nvs, event loop, networking (creates the default event loop the app bus
+  // and status LED subscribe to)
   ESP_ERROR_CHECK(device_init());
+
+  // Early hardware status LED: ON until Wi-Fi connects. Subscribes to the
+  // app event bus, so it must come after device_init().
+  ESP_ERROR_CHECK(status_led_init());
 
   // load initial NVS settings
   ESP_ERROR_CHECK(nvs_read_settings(g_settings));

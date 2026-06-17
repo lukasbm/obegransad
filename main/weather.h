@@ -1,3 +1,5 @@
+#pragma once
+
 #include "esp_err.h"
 #include <cJSON.h>
 #include <esp_http_client.h>
@@ -62,3 +64,10 @@ struct WeatherData {
 };
 
 esp_err_t fetch_weather(float latitude, float longitude, WeatherData &data);
+
+// Cached weather accessors. fetch_weather() populates the cache via
+// weather_set(); scenes read the most recent snapshot via weather_get().
+// TODO: drive weather_set() from a periodic weather client task (see
+// DEVELOPER.md "Weather client").
+WeatherData weather_get();
+void weather_set(const WeatherData &data);

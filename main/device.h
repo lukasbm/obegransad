@@ -1,7 +1,10 @@
+#pragma once
+
 #include "esp_err.h"
 #include <driver/gpio.h>
 
 constexpr gpio_num_t BUTTON_PIN = GPIO_NUM_20;
+constexpr gpio_num_t STATUS_LED_PIN = GPIO_NUM_10;
 
 // basic device initialization (NVS, event loop)
 esp_err_t device_init();

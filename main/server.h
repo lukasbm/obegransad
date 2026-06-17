@@ -1,3 +1,5 @@
+#pragma once
+
 #include "esp_err.h"
 
 // This module is for serving the config page and API.

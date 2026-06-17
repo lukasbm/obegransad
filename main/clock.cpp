@@ -124,3 +124,9 @@ bool get_time_precise(struct timeval &tv) {
 }
 
 time_t get_unix_timestamp(void) { return time(NULL); }
+
+struct tm time_get() {
+  struct tm timeinfo = {};
+  get_local_time(timeinfo);
+  return timeinfo;
+}

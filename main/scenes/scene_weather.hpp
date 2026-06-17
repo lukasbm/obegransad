@@ -59,7 +59,9 @@ public:
   bool requires_wifi() const override { return true; }
 
   void update() override {
-    static RenderTimer timer(200); // 200 ms timer for animations
+    static RenderTimer timer("weather", 200); // 200 ms timer for animations
+    static bool started = (timer.start(), true);
+    (void)started;
 
     if (timer.check()) {
       drawWeatherData(weather_get());

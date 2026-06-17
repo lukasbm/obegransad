@@ -1,5 +1,6 @@
 #include "state.h"
 
+#include "app_events.h"
 #include "device.h"
 #include "scene_switcher.h"
 #include "server.h"
@@ -22,8 +23,18 @@ StateMachine& StateMachine::instance() {
 
 void StateMachine::init() {
     ESP_LOGI(TAG, "Initializing State Machine");
-    
-    // Determine initial state based on WiFi/Credentials
+
+    // Subscribe to the application event bus. The handler only enqueues; the
+    // events are applied on the main task in process_events().
+    event_queue = xQueueCreate(16, sizeof(int32_t));
+    if (event_queue == nullptr) {
+        ESP_LOGE(TAG, "Failed to create event queue");
+    }
+    ESP_ERROR_CHECK(esp_event_handler_register(
+        APP_EVENTS, ESP_EVENT_ANY_ID, &StateMachine::on_app_event, nullptr));
+
+    // Determine initial state based on WiFi/Credentials. Subsequent changes
+    // arrive as events; we only poll once here to pick the starting state.
     if (wifi_has_credentials()) {
         if (wifi_check()) {
             set_state(AppState::OPERATIONAL);
@@ -38,34 +49,25 @@ void StateMachine::init() {
 }
 
 void StateMachine::update() {
-    // Periodic state checks
-    
+    // Apply any pending events first, then render for the (possibly new) state.
+    process_events();
+
     switch (current_state) {
         case AppState::OPERATIONAL:
-            if (!wifi_check()) {
-                ESP_LOGW(TAG, "WiFi lost, entering DEGRADED state");
-                set_state(AppState::DEGRADED);
-                return;
-            }
             tick(); // Update scenes
-            // No extra commit needed as scenes usually commit. 
+            // No extra commit needed as scenes usually commit.
             // But to be safe if we add overlays later:
-            // panel_commit(); 
+            // panel_commit();
             break;
-            
+
         case AppState::DEGRADED:
-            if (wifi_check()) {
-                ESP_LOGI(TAG, "WiFi restored, entering OPERATIONAL state");
-                set_state(AppState::OPERATIONAL);
-                return;
-            }
             tick(); // Update scenes
-            
+
             // Draw warning dot (Top Right Pixel) - Overlay
             panel_setPixel(15, 0, PANEL_BRIGHTNESS_1);
             panel_commit(); // Commit overlay
             break;
-            
+
         case AppState::SETUP:
             // In SETUP, we show the WiFi icon
             panel_clear();
@@ -80,13 +82,59 @@ void StateMachine::update() {
         case AppState::ERROR:
             panel_clear();
             // Draw '!'
-            font_bold.draw_char(4, 4, '!'); 
+            font_bold.drawGlyph('!', 4, 4);
             panel_commit();
             break;
             
         case AppState::SLEEPING:
             // Should be sleeping
             break;
+    }
+}
+
+void StateMachine::on_app_event(void * /*arg*/, esp_event_base_t /*base*/,
+                                int32_t id, void * /*data*/) {
+    StateMachine &self = StateMachine::instance();
+    if (self.event_queue != nullptr) {
+        // Non-blocking: dropping an event under extreme backpressure is
+        // preferable to stalling the event-loop task.
+        xQueueSend(self.event_queue, &id, 0);
+    }
+}
+
+void StateMachine::process_events() {
+    if (event_queue == nullptr) return;
+
+    int32_t id;
+    while (xQueueReceive(event_queue, &id, 0) == pdTRUE) {
+        switch (id) {
+            case APP_EVT_WIFI_CONNECTED:        on_wifi_connected();     break;
+            case APP_EVT_WIFI_DISCONNECTED:     on_wifi_disconnected();  break;
+            case APP_EVT_BUTTON_SHORT:          on_button_short_press(); break;
+            case APP_EVT_BUTTON_LONG:           on_button_long_press();  break;
+            case APP_EVT_BUTTON_DOUBLE:         on_button_double_press();break;
+            case APP_EVT_CAPTIVE_PORTAL_ACTIVE: /* informational */      break;
+            default: break;
+        }
+    }
+}
+
+void StateMachine::on_wifi_connected() {
+    switch (current_state) {
+        case AppState::DEGRADED:
+        case AppState::SETUP:
+            ESP_LOGI(TAG, "WiFi connected, entering OPERATIONAL state");
+            set_state(AppState::OPERATIONAL);
+            break;
+        default:
+            break;
+    }
+}
+
+void StateMachine::on_wifi_disconnected() {
+    if (current_state == AppState::OPERATIONAL) {
+        ESP_LOGW(TAG, "WiFi lost, entering DEGRADED state");
+        set_state(AppState::DEGRADED);
     }
 }
 
