@@ -54,6 +54,9 @@ private:
     // no esp_timer dependency). This marks when the current scene started; when
     // SCENE_DWELL_MS elapses while in a rotating state, we advance.
     unsigned long last_scene_advance_ms = 0;
+    // Toggled by a double button-press. When false, scenes only change on a
+    // single button press.
+    bool auto_advance_enabled = true;
 
     // Helpers
     void draw_icon(const char* name); // Placeholder for drawing status icons

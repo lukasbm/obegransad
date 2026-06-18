@@ -71,7 +71,9 @@ void StateMachine::update() {
 
     // Automatic scene rotation while in a display state (OPERATIONAL/DEGRADED).
     // Driven here on the main task so it survives Wi-Fi flaps and needs no timer.
-    if (is_rotating_state(current_state) &&
+    // Can be toggled off with a double button-press (then only single presses
+    // change scenes).
+    if (auto_advance_enabled && is_rotating_state(current_state) &&
         (millis() - last_scene_advance_ms) >= SCENE_DWELL_MS) {
         next_scene();
         last_scene_advance_ms = millis();
@@ -296,13 +298,20 @@ void StateMachine::on_button_double_press() {
     switch (current_state) {
         case AppState::OPERATIONAL:
         case AppState::DEGRADED:
-            // skipTo(FAVORITE); // Not implemented yet
+            // Toggle automatic scene rotation. When off, only single presses
+            // advance scenes.
+            auto_advance_enabled = !auto_advance_enabled;
+            ESP_LOGI(TAG, "Auto scene-switching %s",
+                     auto_advance_enabled ? "ENABLED" : "DISABLED");
+            if (auto_advance_enabled) {
+                reset_scene_dwell(); // give the current scene a full interval
+            }
             break;
-            
+
         case AppState::ERROR:
             set_state(AppState::DEGRADED);
             break;
-            
+
         default:
             break;
     }
