@@ -1,6 +1,7 @@
 #include "device.h"
 
 #include "app_events.h"
+#include "sdkconfig.h"
 
 // ESP-IDF core dependencies
 #include "esp_check.h"
@@ -126,19 +127,22 @@ bool wifi_has_credentials() {
 }
 
 void wifi_init() {
-  auto &ssid_list = SsidManager::GetInstance().GetSsidList();
-  
-  if (ssid_list.empty()) {
-    ESP_LOGI(TAG, "No stored WiFi credentials, starting captive portal");
+  // Credentials come from Kconfig. Seed the SsidManager so WifiStation connects
+  // to exactly the configured network (no captive portal when an SSID is set).
+  if (CONFIG_OBG_WIFI_SSID[0] == '\0') {
+    ESP_LOGW(TAG, "No WiFi SSID configured (CONFIG_OBG_WIFI_SSID); "
+                  "starting captive portal");
     start_captive_portal();
-  } else {
-    ESP_LOGI(TAG, "Found %zu stored WiFi credential(s), connecting...", ssid_list.size());
-    for (size_t i = 0; i < ssid_list.size(); i++) {
-      ESP_LOGI(TAG, "  [%zu] SSID: %s", i, ssid_list[i].ssid.c_str());
-    }
-    WifiStation::GetInstance().Start();
-    wifi_station_started = true;
+    return;
   }
+
+  auto &mgr = SsidManager::GetInstance();
+  mgr.Clear();
+  mgr.AddSsid(CONFIG_OBG_WIFI_SSID, CONFIG_OBG_WIFI_PASSWORD);
+
+  ESP_LOGI(TAG, "Connecting to configured WiFi SSID: %s", CONFIG_OBG_WIFI_SSID);
+  WifiStation::GetInstance().Start();
+  wifi_station_started = true;
 }
 
 bool wifi_check() { return WifiStation::GetInstance().IsConnected(); }

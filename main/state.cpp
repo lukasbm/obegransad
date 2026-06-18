@@ -2,10 +2,8 @@
 
 #include "app_events.h"
 #include "clock.h"
-#include "config.h"
 #include "device.h"
 #include "scene_switcher.h"
-#include "server.h"
 #include "weather_client.h"
 #include "ikea-obegransad-panel.h"
 
@@ -149,11 +147,6 @@ void StateMachine::process_events() {
             case APP_EVT_ERROR_OCCURED:
                 set_state(AppState::ERROR);
                 break;
-            case APP_EVT_SETTINGS_CHANGED:
-                // Apply config that doesn't take effect on its own.
-                clock_apply_timezone(g_settings.timezone);
-                weather_client_request_fetch();
-                break;
             default: break;
         }
     }
@@ -198,16 +191,11 @@ void StateMachine::enter_state(AppState state) {
     switch (state) {
         case AppState::OPERATIONAL:
             scene_switcher_set_wifi_available(true);
-            // Ensure server is on (if implemented)
-            start_webserver();
-            // Ensure Station is active (it should be if we are here)
             scene_dwell_timer.start(); // begin auto-advancing scenes
             break;
 
         case AppState::DEGRADED:
             scene_switcher_set_wifi_available(false);
-            // Stop server if needed
-            stop_webserver();
             scene_dwell_timer.start(); // scenes still rotate while degraded
             break;
             

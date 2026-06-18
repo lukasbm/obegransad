@@ -1,8 +1,8 @@
 #pragma once
 
-#include "config.h"
 #include "ikea-obegransad-panel.h"
 #include "scene.h"
+#include "sdkconfig.h"
 #include "sprites/heart.hpp"
 #include "sprites/thin_glyphs.hpp"
 
@@ -37,6 +37,6 @@ public:
 
 protected:
   void render(uint32_t /*dt_ms*/) override {
-    drawHeart(g_settings.anniversary_day, g_settings.anniversary_month);
+    drawHeart(CONFIG_OBG_ANNIVERSARY_DAY, CONFIG_OBG_ANNIVERSARY_MONTH);
   }
 };

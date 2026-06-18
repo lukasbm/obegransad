@@ -1,6 +1,5 @@
 #pragma once
 
-#include "config.h"
 #include "helper.hpp"
 #include "scene.h"
 #include "sprites/thin_glyphs.hpp"

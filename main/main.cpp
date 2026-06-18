@@ -8,16 +8,15 @@
 
 #include "app_events.h"
 #include "clock.h"
-#include "config.h"
 #include "device.h"
 #include "ikea-obegransad-panel.h"
 #include "scene_registry.hpp"
 #include "scene_switcher.h"
-#include "server.h"
 #include "status_led.hpp"
 #include "weather.h"
 #include "weather_client.h"
 #include "state.h"
+#include "sdkconfig.h"
 
 static const char* TAG = "main";
 
@@ -88,17 +87,14 @@ extern "C" void app_main()
     // app event bus, so it must come after device_init().
     ESP_ERROR_CHECK(status_led_init());
 
-    // load initial NVS settings
-    ESP_ERROR_CHECK(nvs_read_settings(g_settings));
-
     // the only button
     ESP_ERROR_CHECK(button_init());
 
-    // Initialize WiFi - starts captive portal if no credentials, otherwise connects
+    // Initialize WiFi - connects to the SSID configured in Kconfig
     wifi_init();
 
-    // set up sntp and time zone (from persisted config)
-    ESP_ERROR_CHECK(clock_init(g_settings.timezone));
+    // set up sntp and time zone (from Kconfig)
+    ESP_ERROR_CHECK(clock_init(CONFIG_OBG_TIMEZONE));
 
     // background weather client (idles until a fetch is requested)
     ESP_ERROR_CHECK(weather_client_init());

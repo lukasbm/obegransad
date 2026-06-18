@@ -1,0 +1,46 @@
+menu "Obegransad Configuration"
+
+config OBG_WIFI_SSID
+    string "WiFi SSID"
+    default ""
+    help
+        SSID of the WiFi network to connect to. Leave empty to fall back to the
+        captive portal for provisioning.
+
+config OBG_WIFI_PASSWORD
+    string "WiFi password"
+    default ""
+    help
+        Password for the WiFi network. Leave empty for an open network.
+
+config OBG_TIMEZONE
+    string "POSIX timezone string"
+    default "CET-1CEST,M3.5.0,M10.5.0/3"
+    help
+        POSIX TZ string, e.g. "CET-1CEST,M3.5.0,M10.5.0/3". See
+        https://github.com/nayarsystems/posix_tz_db.
+
+config OBG_WEATHER_LATITUDE
+    string "Weather latitude"
+    default "0.0"
+    help
+        Latitude for the weather scenes, as a decimal string (e.g. "49.45").
+        Leave at 0.0 to disable weather fetching.
+
+config OBG_WEATHER_LONGITUDE
+    string "Weather longitude"
+    default "0.0"
+    help
+        Longitude for the weather scenes, as a decimal string (e.g. "11.08").
+
+config OBG_ANNIVERSARY_DAY
+    int "Anniversary day (1-31)"
+    range 1 31
+    default 1
+
+config OBG_ANNIVERSARY_MONTH
+    int "Anniversary month (1-12)"
+    range 1 12
+    default 1
+
+endmenu

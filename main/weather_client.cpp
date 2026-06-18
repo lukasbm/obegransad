@@ -1,10 +1,11 @@
 #include "weather_client.h"
 
 #include "app_events.h"
-#include "config.h"
 #include "device.h" // wifi_check()
+#include "sdkconfig.h"
 #include "weather.h"
 
+#include <cstdlib> // atof
 #include <esp_log.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -16,9 +17,11 @@ static TaskHandle_t s_task = nullptr;
 // Periodic fallback so data refreshes even without explicit requests.
 static constexpr uint32_t FETCH_INTERVAL_MS = 20 * 60 * 1000; // 20 min
 
+static double weather_latitude() { return atof(CONFIG_OBG_WEATHER_LATITUDE); }
+static double weather_longitude() { return atof(CONFIG_OBG_WEATHER_LONGITUDE); }
+
 static bool location_configured() {
-  return !(g_settings.weather_latitude == 0.0 &&
-           g_settings.weather_longitude == 0.0);
+  return !(weather_latitude() == 0.0 && weather_longitude() == 0.0);
 }
 
 static void do_fetch() {
@@ -33,8 +36,7 @@ static void do_fetch() {
 
   WeatherData data;
   // fetch_weather() populates the cache via weather_set() on success.
-  esp_err_t err = fetch_weather(g_settings.weather_latitude,
-                                g_settings.weather_longitude, data);
+  esp_err_t err = fetch_weather(weather_latitude(), weather_longitude(), data);
   if (err == ESP_OK) {
     ESP_LOGI(TAG, "Weather updated");
     app_post_event(APP_EVT_WEATHER_DATA_READY);

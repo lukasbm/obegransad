@@ -1,6 +1,6 @@
 {
   "C_Cpp.intelliSenseEngine": "default",
-  "idf.espIdfPath": "/home/lukas/.espidf/v5.5.1/esp-idf",
+  "idf.espIdfPath": "/home/lukas/.espressif/v6.0.1/esp-idf",
   "idf.pythonInstallPath": "/usr/bin/python",
   "idf.openOcdConfigs": [
     "board/esp32c3-builtin.cfg"
@@ -31,10 +31,10 @@
     "littlefs",
     "SRCS"
   ],
-  "clangd.path": "/home/lukas/.espressif/tools/esp-clang/esp-19.1.2_20250312/esp-clang/bin/clangd",
+  "clangd.path": "/home/lukas/.espressif/tools/esp-clang/esp-20.1.1_20250829/esp-clang/bin/clangd",
   "clangd.arguments": [
     "--background-index",
-    "--query-driver=/home/lukas/.espressif/tools/riscv32-esp-elf/esp-14.2.0_20241119/riscv32-esp-elf/bin/riscv32-esp-elf-gcc",
+    "--query-driver=/home/lukas/.espressif/tools/riscv32-esp-elf/esp-15.2.0_20251204/riscv32-esp-elf/bin/riscv32-esp-elf-gcc",
     "--compile-commands-dir=/home/lukas/Documents/obegransad/build"
   ],
   "idf.flashType": "UART"

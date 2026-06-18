@@ -28,6 +28,10 @@ CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM=32
 # esp_timer ISR-dispatch (panel refresh uses ESP_TIMER_ISR for low-jitter ticks)
 CONFIG_ESP_TIMER_SUPPORTS_ISR_DISPATCH_METHOD=y
 
+# v6 treats default compiler warnings as errors; several third-party components
+# (panel, managed components) have benign warnings. Keep warnings non-fatal.
+CONFIG_COMPILER_DISABLE_DEFAULT_ERRORS=y
+
 # Log level
 CONFIG_LOG_DEFAULT_LEVEL_DEBUG=y
 CONFIG_LOG_DEFAULT_LEVEL=4
@@ -39,4 +43,14 @@ CONFIG_ESPTOOLPY_FLASHSIZE="4MB"
 # Custom partition table
 CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+
+# Obegransad app configuration (see main/Kconfig.projbuild).
+# Set your WiFi SSID below (leave empty to use the captive portal instead).
+CONFIG_OBG_WIFI_SSID=""
+CONFIG_OBG_WIFI_PASSWORD=""
+CONFIG_OBG_TIMEZONE="CET-1CEST,M3.5.0,M10.5.0/3"
+CONFIG_OBG_WEATHER_LATITUDE="0.0"
+CONFIG_OBG_WEATHER_LONGITUDE="0.0"
+CONFIG_OBG_ANNIVERSARY_DAY=1
+CONFIG_OBG_ANNIVERSARY_MONTH=1
 

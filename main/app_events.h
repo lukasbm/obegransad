@@ -24,7 +24,6 @@ enum app_event_id_t {
   APP_EVT_WEATHER_DATA_READY,  // weather client fetched fresh data
   APP_EVT_SCENE_ADVANCE,       // dwell timer elapsed; advance to next scene
   APP_EVT_ERROR_OCCURED,       // unrecoverable error; app should reflect it
-  APP_EVT_SETTINGS_CHANGED,    // config updated (e.g. via HTTP); re-apply it
 };
 
 // Post an application event onto the default event loop. Safe to call from any
