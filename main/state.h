@@ -1,6 +1,5 @@
 #pragma once
 
-#include "helper.hpp" // RenderTimer
 #include "esp_event.h"
 #include <cstdint>
 #include <freertos/FreeRTOS.h>
@@ -51,10 +50,11 @@ private:
     QueueHandle_t event_queue = nullptr;
     AppState current_state = AppState::SLEEPING; // Default, will change in init
 
-    // Periodic timer driving automatic scene rotation while on a display state.
-    // Its callback only posts APP_EVT_SCENE_ADVANCE (runs on the esp_timer task).
-    RenderTimer scene_dwell_timer;
-    
+    // Automatic scene rotation is driven from update() on the main task (robust,
+    // no esp_timer dependency). This marks when the current scene started; when
+    // SCENE_DWELL_MS elapses while in a rotating state, we advance.
+    unsigned long last_scene_advance_ms = 0;
+
     // Helpers
     void draw_icon(const char* name); // Placeholder for drawing status icons
 };

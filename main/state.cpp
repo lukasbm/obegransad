@@ -3,6 +3,7 @@
 #include "app_events.h"
 #include "clock.h"
 #include "device.h"
+#include "helper.hpp" // millis()
 #include "scene_switcher.h"
 #include "weather_client.h"
 #include "ikea-obegransad-panel.h"
@@ -20,21 +21,21 @@ static const char* TAG = "StateMachine";
 // How long each scene is shown before auto-advancing.
 static constexpr uint32_t SCENE_DWELL_MS = 30000;
 
+// OPERATIONAL and DEGRADED both rotate scenes; transitions between them must not
+// reset the dwell timer.
+static bool is_rotating_state(AppState s) {
+    return s == AppState::OPERATIONAL || s == AppState::DEGRADED;
+}
+
 StateMachine& StateMachine::instance() {
     static StateMachine instance;
     return instance;
 }
 
-StateMachine::StateMachine()
-    : scene_dwell_timer("scene_dwell", SCENE_DWELL_MS, []() {
-          // Runs on the esp_timer task: only post an event; the main task
-          // performs the actual scene switch in process_events().
-          app_post_event(APP_EVT_SCENE_ADVANCE);
-      }) {}
+StateMachine::StateMachine() = default;
 
 void StateMachine::reset_scene_dwell() {
-    scene_dwell_timer.stop();
-    scene_dwell_timer.start();
+    last_scene_advance_ms = millis();
 }
 
 void StateMachine::init() {
@@ -67,6 +68,14 @@ void StateMachine::init() {
 void StateMachine::update() {
     // Apply any pending events first, then render for the (possibly new) state.
     process_events();
+
+    // Automatic scene rotation while in a display state (OPERATIONAL/DEGRADED).
+    // Driven here on the main task so it survives Wi-Fi flaps and needs no timer.
+    if (is_rotating_state(current_state) &&
+        (millis() - last_scene_advance_ms) >= SCENE_DWELL_MS) {
+        next_scene();
+        last_scene_advance_ms = millis();
+    }
 
     switch (current_state) {
         case AppState::OPERATIONAL:
@@ -126,9 +135,18 @@ void StateMachine::process_events() {
         switch (id) {
             case APP_EVT_WIFI_CONNECTED:        on_wifi_connected();     break;
             case APP_EVT_WIFI_DISCONNECTED:     on_wifi_disconnected();  break;
-            case APP_EVT_BUTTON_SHORT:          on_button_short_press(); break;
-            case APP_EVT_BUTTON_LONG:           on_button_long_press();  break;
-            case APP_EVT_BUTTON_DOUBLE:         on_button_double_press();break;
+            case APP_EVT_BUTTON_SHORT:
+                ESP_LOGI(TAG, "button: short press");
+                on_button_short_press();
+                break;
+            case APP_EVT_BUTTON_LONG:
+                ESP_LOGI(TAG, "button: long press");
+                on_button_long_press();
+                break;
+            case APP_EVT_BUTTON_DOUBLE:
+                ESP_LOGI(TAG, "button: double press");
+                on_button_double_press();
+                break;
             case APP_EVT_CAPTIVE_PORTAL_ACTIVE: /* informational */      break;
             case APP_EVT_TIME_SYNCED:
                 ESP_LOGI(TAG, "Time synced");
@@ -179,24 +197,36 @@ void StateMachine::on_wifi_disconnected() {
 
 void StateMachine::set_state(AppState new_state) {
     if (current_state == new_state) return;
-    
+
     ESP_LOGI(TAG, "State transition: %d -> %d", (int)current_state, (int)new_state);
-    
+
+    // OPERATIONAL and DEGRADED form one "scene-rotating" super-state. The dwell
+    // timer must keep running across OPERATIONAL<->DEGRADED flaps (common with
+    // weak Wi-Fi) — only start/stop it when entering/leaving the super-state, so
+    // it isn't reset every time Wi-Fi blips.
+    const bool was_rotating = is_rotating_state(current_state);
+    const bool will_rotate = is_rotating_state(new_state);
+
     exit_state(current_state);
     current_state = new_state;
     enter_state(current_state);
+
+    // Give the first scene a full dwell when we (re)enter the rotating super-state
+    // from a non-rotating state; flaps between OPERATIONAL<->DEGRADED leave the
+    // dwell running so rotation isn't reset by Wi-Fi blips.
+    if (will_rotate && !was_rotating) {
+        last_scene_advance_ms = millis();
+    }
 }
 
 void StateMachine::enter_state(AppState state) {
     switch (state) {
         case AppState::OPERATIONAL:
             scene_switcher_set_wifi_available(true);
-            scene_dwell_timer.start(); // begin auto-advancing scenes
             break;
 
         case AppState::DEGRADED:
             scene_switcher_set_wifi_available(false);
-            scene_dwell_timer.start(); // scenes still rotate while degraded
             break;
             
         case AppState::SETUP:
@@ -225,13 +255,11 @@ void StateMachine::exit_state(AppState state) {
         case AppState::SETUP:
             stop_captive_portal();
             break;
-        case AppState::OPERATIONAL:
-        case AppState::DEGRADED:
-            scene_dwell_timer.stop(); // no auto-advance off the display states
-            break;
         default:
             break;
     }
+    // Note: the scene dwell timer is managed in set_state() across the
+    // OPERATIONAL/DEGRADED super-state, not started/stopped here.
 }
 
 void StateMachine::on_button_short_press() {

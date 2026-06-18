@@ -28,8 +28,16 @@ static bool wifi_station_started = false;
 // Translate low-level Wi-Fi/IP driver events into high-level app events so the
 // rest of the system can subscribe to connectivity changes without polling.
 static void wifi_event_handler(void * /*arg*/, esp_event_base_t event_base,
-                               int32_t event_id, void * /*event_data*/) {
+                               int32_t event_id, void *event_data) {
   if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+    if (event_data != nullptr) {
+      const auto *d =
+          static_cast<wifi_event_sta_disconnected_t *>(event_data);
+      // reason 15 = 4WAY_HANDSHAKE_TIMEOUT (wrong password); 201 = NO_AP_FOUND;
+      // 2/4 = AUTH/ASSOC_EXPIRE (often weak signal). See esp_wifi_types.h.
+      ESP_LOGW(TAG, "WiFi disconnected from '%s' (reason=%d, rssi=%d)", d->ssid,
+               d->reason, d->rssi);
+    }
     app_post_event(APP_EVT_WIFI_DISCONNECTED);
   } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
     app_post_event(APP_EVT_WIFI_CONNECTED);

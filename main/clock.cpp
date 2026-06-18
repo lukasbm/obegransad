@@ -137,9 +137,9 @@ bool get_local_time(struct tm &timeinfo) {
   time_t now;
   time(&now);
 
-  // Check if time is reasonable (after 2020)
+  // Check if time is reasonable (after 2020). This is a per-frame query for the
+  // clock scenes, so don't log here — the bool return is the signal.
   if (now < MIN_VALID_TIME) { // 2020-01-01 00:00:00 UTC
-    ESP_LOGW(TAG, "Time not synchronized yet");
     return false;
   }
 

@@ -130,10 +130,13 @@ esp_err_t panel_init(panel_config_t config) {
   ESP_RETURN_ON_ERROR(rmt_setup_oe_channel(), TAG, "RMT setup failed");
   ESP_RETURN_ON_ERROR(init_spi_interface(), TAG, "SPI initialization failed");
 
-  // Create high priority task pinned to core 1 (app core)
+  // Create high priority task pinned to the last core (app core on dual-core,
+  // core 0 on the single-core ESP32-C3). Pinning to a non-existent core 1
+  // asserts in xTaskCreatePinnedToCore on single-core targets.
   // Stack size 4096 should be sufficient for SPI/RMT calls
   xTaskCreatePinnedToCore(panel_task_func, "panel_task", 4096, NULL,
-                          configMAX_PRIORITIES - 1, &g_panel_task_handle, 1);
+                          configMAX_PRIORITIES - 1, &g_panel_task_handle,
+                          configNUMBER_OF_CORES - 1);
 
   ESP_RETURN_ON_ERROR(init_refresh_timer(), TAG, "Timer initialization failed");
 

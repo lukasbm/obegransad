@@ -2,5 +2,13 @@
 # in this exact order for cmake to work correctly
 cmake_minimum_required(VERSION 3.10)
 
+# Layer an optional, gitignored sdkconfig.defaults.local on top of the tracked
+# sdkconfig.defaults. Put secrets (WiFi SSID/password) there so they never get
+# committed. Later files take precedence.
+set(SDKCONFIG_DEFAULTS "sdkconfig.defaults")
+if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.defaults.local")
+    list(APPEND SDKCONFIG_DEFAULTS "sdkconfig.defaults.local")
+endif()
+
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(obegransad)

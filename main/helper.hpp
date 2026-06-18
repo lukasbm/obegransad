@@ -1,5 +1,6 @@
 #pragma once
 
+#include <esp_log.h>
 #include <esp_timer.h>
 #include <functional>
 #include <stdint.h>
@@ -78,7 +79,11 @@ public:
         .name = name,
         .skip_unhandled_events = true,
     };
-    esp_timer_create(&timer_args, &timer);
+    esp_err_t err = esp_timer_create(&timer_args, &timer);
+    if (err != ESP_OK) {
+      ESP_LOGE("RenderTimer", "create '%s' failed: %s", name,
+               esp_err_to_name(err));
+    }
   }
 
   ~RenderTimer() {
@@ -90,11 +95,11 @@ public:
 
   void start() {
     if (timer) {
-      esp_timer_start_periodic(timer, interval_us);
+      esp_err_t err = esp_timer_start_periodic(timer, interval_us);
+      if (err != ESP_OK) {
+        ESP_LOGE("RenderTimer", "start failed: %s", esp_err_to_name(err));
+      }
     }
-
-    // immediately trigger the callback once
-    // timer_callback(this);
   }
 
   void stop() {

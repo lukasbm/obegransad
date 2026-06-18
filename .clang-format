@@ -1,0 +1,3 @@
+BasedOnStyle: Google
+BreakBeforeBrace: Attach
+ColumnLimit: 100

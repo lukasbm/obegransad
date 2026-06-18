@@ -1,5 +1,6 @@
 build/
 sdkconfig
 sdkconfig.old
+sdkconfig.defaults.local
 managed_components/
 data/
