@@ -1,9 +1,12 @@
 #include "state.h"
 
 #include "app_events.h"
+#include "clock.h"
+#include "config.h"
 #include "device.h"
 #include "scene_switcher.h"
 #include "server.h"
+#include "weather_client.h"
 #include "ikea-obegransad-panel.h"
 
 // Sprites
@@ -16,9 +19,24 @@
 
 static const char* TAG = "StateMachine";
 
+// How long each scene is shown before auto-advancing.
+static constexpr uint32_t SCENE_DWELL_MS = 30000;
+
 StateMachine& StateMachine::instance() {
     static StateMachine instance;
     return instance;
+}
+
+StateMachine::StateMachine()
+    : scene_dwell_timer("scene_dwell", SCENE_DWELL_MS, []() {
+          // Runs on the esp_timer task: only post an event; the main task
+          // performs the actual scene switch in process_events().
+          app_post_event(APP_EVT_SCENE_ADVANCE);
+      }) {}
+
+void StateMachine::reset_scene_dwell() {
+    scene_dwell_timer.stop();
+    scene_dwell_timer.start();
 }
 
 void StateMachine::init() {
@@ -114,12 +132,40 @@ void StateMachine::process_events() {
             case APP_EVT_BUTTON_LONG:           on_button_long_press();  break;
             case APP_EVT_BUTTON_DOUBLE:         on_button_double_press();break;
             case APP_EVT_CAPTIVE_PORTAL_ACTIVE: /* informational */      break;
+            case APP_EVT_TIME_SYNCED:
+                ESP_LOGI(TAG, "Time synced");
+                // Timestamps are meaningful now; refresh weather.
+                weather_client_request_fetch();
+                break;
+            case APP_EVT_WEATHER_DATA_READY:
+                ESP_LOGI(TAG, "Weather data ready");
+                break;
+            case APP_EVT_SCENE_ADVANCE:
+                if (current_state == AppState::OPERATIONAL ||
+                    current_state == AppState::DEGRADED) {
+                    next_scene();
+                }
+                break;
+            case APP_EVT_ERROR_OCCURED:
+                set_state(AppState::ERROR);
+                break;
+            case APP_EVT_SETTINGS_CHANGED:
+                // Apply config that doesn't take effect on its own.
+                clock_apply_timezone(g_settings.timezone);
+                weather_client_request_fetch();
+                break;
             default: break;
         }
     }
 }
 
 void StateMachine::on_wifi_connected() {
+    // Now that we have connectivity, kick an immediate NTP re-poll so the clock
+    // updates promptly instead of waiting for the next scheduled interval, and
+    // request a fresh weather fetch.
+    clock_start_sync();
+    weather_client_request_fetch();
+
     switch (current_state) {
         case AppState::DEGRADED:
         case AppState::SETUP:
@@ -153,14 +199,16 @@ void StateMachine::enter_state(AppState state) {
         case AppState::OPERATIONAL:
             scene_switcher_set_wifi_available(true);
             // Ensure server is on (if implemented)
-            start_webserver(); 
+            start_webserver();
             // Ensure Station is active (it should be if we are here)
+            scene_dwell_timer.start(); // begin auto-advancing scenes
             break;
-            
+
         case AppState::DEGRADED:
             scene_switcher_set_wifi_available(false);
             // Stop server if needed
             stop_webserver();
+            scene_dwell_timer.start(); // scenes still rotate while degraded
             break;
             
         case AppState::SETUP:
@@ -189,6 +237,10 @@ void StateMachine::exit_state(AppState state) {
         case AppState::SETUP:
             stop_captive_portal();
             break;
+        case AppState::OPERATIONAL:
+        case AppState::DEGRADED:
+            scene_dwell_timer.stop(); // no auto-advance off the display states
+            break;
         default:
             break;
     }
@@ -204,8 +256,9 @@ void StateMachine::on_button_short_press() {
         case AppState::OPERATIONAL:
         case AppState::DEGRADED:
             next_scene();
+            reset_scene_dwell(); // manual switch gets a full dwell interval
             break;
-            
+
         case AppState::ERROR:
             set_state(AppState::SETUP);
             break;

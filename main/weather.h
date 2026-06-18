@@ -71,3 +71,7 @@ esp_err_t fetch_weather(float latitude, float longitude, WeatherData &data);
 // DEVELOPER.md "Weather client").
 WeatherData weather_get();
 void weather_set(const WeatherData &data);
+
+// True once a successful fetch has populated the cache (weatherCode is valid).
+// Scenes use this to show a placeholder instead of empty/zeroed data.
+bool weather_is_valid();

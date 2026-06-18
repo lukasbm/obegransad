@@ -42,21 +42,17 @@ private:
 
 public:
   const char *get_scene_name() const override { return "Concentric Circles"; }
+  uint16_t target_fps() const override { return 10; }
 
-  void activate() override {
+protected:
+  void on_activate() override {
     w2 = 15;
     w1 = w2 - 10; // 10 so they are equally spaced in the 20 radius wheel.
-    draw();
   }
-  void update() override {
-    static unsigned long lastUpdateTime = 0;
 
-    if (millis() - lastUpdateTime > 100) // 10FPS
-    {
-      w1 = (w1 + 1) % 20;
-      w2 = (w2 + 1) % 20;
-      draw();
-      lastUpdateTime = millis();
-    }
+  void render(uint32_t /*dt_ms*/) override {
+    w1 = (w1 + 1) % 20;
+    w2 = (w2 + 1) % 20;
+    draw();
   }
 };

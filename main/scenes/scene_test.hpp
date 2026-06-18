@@ -7,8 +7,10 @@
 class SpriteTestScene : public Scene {
 public:
   const char *get_scene_name() const override { return "Test"; }
+  uint16_t target_fps() const override { return 0; } // static, draw once
 
-  void activate() override {
+protected:
+  void render(uint32_t /*dt_ms*/) override {
     panel_clear();
 
     font_bold.drawGlyph('1', 0, 0);

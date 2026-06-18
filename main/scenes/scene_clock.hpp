@@ -8,6 +8,8 @@
 // bold clock scene
 class ClockScene : public Scene {
 private:
+  int lastMinute = -1;
+
   void drawTime(uint8_t hour, uint8_t minute) {
     const uint8_t *sprite;
 
@@ -30,17 +32,12 @@ private:
 
 public:
   const char *get_scene_name() const override { return "Digital Clock"; }
+  uint16_t target_fps() const override { return 2; }
 
+protected:
+  void on_activate() override { lastMinute = -1; } // force redraw on activate
 
-
-  void activate() override {
-    struct tm time = time_get();
-    drawTime(time.tm_hour, time.tm_min);
-  }
-
-  void update() override {
-    static int lastMinute = -1;
-
+  void render(uint32_t /*dt_ms*/) override {
     struct tm time = time_get();
     if (time.tm_min != lastMinute) {
       drawTime(time.tm_hour, time.tm_min);

@@ -9,6 +9,8 @@
 // bold clock scene
 class ClockSceneWithSecondHand : public Scene {
 private:
+  int lastSecond = -1;
+
   void drawTime(uint8_t hour, uint8_t minute, uint8_t second = 0) {
     const uint8_t *sprite;
 
@@ -43,20 +45,15 @@ private:
 
 public:
   const char *get_scene_name() const override { return "Clock w/ seconds"; }
+  uint16_t target_fps() const override { return 4; } // catch second changes
 
+protected:
+  void on_activate() override { lastSecond = -1; }
 
-  void activate() override {
-    struct tm time = time_get();
-    drawTime(time.tm_hour, time.tm_min);
-  }
-
-  void update() override {
-    static int lastSecond = -1;
-
+  void render(uint32_t /*dt_ms*/) override {
     struct tm time = time_get();
     if (time.tm_sec != lastSecond) {
       drawTime(time.tm_hour, time.tm_min, time.tm_sec);
-      ;
       lastSecond = time.tm_sec;
     }
   }

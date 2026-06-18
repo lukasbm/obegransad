@@ -9,6 +9,7 @@
 #include <esp_crt_bundle.h>
 #include <esp_err.h>
 #include <esp_http_client.h>
+#include <freertos/FreeRTOS.h>
 #include <netdb.h>
 #include <sys/socket.h>
 
@@ -271,12 +272,32 @@ esp_err_t fetch_weather(float latitude, float longitude, WeatherData &data) {
   return err;
 }
 
-// Cached snapshot of the most recently fetched weather. Read by scenes.
+// Cached snapshot of the most recently fetched weather. Written by the weather
+// client task, read by scenes on the main task — guarded by a spinlock since
+// the payload is a small fixed-size struct copy.
 static WeatherData g_cached_weather;
+static portMUX_TYPE g_weather_mux = portMUX_INITIALIZER_UNLOCKED;
 
-WeatherData weather_get() { return g_cached_weather; }
+WeatherData weather_get() {
+  WeatherData copy;
+  portENTER_CRITICAL(&g_weather_mux);
+  copy = g_cached_weather;
+  portEXIT_CRITICAL(&g_weather_mux);
+  return copy;
+}
 
-void weather_set(const WeatherData &data) { g_cached_weather = data; }
+void weather_set(const WeatherData &data) {
+  portENTER_CRITICAL(&g_weather_mux);
+  g_cached_weather = data;
+  portEXIT_CRITICAL(&g_weather_mux);
+}
+
+bool weather_is_valid() {
+  portENTER_CRITICAL(&g_weather_mux);
+  const bool valid = g_cached_weather.weatherCode != WEATHER_INVALID;
+  portEXIT_CRITICAL(&g_weather_mux);
+  return valid;
+}
 
 void WeatherData::print() const {
   ESP_LOGI(TAG,

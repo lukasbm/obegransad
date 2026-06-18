@@ -12,8 +12,6 @@ private:
   bool buffer[16][16];
   bool back_buffer[16][16];
 
-  RenderTimer evol_timer;
-
   void evolve() {
     for (uint8_t y = 0; y < 16; ++y) {
       for (uint8_t x = 0; x < 16; ++x) {
@@ -63,17 +61,11 @@ private:
   }
 
 public:
-  GameOfLifeScene()
-      : evol_timer("game of life evolution timer", 500, [this]() {
-          this->evolve();
-          this->draw();
-        }) {}
-
   const char *get_scene_name() const override { return "Game of Life"; }
+  uint16_t target_fps() const override { return 2; } // evolve every 500 ms
 
-  void activate() override {
-    evol_timer.start();
-
+protected:
+  void on_activate() override {
     panel_clear();
     clear_buffers();
 
@@ -87,5 +79,8 @@ public:
     }
   }
 
-  void deactivate() override { evol_timer.stop(); }
+  void render(uint32_t /*dt_ms*/) override {
+    evolve();
+    draw();
+  }
 };

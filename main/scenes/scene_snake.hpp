@@ -38,15 +38,12 @@ private:
 
 public:
   const char *get_scene_name() const override { return "Snake"; }
+  uint16_t target_fps() const override { return 1; } // moves once a second
 
-  void update() override {
-    static unsigned long lastUpdateTime = 0;
-
-    if (millis() > lastUpdateTime + 1000) {
-      panel_clear();
-      drawSnake();
-      headPos = (headPos + 1) % 60;
-      lastUpdateTime = millis();
-    }
+protected:
+  void render(uint32_t /*dt_ms*/) override {
+    panel_clear();
+    drawSnake();
+    headPos = (headPos + 1) % 60;
   }
 };

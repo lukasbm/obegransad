@@ -187,6 +187,52 @@ char *serialize_settings_json(const Settings &settings) {
   cJSON_AddNumberToObject(root, "anniversary_month",
                           settings.anniversary_month);
 
+  // user_image: 16x16 grayscale (array of 16 rows, each an array of 16 numbers)
+  {
+    cJSON *rows = cJSON_CreateArray();
+    if (!rows) {
+      cJSON_Delete(root);
+      return nullptr;
+    }
+    for (int r = 0; r < 16; ++r) {
+      cJSON *row = cJSON_CreateArray();
+      if (!row || !cJSON_AddItemToArray(rows, row)) {
+        cJSON_Delete(row);
+        cJSON_Delete(rows);
+        cJSON_Delete(root);
+        return nullptr;
+      }
+      for (int c = 0; c < 16; ++c) {
+        cJSON_AddItemToArray(row,
+                             cJSON_CreateNumber(settings.user_image[r][c]));
+      }
+    }
+    cJSON_AddItemToObject(root, "user_image", rows);
+  }
+
+  // game_of_life_start: 16x16 booleans
+  {
+    cJSON *rows = cJSON_CreateArray();
+    if (!rows) {
+      cJSON_Delete(root);
+      return nullptr;
+    }
+    for (int r = 0; r < 16; ++r) {
+      cJSON *row = cJSON_CreateArray();
+      if (!row || !cJSON_AddItemToArray(rows, row)) {
+        cJSON_Delete(row);
+        cJSON_Delete(rows);
+        cJSON_Delete(root);
+        return nullptr;
+      }
+      for (int c = 0; c < 16; ++c) {
+        cJSON_AddItemToArray(
+            row, cJSON_CreateBool(settings.game_of_life_start[r][c]));
+      }
+    }
+    cJSON_AddItemToObject(root, "game_of_life_start", rows);
+  }
+
   // Print the JSON object to a string
   char *json_string = cJSON_Print(root);
   if (!json_string) {
@@ -221,7 +267,10 @@ esp_err_t parse_settings_json(const char *json, Settings &settings) {
   }
 
   cJSON *item;
-  Settings out = {};
+  // Start from the current settings so a partial POST (e.g. the config form
+  // omitting the large image / Game-of-Life arrays) preserves existing values
+  // instead of zeroing them.
+  Settings out = g_settings;
 
   // Parse brightness_day
   item = cJSON_GetObjectItemCaseSensitive(root, "brightness_day");
@@ -318,6 +367,60 @@ esp_err_t parse_settings_json(const char *json, Settings &settings) {
   if (!item || !cJSON_IsNumber(item)) {
   } else {
     out.anniversary_month = (uint8_t)item->valueint;
+  }
+
+  // Parse user_image (optional 16x16 grayscale). If present it must be a
+  // well-formed 16x16 array; if absent, the current value is kept.
+  item = cJSON_GetObjectItemCaseSensitive(root, "user_image");
+  if (item) {
+    if (!cJSON_IsArray(item) || cJSON_GetArraySize(item) != 16) {
+      ESP_LOGE(TAG, "Invalid 'user_image' in JSON (expected 16 rows)");
+      cJSON_Delete(root);
+      return ESP_ERR_INVALID_ARG;
+    }
+    for (int r = 0; r < 16; ++r) {
+      cJSON *row = cJSON_GetArrayItem(item, r);
+      if (!cJSON_IsArray(row) || cJSON_GetArraySize(row) != 16) {
+        ESP_LOGE(TAG, "Invalid 'user_image' row %d in JSON", r);
+        cJSON_Delete(root);
+        return ESP_ERR_INVALID_ARG;
+      }
+      for (int c = 0; c < 16; ++c) {
+        cJSON *px = cJSON_GetArrayItem(row, c);
+        if (!cJSON_IsNumber(px)) {
+          cJSON_Delete(root);
+          return ESP_ERR_INVALID_ARG;
+        }
+        out.user_image[r][c] = (uint8_t)px->valueint;
+      }
+    }
+  }
+
+  // Parse game_of_life_start (optional 16x16 booleans). Same all-or-nothing
+  // validation; absent means keep the current value.
+  item = cJSON_GetObjectItemCaseSensitive(root, "game_of_life_start");
+  if (item) {
+    if (!cJSON_IsArray(item) || cJSON_GetArraySize(item) != 16) {
+      ESP_LOGE(TAG, "Invalid 'game_of_life_start' in JSON (expected 16 rows)");
+      cJSON_Delete(root);
+      return ESP_ERR_INVALID_ARG;
+    }
+    for (int r = 0; r < 16; ++r) {
+      cJSON *row = cJSON_GetArrayItem(item, r);
+      if (!cJSON_IsArray(row) || cJSON_GetArraySize(row) != 16) {
+        ESP_LOGE(TAG, "Invalid 'game_of_life_start' row %d in JSON", r);
+        cJSON_Delete(root);
+        return ESP_ERR_INVALID_ARG;
+      }
+      for (int c = 0; c < 16; ++c) {
+        cJSON *cell = cJSON_GetArrayItem(row, c);
+        if (!cJSON_IsBool(cell)) {
+          cJSON_Delete(root);
+          return ESP_ERR_INVALID_ARG;
+        }
+        out.game_of_life_start[r][c] = cJSON_IsTrue(cell);
+      }
+    }
   }
 
   // successfully parsed all items

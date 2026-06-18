@@ -33,19 +33,10 @@ private:
 
 public:
   const char *get_scene_name() const override { return "Anniversary"; }
+  uint16_t target_fps() const override { return 4; }
 
-  void activate() override {
+protected:
+  void render(uint32_t /*dt_ms*/) override {
     drawHeart(g_settings.anniversary_day, g_settings.anniversary_month);
-  }
-
-  void update() override {
-    static int lastDraw = millis();
-
-    // update animation (4 times a second - 4 FPS)
-    // TODO: use render timer!
-    if (millis() - lastDraw > 250) {
-      drawHeart(g_settings.anniversary_day, g_settings.anniversary_month);
-      lastDraw = millis();
-    }
   }
 };

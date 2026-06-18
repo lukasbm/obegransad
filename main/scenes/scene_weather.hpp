@@ -53,18 +53,25 @@ private:
     panel_commit();
   }
 
+  // Shown while online but no weather data has arrived yet (or fetch failing).
+  void drawWaiting() {
+    panel_clear();
+    font_thin.drawGlyph('-', 4, 5);
+    font_thin.drawGlyph('-', 9, 5);
+    panel_commit();
+  }
+
 public:
   const char *get_scene_name() const override { return "Current Weather"; }
-
+  uint16_t target_fps() const override { return 5; } // 200 ms animations
   bool requires_wifi() const override { return true; }
 
-  void update() override {
-    static RenderTimer timer("weather", 200); // 200 ms timer for animations
-    static bool started = (timer.start(), true);
-    (void)started;
-
-    if (timer.check()) {
-      drawWeatherData(weather_get());
+protected:
+  void render(uint32_t /*dt_ms*/) override {
+    if (!weather_is_valid()) {
+      drawWaiting();
+      return;
     }
+    drawWeatherData(weather_get());
   }
 };

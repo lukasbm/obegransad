@@ -7,30 +7,34 @@
 
 #ifdef __cplusplus
 extern "C" {
+
+
 #endif
 
 #define PANEL_WIDTH 16
 #define PANEL_HEIGHT 16
 
 // provide a simple set of nice brightness levels (manually selected)
-typedef enum : uint8_t {
-  PANEL_BRIGHTNESS_OFF = 0,
-  PANEL_BRIGHTNESS_1 = 3, // 17
-  PANEL_BRIGHTNESS_2 = 63,
-  PANEL_BRIGHTNESS_3 = 255,
+typedef enum : uint8_t
+{
+    PANEL_BRIGHTNESS_OFF = 0,
+    PANEL_BRIGHTNESS_1 = 3, // 17
+    PANEL_BRIGHTNESS_2 = 63,
+    PANEL_BRIGHTNESS_3 = 255,
 } Brightness;
 
 extern const Brightness brightness_levels[];
 
 // panel configuration structure
-typedef struct {
-  gpio_num_t latch_pin;
-  gpio_num_t clk_pin;
-  gpio_num_t di_pin;
-  gpio_num_t oe_pin;
-  spi_host_device_t spi_host;
-  int spi_clock_speed_hz;
-  float gamma; // gamma correction factor for brightness scaling
+typedef struct
+{
+    gpio_num_t latch_pin;
+    gpio_num_t clk_pin;
+    gpio_num_t di_pin;
+    gpio_num_t oe_pin;
+    spi_host_device_t spi_host;
+    int spi_clock_speed_hz;
+    float gamma; // gamma correction factor for brightness scaling
 } panel_config_t;
 
 /**

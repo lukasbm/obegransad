@@ -10,8 +10,6 @@
 // relative to current.
 class WeatherForecastScene : public Scene {
 private:
-  RenderTimer weather_update_timer;
-
   void drawWeatherData(const WeatherData &weatherData) {
     panel_clear();
 
@@ -61,26 +59,26 @@ private:
     panel_commit();
   }
 
-  void fetch_and_draw() {
-    WeatherData data;
-    fetch_weather(g_settings.weather_latitude, g_settings.weather_longitude,
-                  data);
-    drawWeatherData(data);
+  void drawWaiting() {
+    panel_clear();
+    font_thin.drawGlyph('-', 4, 5);
+    font_thin.drawGlyph('-', 9, 5);
+    panel_commit();
   }
 
 public:
   const char *get_scene_name() const override { return "Weather Forecast"; }
-
+  uint16_t target_fps() const override { return 1; }
   bool requires_wifi() const override { return true; }
 
-  WeatherForecastScene()
-      : weather_update_timer("weather update timer", 20000,
-                             [this]() { fetch_and_draw(); }) {}
-
-  void activate() override {
-    fetch_and_draw();
-    weather_update_timer.start();
+protected:
+  // Reads the shared cache populated by the background weather client; never
+  // fetches here (that would block the render path on a 30 s HTTPS request).
+  void render(uint32_t /*dt_ms*/) override {
+    if (!weather_is_valid()) {
+      drawWaiting();
+      return;
+    }
+    drawWeatherData(weather_get());
   }
-
-  void deactivate() override { weather_update_timer.stop(); }
 };

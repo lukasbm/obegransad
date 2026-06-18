@@ -1,6 +1,7 @@
 #include "server.h"
 #include "http_status_codes.h"
 
+#include "app_events.h"
 #include "config.h"
 #include "esp_check.h"
 #include "esp_err.h"
@@ -24,22 +25,11 @@ struct EmbeddedFile {
 
 extern const uint8_t index_html_start[] asm("_binary_index_html_start");
 extern const uint8_t index_html_end[] asm("_binary_index_html_end");
-extern const uint8_t style_css_start[] asm("_binary_style_css_start");
-extern const uint8_t style_css_end[] asm("_binary_style_css_end");
-extern const uint8_t script_js_start[] asm("_binary_script_js_start");
-extern const uint8_t script_js_end[] asm("_binary_script_js_end");
 
-// Define the embedded files
+// The config page is a single self-contained file (inline CSS + JS).
 static const EmbeddedFile indexHtml = {.start = index_html_start,
                                        .end = index_html_end,
                                        .content_type = "text/html"};
-static const EmbeddedFile styleCss = {.start = style_css_start,
-
-                                      .end = style_css_end,
-                                      .content_type = "text/css"};
-static const EmbeddedFile scriptJs = {.start = script_js_start,
-                                      .end = script_js_end,
-                                      .content_type = "application/javascript"};
 
 // The caller has to set the http status
 // start and end refer to the asm pointers of the embedded files
@@ -250,6 +240,10 @@ static esp_err_t settings_get_handler(httpd_req_t *req) {
 // This function expects a JSON body with the new settings
 static esp_err_t settings_post_handler(httpd_req_t *req) {
   char *buf = (char *)malloc(req->content_len + 2);
+  if (buf == nullptr) {
+    httpd_resp_set_status(req, HTTP_ERR_500_INTERNAL_SERVER_ERROR);
+    return send_json_message(req, "Out of memory");
+  }
 
   // Read in the request body
   int ret = httpd_req_recv(req, buf, req->content_len + 1);
@@ -270,10 +264,23 @@ static esp_err_t settings_post_handler(httpd_req_t *req) {
     return send_json_message(req, "Failed to parse settings JSON");
   }
 
-  // Update global settings
+  // Update global settings and persist to NVS
   g_settings = settings;
-  ESP_LOGI(TAG, "Settings updated successfully");
   free(buf);
+
+  esp_err_t persist_err = nvs_write_settings(g_settings);
+  if (persist_err != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to persist settings: %s",
+             esp_err_to_name(persist_err));
+    httpd_resp_set_status(req, HTTP_ERR_500_INTERNAL_SERVER_ERROR);
+    return send_json_message(req, "Settings parsed but failed to persist");
+  }
+
+  // Let the application re-apply settings that don't take effect on their own
+  // (timezone, weather location) on the main task.
+  app_post_event(APP_EVT_SETTINGS_CHANGED);
+
+  ESP_LOGI(TAG, "Settings updated and persisted successfully");
   return send_json_message(req, "Settings updated successfully");
 }
 
@@ -292,6 +299,16 @@ static esp_err_t catch_all_handler(httpd_req_t *req) {
   return send_json_status(req, HTTP_ERR_404_NOT_FOUND);
 }
 
+// Serve the config page at the root.
+static esp_err_t root_get_handler(httpd_req_t *req) {
+  return serve_embedded_file(req, indexHtml);
+}
+
+static const httpd_uri_t root_get = {.uri = "/",
+                                     .method = HTTP_GET,
+                                     .handler = root_get_handler,
+                                     .user_ctx = NULL};
+
 static const httpd_uri_t settings_get = {.uri = "/api/settings",
                                          .method = HTTP_GET,
                                          .handler = settings_get_handler,
@@ -306,8 +323,8 @@ static const httpd_uri_t settings_delete = {.uri = "/settings",
                                             .user_ctx = NULL};
 
 static const httpd_uri_t catch_all = {
-    .uri = "/*",        // Catch all routes
-    .method = HTTP_GET, // FIXME: make this work for all methods
+    .uri = "/*", // Catch all routes
+    .method = (httpd_method_t)HTTP_ANY,
     .handler = catch_all_handler,
     .user_ctx = NULL};
 
@@ -316,6 +333,8 @@ static const httpd_uri_t catch_all = {
 ////////////////
 
 static esp_err_t register_routes(httpd_handle_t &server) {
+  ESP_RETURN_ON_ERROR(httpd_register_uri_handler(server, &root_get), TAG,
+                      "Failed to register root GET handler");
   ESP_RETURN_ON_ERROR(httpd_register_uri_handler(server, &settings_get), TAG,
                       "Failed to register settings GET handler");
   ESP_RETURN_ON_ERROR(httpd_register_uri_handler(server, &settings_post), TAG,
@@ -340,10 +359,12 @@ esp_err_t start_webserver() {
 
   httpd_handle_t server;
   httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+  // The catch-all "/*" handler needs the wildcard matcher enabled.
+  config.uri_match_fn = httpd_uri_match_wildcard;
   ESP_RETURN_ON_ERROR(httpd_start(&server, &config), TAG,
                       "Failed to start web server");
-  // ESP_RETURN_ON_ERROR(register_error_handlers(server), TAG,
-  //                     "Failed to register error handlers");
+  ESP_RETURN_ON_ERROR(register_error_handlers(server), TAG,
+                      "Failed to register error handlers");
   ESP_RETURN_ON_ERROR(register_routes(server), TAG,
                       "Failed to register routes");
   g_server = server; // Store server handle globally

@@ -19,6 +19,12 @@ enum app_event_id_t {
   APP_EVT_BUTTON_SHORT,
   APP_EVT_BUTTON_LONG,
   APP_EVT_BUTTON_DOUBLE,
+  // Appended (do not reorder — handlers switch on these by value):
+  APP_EVT_TIME_SYNCED,         // NTP completed a sync
+  APP_EVT_WEATHER_DATA_READY,  // weather client fetched fresh data
+  APP_EVT_SCENE_ADVANCE,       // dwell timer elapsed; advance to next scene
+  APP_EVT_ERROR_OCCURED,       // unrecoverable error; app should reflect it
+  APP_EVT_SETTINGS_CHANGED,    // config updated (e.g. via HTTP); re-apply it
 };
 
 // Post an application event onto the default event loop. Safe to call from any

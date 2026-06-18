@@ -1,5 +1,6 @@
 #pragma once
 
+#include "helper.hpp" // RenderTimer
 #include "esp_event.h"
 #include <cstdint>
 #include <freertos/FreeRTOS.h>
@@ -23,8 +24,11 @@ public:
     AppState get_state() const { return current_state; }
 
 private:
-    StateMachine() = default;
+    StateMachine();
     void set_state(AppState new_state);
+
+    // Restart the auto-advance dwell so the current scene gets a full interval.
+    void reset_scene_dwell();
 
     // esp_event handler (runs in the event-loop task): enqueues events for the
     // main task so all state/scene/panel mutation stays single-threaded.
@@ -46,6 +50,10 @@ private:
 
     QueueHandle_t event_queue = nullptr;
     AppState current_state = AppState::SLEEPING; // Default, will change in init
+
+    // Periodic timer driving automatic scene rotation while on a display state.
+    // Its callback only posts APP_EVT_SCENE_ADVANCE (runs on the esp_timer task).
+    RenderTimer scene_dwell_timer;
     
     // Helpers
     void draw_icon(const char* name); // Placeholder for drawing status icons
