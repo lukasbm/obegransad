@@ -15,11 +15,14 @@
 #include <esp_log.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <sdkconfig.h>
 
 static const char* TAG = "StateMachine";
 
-// How long each scene is shown before auto-advancing.
-static constexpr uint32_t SCENE_DWELL_MS = 30000;
+// How long each scene is shown before auto-advancing (from Kconfig). The rotation
+// alternates clock and non-clock scenes, so a clock is visible at least every
+// other dwell interval.
+static constexpr uint32_t SCENE_DWELL_MS = CONFIG_OBG_SCENE_DWELL_MS;
 
 // OPERATIONAL and DEGRADED both rotate scenes; transitions between them must not
 // reset the dwell timer.
@@ -75,7 +78,7 @@ void StateMachine::update() {
     // change scenes).
     if (auto_advance_enabled && is_rotating_state(current_state) &&
         (millis() - last_scene_advance_ms) >= SCENE_DWELL_MS) {
-        next_scene();
+        next_auto_scene();
         last_scene_advance_ms = millis();
     }
 
@@ -161,7 +164,7 @@ void StateMachine::process_events() {
             case APP_EVT_SCENE_ADVANCE:
                 if (current_state == AppState::OPERATIONAL ||
                     current_state == AppState::DEGRADED) {
-                    next_scene();
+                    next_auto_scene();
                 }
                 break;
             case APP_EVT_ERROR_OCCURED:

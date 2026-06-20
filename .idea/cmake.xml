@@ -2,8 +2,20 @@
 <project version="4">
   <component name="CMakeSharedSettings">
     <configurations>
-      <configuration PROFILE_NAME="Debug" ENABLED="true" CONFIG_NAME="Debug" GENERATION_OPTIONS="-DIDF_TARGET=esp32c3" TOOLCHAIN_NAME="ESP-IDF" NO_GENERATOR="true" />
-      <configuration PROFILE_NAME="Release" ENABLED="true" CONFIG_NAME="Release" GENERATION_OPTIONS="-DIDF_TARGET=esp32c3" TOOLCHAIN_NAME="ESP-IDF" NO_GENERATOR="true" />
+      <configuration PROFILE_NAME="Debug" ENABLED="true" CONFIG_NAME="Debug" TOOLCHAIN_NAME="ESP-IDF" GENERATION_OPTIONS="-DIDF_TARGET=esp32c3" NO_GENERATOR="true">
+        <ADDITIONAL_GENERATION_ENVIRONMENT>
+          <envs>
+            <env name="IDF_PATH" value="$USER_HOME$/.espressif/v6.0.1/esp-idf" />
+          </envs>
+        </ADDITIONAL_GENERATION_ENVIRONMENT>
+      </configuration>
+      <configuration PROFILE_NAME="Release" ENABLED="true" CONFIG_NAME="Release" TOOLCHAIN_NAME="ESP-IDF" GENERATION_OPTIONS="-DIDF_TARGET=esp32c3" NO_GENERATOR="true">
+        <ADDITIONAL_GENERATION_ENVIRONMENT>
+          <envs>
+            <env name="IDF_PATH" value="$USER_HOME$/.espressif/v6.0.1/esp-idf" />
+          </envs>
+        </ADDITIONAL_GENERATION_ENVIRONMENT>
+      </configuration>
     </configurations>
   </component>
 </project>

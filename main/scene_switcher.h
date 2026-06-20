@@ -24,6 +24,16 @@ void unregister_scene(Scene *scene);
 void next_scene();
 
 /**
+ * @brief Advances the automatic rotation, interleaving clock and non-clock
+ * scenes: each call shows the "other" category from the last auto-shown scene.
+ * Clock and non-clock scenes each advance through their own group in list order,
+ * so the sequence is non-clock A, clock, non-clock B, clock, ... ensuring a clock
+ * is shown at least every other dwell interval. Falls back to the same category
+ * if the other one has no currently-valid scene.
+ */
+void next_auto_scene();
+
+/**
  * @brief Goes back to the previous scene.
  * It calls the activate method of the previous scene and deactivates the
  * current one.

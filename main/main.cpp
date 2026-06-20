@@ -1,18 +1,13 @@
 #include "esp_check.h"
-#include "freertos/idf_additions.h"
-#include <button_gpio.h>
 #include <esp_err.h>
 #include <esp_log.h>
-#include <esp_system.h>
 #include <freertos/projdefs.h>
-#include <iot_button.h>
 
-#include "app_events.h"
+#include "button.h"
 #include "clock.h"
 #include "device.h"
 #include "ikea-obegransad-panel.h"
 #include "scene_registry.hpp"
-#include "scene_switcher.h"
 #include "status_led.hpp"
 #include "weather.h"
 #include "weather_client.h"
@@ -21,108 +16,56 @@
 
 static const char* TAG = "main";
 
-static void button_long_press(void* arg, void* usr_data)
-{
-    app_post_event(APP_EVT_BUTTON_LONG);
-}
+extern "C" void app_main() {
+  ESP_LOGI(TAG, "Startup");
 
-static void button_short_press(void* arg, void* usr_data)
-{
-    app_post_event(APP_EVT_BUTTON_SHORT);
-}
+  // Reduce WiFi debug spam before initialization
+  esp_log_level_set("wifi", ESP_LOG_WARN);
+  esp_log_level_set("WifiStation", ESP_LOG_INFO);
+  esp_log_level_set("WifiConfigurationAp", ESP_LOG_INFO);
 
-static void button_double_press(void* arg, void* usr_data)
-{
-    app_post_event(APP_EVT_BUTTON_DOUBLE);
-}
+  // nvs, event loop, networking (creates the default event loop the app bus
+  // and status LED subscribe to)
+  ESP_ERROR_CHECK(device_init());
 
-esp_err_t button_init()
-{
-    // TODO: also consider low power mode:
-    // https://docs.espressif.com/projects/esp-iot-solution/en/latest/input_device/button.html#low-power
+  // Early hardware status LED: ON until Wi-Fi connects. Subscribes to the
+  // app event bus, so it must come after device_init().
+  ESP_ERROR_CHECK(status_led_init());
 
-    const button_config_t btn_cfg = {
-        .long_press_time = 5000, // ms
-        .short_press_time = 50 // ms
-    };
-    const button_gpio_config_t btn_gpio_cfg = {
-        .gpio_num = BUTTON_PIN,
-        .active_level = 0, // Active low (pressed = LOW)
-        .enable_power_save = true, // Enable power saving mode
-        .disable_pull = false // Enable internal pull-up
-    };
+  // the only button
+  ESP_ERROR_CHECK(button_init());
 
-    button_handle_t btn;
-    ESP_RETURN_ON_ERROR(iot_button_new_gpio_device(&btn_cfg, &btn_gpio_cfg, &btn),
-                        TAG, "Failed to create button");
+  // Initialize WiFi - connects to the SSID configured in Kconfig
+  wifi_init();
 
-    // register callbacks
-    ESP_RETURN_ON_ERROR(iot_button_register_cb(btn, BUTTON_SINGLE_CLICK, nullptr,
-                                               button_short_press, nullptr),
-                        TAG, "Failed to register short press callback");
-    ESP_RETURN_ON_ERROR(iot_button_register_cb(btn, BUTTON_LONG_PRESS_START, nullptr,
-                                               button_long_press, nullptr),
-                        TAG, "Failed to register long press callback");
-    ESP_RETURN_ON_ERROR(iot_button_register_cb(btn, BUTTON_DOUBLE_CLICK, nullptr,
-                                               button_double_press, nullptr),
-                        TAG, "Failed to register double press callback");
+  // set up sntp and time zone (from Kconfig)
+  ESP_ERROR_CHECK(clock_init(CONFIG_OBG_TIMEZONE));
 
-    return ESP_OK;
-}
+  // background weather client (idles until a fetch is requested)
+  ESP_ERROR_CHECK(weather_client_init());
 
+  // setup and start panel
+  static panel_config_t panel_config = {
+      .latch_pin = (gpio_num_t)3,
+      .clk_pin = (gpio_num_t)4,
+      .di_pin = (gpio_num_t)5,
+      .oe_pin = (gpio_num_t)6,
+      .spi_host = SPI2_HOST, // Use SPI2 for better performance
+      .spi_clock_speed_hz = 3 * 1000 * 1000, // 1 MHz SPI clock speed
+      .gamma = 2.2
+  };
 
-extern "C" void app_main()
-{
-    ESP_LOGI(TAG, "Startup");
+  ESP_ERROR_CHECK(panel_init(panel_config));
+  ESP_ERROR_CHECK(panel_timer_start());
 
-    // Reduce WiFi debug spam before initialization
-    esp_log_level_set("wifi", ESP_LOG_WARN);
-    esp_log_level_set("WifiStation", ESP_LOG_INFO);
-    esp_log_level_set("WifiConfigurationAp", ESP_LOG_INFO);
+  // Register scenes (single place — see scene_registry.hpp)
+  register_all_scenes();
 
-    // nvs, event loop, networking (creates the default event loop the app bus
-    // and status LED subscribe to)
-    ESP_ERROR_CHECK(device_init());
+  // Init State Machine
+  StateMachine::instance().init();
 
-    // Early hardware status LED: ON until Wi-Fi connects. Subscribes to the
-    // app event bus, so it must come after device_init().
-    ESP_ERROR_CHECK(status_led_init());
-
-    // the only button
-    ESP_ERROR_CHECK(button_init());
-
-    // Initialize WiFi - connects to the SSID configured in Kconfig
-    wifi_init();
-
-    // set up sntp and time zone (from Kconfig)
-    ESP_ERROR_CHECK(clock_init(CONFIG_OBG_TIMEZONE));
-
-    // background weather client (idles until a fetch is requested)
-    ESP_ERROR_CHECK(weather_client_init());
-
-    // setup and start panel
-    static panel_config_t panel_config = {
-        .latch_pin = (gpio_num_t)3,
-        .clk_pin = (gpio_num_t)4,
-        .di_pin = (gpio_num_t)5,
-        .oe_pin = (gpio_num_t)6,
-        .spi_host = SPI2_HOST, // Use SPI2 for better performance
-        .spi_clock_speed_hz = 3 * 1000 * 1000, // 1 MHz SPI clock speed
-        .gamma = 2.2
-    };
-
-    ESP_ERROR_CHECK(panel_init(panel_config));
-    ESP_ERROR_CHECK(panel_timer_start());
-
-    // Register scenes (single place — see scene_registry.hpp)
-    register_all_scenes();
-
-    // Init State Machine
-    StateMachine::instance().init();
-
-    while (true)
-    {
-        StateMachine::instance().update();
-        vTaskDelay(pdMS_TO_TICKS(100));
-    }
+  while (true) {
+    StateMachine::instance().update();
+    vTaskDelay(pdMS_TO_TICKS(100));
+  }
 }

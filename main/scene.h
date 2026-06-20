@@ -31,6 +31,10 @@ public:
   // If true, the scene switcher skips this scene while Wi-Fi is unavailable.
   virtual bool requires_wifi() const { return false; }
 
+  // If true, this scene shows the time. The auto-rotation interleaves clock and
+  // non-clock scenes so a clock is visible at least every other dwell interval.
+  virtual bool is_clock() const { return false; }
+
   // Desired render rate. Return 0 for a static/one-shot scene: render() then
   // runs once right after activation and not again. Default 10 FPS.
   virtual uint16_t target_fps() const { return 10; }

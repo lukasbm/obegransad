@@ -35,6 +35,12 @@ CONFIG_COMPILER_DISABLE_DEFAULT_ERRORS=y
 # Log level
 CONFIG_LOG_DEFAULT_LEVEL_INFO=y
 
+# Console over USB-Serial-JTAG only. The default UART0 console occupies GPIO20/21;
+# GPIO20 is the user button, so the UART console makes the button erratic. The
+# board is flashed/monitored over USB anyway, so move the console fully to USB
+# and free the UART pins.
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+
 # Flash
 CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
 CONFIG_ESPTOOLPY_FLASHSIZE="4MB"
@@ -52,4 +58,5 @@ CONFIG_OBG_WEATHER_LATITUDE="0.0"
 CONFIG_OBG_WEATHER_LONGITUDE="0.0"
 CONFIG_OBG_ANNIVERSARY_DAY=1
 CONFIG_OBG_ANNIVERSARY_MONTH=1
+CONFIG_OBG_SCENE_DWELL_MS=10000
 

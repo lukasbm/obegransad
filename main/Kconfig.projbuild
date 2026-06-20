@@ -43,4 +43,13 @@ config OBG_ANNIVERSARY_MONTH
     range 1 12
     default 1
 
+config OBG_SCENE_DWELL_MS
+    int "Auto scene-switch dwell (ms)"
+    range 1000 600000
+    default 10000
+    help
+        How long each scene is shown before the automatic rotation advances to
+        the next one (milliseconds). The rotation alternates clock and non-clock
+        scenes, so a clock is visible at least every other dwell interval.
+
 endmenu
