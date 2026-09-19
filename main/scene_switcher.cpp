@@ -1,194 +1,199 @@
 #include "scene_switcher.h"
 
-#include "ikea-obegransad-panel.h"
-#include <array>
-#include <list>
+#include "presets.hpp"
+
+#include <cstring>
+#include <esp_log.h>
 #include <vector>
 
-// list of scenes
-static std::list<Scene *> scenes;
-static size_t current_scene_index = 0;
-static bool wifi_available = false;
+static const char *TAG = "scenes";
 
-// Auto-rotation alternates between clock and non-clock scenes. Each category
-// keeps its own cursor (the index it last showed) so the two groups advance
-// independently in list order; next_auto_clock decides which group comes next.
-static int last_clock_index = -1;
-static int last_nonclock_index = -1;
-static bool next_auto_clock = false; // start on a non-clock, then a clock, ...
+namespace {
 
-static bool is_scene_valid(Scene* s) {
-    if (!s) return false;
-    return wifi_available || !s->requires_wifi();
+// All registered scenes, in registration order.
+std::vector<Scene *> scenes;
+
+// Preset scene names resolved to indices into `scenes`. Resolved once at init
+// so the rotation never touches strings.
+int8_t resolved[PRESET_COUNT][MAX_PRESET_SCENES];
+uint8_t resolved_count[PRESET_COUNT];
+
+uint8_t current_preset = 0;
+uint8_t position_in_preset = 0; // index into resolved[current_preset]
+int current_scene_index = -1;   // index into `scenes`, -1 = nothing active
+bool on_fallback = false;       // showing the fallback, not a preset scene
+bool wifi_available = false;
+
+bool is_scene_valid(int idx) {
+  if (idx < 0 || (size_t)idx >= scenes.size()) {
+    return false;
+  }
+  return wifi_available || !scenes[idx]->requires_wifi();
 }
 
-static Scene* scene_at(size_t idx) {
-    return *std::next(scenes.begin(), idx);
-}
-
-// Find the next valid scene of the requested category (clock/non-clock),
-// searching forward (with wraparound) starting just after `from`. Returns -1 if
-// no valid scene of that category exists. `from` may be -1 to start at the top.
-static int find_next_in_category(int from, bool want_clock) {
-    const size_t n = scenes.size();
-    if (n == 0) return -1;
-    const size_t base = (from < 0) ? n - 1 : (size_t)from;
-    for (size_t step = 1; step <= n; ++step) {
-        const size_t idx = (base + step) % n;
-        Scene* s = scene_at(idx);
-        if (is_scene_valid(s) && s->is_clock() == want_clock) {
-            return (int)idx;
-        }
+int scene_index_by_name(const char *name) {
+  for (size_t i = 0; i < scenes.size(); i++) {
+    if (strcmp(scenes[i]->get_scene_name(), name) == 0) {
+      return (int)i;
     }
-    return -1;
+  }
+  return -1;
 }
 
-// Switch the active scene to `idx` (deactivate current, activate target).
-static void activate_scene(size_t idx) {
-    if (idx == current_scene_index) return;
-    scene_at(current_scene_index)->deactivate();
-    current_scene_index = idx;
-    scene_at(idx)->activate();
-}
-
-// After a manual move, realign the auto cursors to the current scene so that
-// auto-rotation resumes cleanly with the opposite category next.
-static void sync_auto_cursors_to_current() {
-    if (scenes.empty()) return;
-    const bool is_clk = scene_at(current_scene_index)->is_clock();
-    if (is_clk) {
-        last_clock_index = (int)current_scene_index;
-    } else {
-        last_nonclock_index = (int)current_scene_index;
+// Shown when the active preset has no scene we can display right now (e.g. a
+// weather-only preset while Wi-Fi is down).
+int fallback_scene_index() {
+  for (size_t i = 0; i < scenes.size(); i++) {
+    if (!scenes[i]->requires_wifi()) {
+      return (int)i;
     }
-    next_auto_clock = !is_clk;
-}
-
-void register_scene(Scene *scene) { scenes.push_back(scene); }
-
-void unregister_scene(Scene *scene) {
-  scenes.remove(scene);
-  if (current_scene_index >= scenes.size()) {
-    current_scene_index = 0; // reset index if it was out of bounds
   }
+  return scenes.empty() ? -1 : 0;
 }
 
-void next_scene() {
-  if (scenes.empty())
+void activate_index(int idx) {
+  if (idx < 0 || (size_t)idx >= scenes.size() || idx == current_scene_index) {
     return;
-  
-  size_t start_index = current_scene_index;
-  size_t new_index = current_scene_index;
-  
-  do {
-      new_index++;
-      if (new_index >= scenes.size()) {
-        new_index = 0;
-      }
-      
-      auto it = std::next(scenes.begin(), new_index);
-      if (is_scene_valid(*it)) {
-          // Found a valid scene
-           auto current_it = std::next(scenes.begin(), current_scene_index);
-           (*current_it)->deactivate();
-           
-           current_scene_index = new_index;
-           (*it)->activate();
-           sync_auto_cursors_to_current();
-           return;
-      }
-  } while (new_index != start_index);
-}
-
-void next_auto_scene() {
-  if (scenes.empty()) return;
-
-  bool want_clock = next_auto_clock;
-  int from = want_clock ? last_clock_index : last_nonclock_index;
-  int target = find_next_in_category(from, want_clock);
-
-  // Desired category has no valid scene right now (e.g. clocks vs. a list with
-  // none, or non-clock-only while Wi-Fi-gated scenes are filtered). Fall back to
-  // the other category so rotation keeps moving, and try the wanted one again
-  // next time.
-  if (target < 0) {
-    want_clock = !want_clock;
-    from = want_clock ? last_clock_index : last_nonclock_index;
-    target = find_next_in_category(from, want_clock);
   }
-  if (target < 0) return;
-
-  activate_scene((size_t)target);
-  if (want_clock) {
-    last_clock_index = target;
-  } else {
-    last_nonclock_index = target;
+  if (current_scene_index >= 0) {
+    scenes[current_scene_index]->deactivate();
   }
-  next_auto_clock = !want_clock; // alternate for the next interval
-}
-
-void prev_scene() {
-  if (scenes.empty())
-    return;
-
-  size_t start_index = current_scene_index;
-  size_t new_index = current_scene_index;
-
-  do {
-      if (new_index == 0) {
-        new_index = scenes.size() - 1;
-      } else {
-        new_index--;
-      }
-      
-      auto it = std::next(scenes.begin(), new_index);
-      if (is_scene_valid(*it)) {
-           auto current_it = std::next(scenes.begin(), current_scene_index);
-           (*current_it)->deactivate();
-           
-           current_scene_index = new_index;
-           (*it)->activate();
-           sync_auto_cursors_to_current();
-           return;
-      }
-  } while (new_index != start_index);
-}
-
-void skipTo(size_t idx) {
-  if (scenes.empty() || idx >= scenes.size())
-    return;
-    
-  if (current_scene_index == idx) return;
-
-  auto it = std::next(scenes.begin(), idx);
-  if (!is_scene_valid(*it)) return; // Don't switch to invalid scene
-
-  // Deactivate current
-  auto current_it = std::next(scenes.begin(), current_scene_index);
-  (*current_it)->deactivate();
-
   current_scene_index = idx;
+  scenes[idx]->activate();
+}
 
-  // Activate new
-  (*it)->activate();
-  sync_auto_cursors_to_current();
+// First valid position at or after `from` (wrapping) within the active preset,
+// or -1 if the preset has nothing displayable right now.
+int find_valid_position(uint8_t from) {
+  const uint8_t count = resolved_count[current_preset];
+  for (uint8_t step = 0; step < count; step++) {
+    const uint8_t pos = (from + step) % count;
+    if (is_scene_valid(resolved[current_preset][pos])) {
+      return (int)pos;
+    }
+  }
+  return -1;
+}
+
+// Show the preset starting at `from`, falling back if nothing in it is valid.
+void show_preset_from(uint8_t from) {
+  const int pos = resolved_count[current_preset] ? find_valid_position(from) : -1;
+  if (pos < 0) {
+    ESP_LOGW(TAG, "preset %u '%s' has no displayable scene; using fallback",
+             current_preset, presets[current_preset].name);
+    on_fallback = true;
+    activate_index(fallback_scene_index());
+    return;
+  }
+  on_fallback = false;
+  position_in_preset = (uint8_t)pos;
+  activate_index(resolved[current_preset][pos]);
+}
+
+void select_preset(uint8_t index) {
+  current_preset = index;
+  ESP_LOGI(TAG, "preset %u: %s (%u scene(s), dwell %ums)", current_preset,
+           presets[current_preset].name, resolved_count[current_preset],
+           (unsigned)presets[current_preset].dwell_ms);
+  show_preset_from(0);
+}
+
+// Next non-empty preset in the given direction, wrapping. Returns the current
+// one if no other preset has any scenes.
+uint8_t step_preset(int direction) {
+  int candidate = current_preset;
+  for (uint8_t step = 1; step <= PRESET_COUNT; step++) {
+    candidate = (candidate + direction + PRESET_COUNT) % PRESET_COUNT;
+    if (resolved_count[candidate] > 0) {
+      return (uint8_t)candidate;
+    }
+  }
+  return current_preset;
+}
+
+} // namespace
+
+void register_scene(Scene *scene) {
+  if (scene) {
+    scenes.push_back(scene);
+  }
+}
+
+void scene_switcher_init() {
+  memset(resolved_count, 0, sizeof(resolved_count));
+
+  for (uint8_t p = 0; p < PRESET_COUNT; p++) {
+    const Preset &preset = presets[p];
+    const uint8_t wanted = preset.scenes ? preset.scene_count : 0;
+    if (wanted > MAX_PRESET_SCENES) {
+      ESP_LOGE(TAG, "preset %u '%s' lists %u scenes, max is %u; truncating", p,
+               preset.name, wanted, MAX_PRESET_SCENES);
+    }
+    for (uint8_t i = 0; i < wanted && i < MAX_PRESET_SCENES; i++) {
+      const int idx = scene_index_by_name(preset.scenes[i]);
+      if (idx < 0) {
+        ESP_LOGE(TAG, "preset %u '%s': unknown scene \"%s\", skipped", p,
+                 preset.name, preset.scenes[i]);
+        continue;
+      }
+      resolved[p][resolved_count[p]++] = (int8_t)idx;
+    }
+    if (resolved_count[p] > 0) {
+      ESP_LOGI(TAG, "preset %u '%s': %u scene(s), dwell %ums", p, preset.name,
+               resolved_count[p], (unsigned)preset.dwell_ms);
+    }
+  }
+
+  select_preset(0);
+}
+
+uint8_t preset_current() { return current_preset; }
+
+void preset_next() { select_preset(step_preset(+1)); }
+
+void preset_prev() { select_preset(step_preset(-1)); }
+
+uint32_t preset_dwell_ms() { return presets[current_preset].dwell_ms; }
+
+void rotation_advance() {
+  if (resolved_count[current_preset] == 0) {
+    return;
+  }
+  show_preset_from((uint8_t)((position_in_preset + 1) %
+                             resolved_count[current_preset]));
+}
+
+void scene_force_redraw() {
+  if (current_scene_index >= 0) {
+    scenes[current_scene_index]->request_redraw();
+  }
 }
 
 void tick() {
-  if (scenes.empty()) return;
-  // Get an iterator to the current scene
-  auto it = std::next(scenes.begin(), current_scene_index);
-  (*it)->update();
+  if (current_scene_index >= 0) {
+    scenes[current_scene_index]->update();
+  }
 }
 
 void scene_switcher_set_wifi_available(bool available) {
-    wifi_available = available;
-    
-    if (scenes.empty()) return;
+  if (wifi_available == available) {
+    return;
+  }
+  wifi_available = available;
 
-    auto it = std::next(scenes.begin(), current_scene_index);
-    if (!is_scene_valid(*it)) {
-        next_scene(); // Switch to next valid scene if current became invalid
+  if (scenes.empty()) {
+    return;
+  }
+
+  if (available) {
+    // Wi-Fi-gated scenes are back in play; if we had to fall back, return to
+    // the preset's own rotation.
+    if (on_fallback) {
+      show_preset_from(position_in_preset);
     }
+  } else if (!on_fallback && resolved_count[current_preset] > 0 &&
+             !is_scene_valid(current_scene_index)) {
+    // The scene we are showing just became unavailable.
+    rotation_advance();
+  }
 }
-

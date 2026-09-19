@@ -4,6 +4,8 @@
 #include "clock.h"
 #include "device.h"
 #include "helper.hpp" // millis()
+#include "overlays.hpp"
+#include "popup.h"
 #include "scene_switcher.h"
 #include "weather_client.h"
 #include "ikea-obegransad-panel.h"
@@ -19,10 +21,8 @@
 
 static const char* TAG = "StateMachine";
 
-// How long each scene is shown before auto-advancing (from Kconfig). The rotation
-// alternates clock and non-clock scenes, so a clock is visible at least every
-// other dwell interval.
-static constexpr uint32_t SCENE_DWELL_MS = CONFIG_OBG_SCENE_DWELL_MS;
+// How long the preset-number / Wi-Fi popups stay on screen (from Kconfig).
+static constexpr uint32_t POPUP_MS = CONFIG_OBG_POPUP_MS;
 
 // OPERATIONAL and DEGRADED both rotate scenes; transitions between them must not
 // reset the dwell timer.
@@ -39,6 +39,11 @@ StateMachine::StateMachine() = default;
 
 void StateMachine::reset_scene_dwell() {
     last_scene_advance_ms = millis();
+}
+
+void StateMachine::show_preset_popup() {
+    popup_show(overlay_preset_number(preset_current()), POPUP_MS);
+    reset_scene_dwell(); // the new preset's first scene gets a full interval
 }
 
 void StateMachine::init() {
@@ -72,13 +77,25 @@ void StateMachine::update() {
     // Apply any pending events first, then render for the (possibly new) state.
     process_events();
 
-    // Automatic scene rotation while in a display state (OPERATIONAL/DEGRADED).
-    // Driven here on the main task so it survives Wi-Fi flaps and needs no timer.
-    // Can be toggled off with a double button-press (then only single presses
-    // change scenes).
-    if (auto_advance_enabled && is_rotating_state(current_state) &&
-        (millis() - last_scene_advance_ms) >= SCENE_DWELL_MS) {
-        next_auto_scene();
+    // A popup owns the whole panel while it is up; nothing else draws.
+    if (popup_is_active()) {
+        popup_render();
+        popup_was_active = true;
+        return;
+    }
+    if (popup_was_active) {
+        popup_was_active = false;
+        scene_force_redraw();  // the popup overwrote the scene's frame
+        reset_scene_dwell();   // and the scene gets a full interval
+    }
+
+    // Automatic scene rotation within the active preset while in a display state
+    // (OPERATIONAL/DEGRADED). Driven here on the main task so it survives Wi-Fi
+    // flaps and needs no timer. A preset with dwell_ms == 0 never rotates.
+    const uint32_t dwell_ms = preset_dwell_ms();
+    if (dwell_ms > 0 && is_rotating_state(current_state) &&
+        (millis() - last_scene_advance_ms) >= dwell_ms) {
+        rotation_advance();
         last_scene_advance_ms = millis();
     }
 
@@ -93,7 +110,7 @@ void StateMachine::update() {
         case AppState::DEGRADED:
             tick(); // Update scenes
 
-            // Draw warning dot (Top Right Pixel) - Overlay
+            // Draw warning dot (bottom-left pixel) - Overlay
             panel_setPixel(15, 0, PANEL_BRIGHTNESS_1);
             panel_commit(); // Commit overlay
             break;
@@ -162,9 +179,8 @@ void StateMachine::process_events() {
                 ESP_LOGI(TAG, "Weather data ready");
                 break;
             case APP_EVT_SCENE_ADVANCE:
-                if (current_state == AppState::OPERATIONAL ||
-                    current_state == AppState::DEGRADED) {
-                    next_auto_scene();
+                if (is_rotating_state(current_state)) {
+                    rotation_advance();
                 }
                 break;
             case APP_EVT_ERROR_OCCURED:
@@ -176,6 +192,13 @@ void StateMachine::process_events() {
 }
 
 void StateMachine::on_wifi_connected() {
+    // Announce a *regained* connection only — the first connect after boot is
+    // expected and needs no popup.
+    if (had_connection) {
+        popup_show(overlay_wifi(true), POPUP_MS);
+    }
+    had_connection = true;
+
     // Now that we have connectivity, kick an immediate NTP re-poll so the clock
     // updates promptly instead of waiting for the next scheduled interval, and
     // request a fresh weather fetch.
@@ -196,6 +219,7 @@ void StateMachine::on_wifi_connected() {
 void StateMachine::on_wifi_disconnected() {
     if (current_state == AppState::OPERATIONAL) {
         ESP_LOGW(TAG, "WiFi lost, entering DEGRADED state");
+        popup_show(overlay_wifi(false), POPUP_MS);
         set_state(AppState::DEGRADED);
     }
 }
@@ -276,8 +300,8 @@ void StateMachine::on_button_short_press() {
             
         case AppState::OPERATIONAL:
         case AppState::DEGRADED:
-            next_scene();
-            reset_scene_dwell(); // manual switch gets a full dwell interval
+            preset_next();
+            show_preset_popup();
             break;
 
         case AppState::ERROR:
@@ -301,14 +325,8 @@ void StateMachine::on_button_double_press() {
     switch (current_state) {
         case AppState::OPERATIONAL:
         case AppState::DEGRADED:
-            // Toggle automatic scene rotation. When off, only single presses
-            // advance scenes.
-            auto_advance_enabled = !auto_advance_enabled;
-            ESP_LOGI(TAG, "Auto scene-switching %s",
-                     auto_advance_enabled ? "ENABLED" : "DISABLED");
-            if (auto_advance_enabled) {
-                reset_scene_dwell(); // give the current scene a full interval
-            }
+            preset_prev();
+            show_preset_popup();
             break;
 
         case AppState::ERROR:

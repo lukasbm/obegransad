@@ -20,7 +20,7 @@
 //     void on_activate() override { /* one-time setup */ }
 //     void render(uint32_t dt_ms) override { /* draw one frame */ }
 //   };
-// Then add it to the table in scenes/scene_registry.hpp.
+// Then add it to scene_registry.hpp, and to a preset in presets.hpp.
 class Scene {
 public:
   virtual ~Scene() = default;
@@ -30,10 +30,6 @@ public:
 
   // If true, the scene switcher skips this scene while Wi-Fi is unavailable.
   virtual bool requires_wifi() const { return false; }
-
-  // If true, this scene shows the time. The auto-rotation interleaves clock and
-  // non-clock scenes so a clock is visible at least every other dwell interval.
-  virtual bool is_clock() const { return false; }
 
   // Desired render rate. Return 0 for a static/one-shot scene: render() then
   // runs once right after activation and not again. Default 10 FPS.
@@ -50,6 +46,13 @@ public:
   void deactivate() {
     on_deactivate();
     log_scene_event("deactivated");
+  }
+
+  // Force the next update() to render, regardless of the FPS throttle. Used
+  // when something else (an overlay) overwrote the panel.
+  void request_redraw() {
+    has_rendered = false;
+    on_redraw_requested();
   }
 
   void update() {
@@ -76,6 +79,11 @@ protected:
   // Optional one-time hooks around (de)activation.
   virtual void on_activate() {}
   virtual void on_deactivate() {}
+
+  // The panel was overwritten from the outside; drop any "nothing changed, so
+  // nothing to draw" caching so the next render() paints a full frame. Only
+  // scenes that skip drawing when their inputs are unchanged need this.
+  virtual void on_redraw_requested() {}
 
   void log_scene_event(const char *event) const {
     ESP_LOGI("scene", "%s: %s", get_scene_name(), event);

@@ -2,48 +2,49 @@
 
 #include "scene.h"
 #include <cstddef>
+#include <cstdint>
 
 /**
- * @brief Registers a scene to the scene switcher.
- * It uses the scenes static array to store the scene and to avoid duplicates.
- * The scenes are stored in a list
+ * @brief Registers a scene, appending it to the registry in display order.
+ * Presets refer to scenes by name, so the registry order only matters for the
+ * Wi-Fi fallback (the first non-Wi-Fi scene is used).
  */
 void register_scene(Scene *scene);
 
 /**
- * @brief Unregisters a scene from the scene switcher.
- * It uses the scenes static name to remove the scene.
+ * @brief Resolves the preset table (see presets.hpp) against the registered
+ * scenes and activates preset 0. Call once, after register_all_scenes().
  */
-void unregister_scene(Scene *scene);
+void scene_switcher_init();
+
+/// @brief Index of the active preset (0..PRESET_COUNT-1).
+uint8_t preset_current();
 
 /**
- * @brief Advances to the next scene.
- * It calls the activate method of the next scene and deactivates the current
- * one.
+ * @brief Selects the next/previous non-empty preset, wrapping around, and
+ * activates its first valid scene.
  */
-void next_scene();
+void preset_next();
+void preset_prev();
 
 /**
- * @brief Advances the automatic rotation, interleaving clock and non-clock
- * scenes: each call shows the "other" category from the last auto-shown scene.
- * Clock and non-clock scenes each advance through their own group in list order,
- * so the sequence is non-clock A, clock, non-clock B, clock, ... ensuring a clock
- * is shown at least every other dwell interval. Falls back to the same category
- * if the other one has no currently-valid scene.
+ * @brief How long each scene of the active preset is shown.
+ * 0 means the preset does not rotate at all.
  */
-void next_auto_scene();
+uint32_t preset_dwell_ms();
 
 /**
- * @brief Goes back to the previous scene.
- * It calls the activate method of the previous scene and deactivates the
- * current one.
+ * @brief Advances to the next scene within the active preset, skipping scenes
+ * that need Wi-Fi while it is unavailable.
  */
-void prev_scene();
+void rotation_advance();
 
 /**
- * @brief Goes to the scene with the given index.
+ * @brief Makes the current scene draw a frame on the next tick(), even if its
+ * target FPS or internal change detection would have skipped it. Used after an
+ * overlay covered the panel.
  */
-void skipTo(size_t idx);
+void scene_force_redraw();
 
 /**
  * @brief Updates the current scene.

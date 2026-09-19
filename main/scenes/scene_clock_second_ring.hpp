@@ -46,10 +46,10 @@ private:
 public:
   const char *get_scene_name() const override { return "Clock w/ seconds"; }
   uint16_t target_fps() const override { return 4; } // catch second changes
-  bool is_clock() const override { return true; }
 
 protected:
   void on_activate() override { lastSecond = -1; }
+  void on_redraw_requested() override { lastSecond = -1; }
 
   void render(uint32_t /*dt_ms*/) override {
     struct tm time = time_get();

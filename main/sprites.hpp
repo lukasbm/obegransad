@@ -1,5 +1,6 @@
 #pragma once
 
+#include "frame.hpp"
 #include "ikea-obegransad-panel.h"
 #include <cstddef>
 #include <cstdint>
@@ -30,39 +31,53 @@ inline bwb_header_t bwb_read_header(const uint8_t *data_start) {
 }
 
 /**
- * @brief Draws a sprite on the LED panel
+ * @brief Draws a sprite on the LED panel, or into an off-screen Frame
  * @param tlX Top-left X coordinate (0-15)
  * @param tlY Top-left Y coordinate (0-15)
- * @param data Pointer to sprite data (packed 2-bit pixels)
- * @param color_depth Color depth of the sprite (bits per pixel)
+ * @param data Pointer to sprite data (one byte per pixel)
  * @param width Width of the sprite in pixels
  * @param height Height of the sprite in pixels
+ * @param target Frame to draw into, or nullptr to draw straight to the panel
+ * @param scale Integer upscaling factor; each source pixel becomes a
+ *        scale x scale block (1 = original size)
  *
  * This function draws a sprite at the specified top-left corner (tlX, tlY).
- * The sprite data is expected to be packed with [color_depth] bits per pixel.
  *
  * @note It is also possible to draw sprites that are larger than the panel or
  * (partially) out of bounds, but they will be clipped.
  */
 inline void drawSprite(int8_t tlX, int8_t tlY, const uint8_t *data,
-                       uint8_t width, uint8_t height) {
+                       uint8_t width, uint8_t height, Frame *target = nullptr,
+                       uint8_t scale = 1) {
+  if (scale == 0) {
+    return;
+  }
+
   // Iterate over each pixel of the sprite
   for (uint8_t y = 0; y < height; y++) {
     for (uint8_t x = 0; x < width; x++) {
-      // Calculate the target coordinates on the panel
-      int16_t targetX = tlX + x;
-      int16_t targetY = tlY + y;
+      const uint8_t pixel_brightness = data[y * width + x];
 
-      // Clip the sprite, only draw pixels that are on the panel
-      if (targetX < 0 || targetX >= PANEL_WIDTH || targetY < 0 ||
-          targetY >= PANEL_HEIGHT) {
-        continue; // Skip out-of-bounds pixels
+      // A scaled pixel covers a scale x scale block on the target
+      for (uint8_t sy = 0; sy < scale; sy++) {
+        for (uint8_t sx = 0; sx < scale; sx++) {
+          const int16_t targetX = tlX + x * scale + sx;
+          const int16_t targetY = tlY + y * scale + sy;
+
+          // Clip the sprite, only draw pixels that are on the panel
+          if (targetX < 0 || targetX >= PANEL_WIDTH || targetY < 0 ||
+              targetY >= PANEL_HEIGHT) {
+            continue; // Skip out-of-bounds pixels
+          }
+
+          if (target) {
+            target->set((uint8_t)targetY, (uint8_t)targetX, pixel_brightness);
+          } else {
+            panel_setPixel((uint8_t)targetY, (uint8_t)targetX,
+                           pixel_brightness);
+          }
+        }
       }
-
-      size_t pixel_index = y * width + x;
-      uint8_t pixel_brightness = data[pixel_index];
-
-      panel_setPixel(targetY, targetX, pixel_brightness);
     }
   }
 }
@@ -89,8 +104,9 @@ struct SingleSprite : Sprite {
   /**
    * @brief Draws the sprite at the specified top-left corner (tlX, tlY)
    */
-  void draw(const uint8_t tlX, const uint8_t tlY) const {
-    drawSprite(tlX, tlY, data_start, header.w, header.h);
+  void draw(const uint8_t tlX, const uint8_t tlY, Frame *target = nullptr,
+            uint8_t scale = 1) const {
+    drawSprite(tlX, tlY, data_start, header.w, header.h, target, scale);
   }
 };
 
@@ -117,10 +133,11 @@ struct TextureAtlas : Sprite {
    * @brief directly draw the sprite by index at the specified top-left corner
    */
   void drawByIndex(const unsigned short index, const uint8_t tlX,
-                   const uint8_t tlY) const {
+                   const uint8_t tlY, Frame *target = nullptr,
+                   uint8_t scale = 1) const {
     const uint8_t *spriteData = getByIndex(index);
     if (spriteData) {
-      drawSprite(tlX, tlY, spriteData, header.w, header.h);
+      drawSprite(tlX, tlY, spriteData, header.w, header.h, target, scale);
     }
   }
 };
@@ -140,10 +157,11 @@ struct FontSheet : TextureAtlas {
     return getByIndex(index);
   }
 
-  void drawGlyph(const char c, const uint8_t tlX, const uint8_t tlY) const {
+  void drawGlyph(const char c, const uint8_t tlX, const uint8_t tlY,
+                 Frame *target = nullptr, uint8_t scale = 1) const {
     const uint8_t *glyphData = getGlyph(c);
     if (glyphData) {
-      drawSprite(tlX, tlY, glyphData, header.w, header.h);
+      drawSprite(tlX, tlY, glyphData, header.w, header.h, target, scale);
     }
   }
 };

@@ -29,6 +29,9 @@ private:
     // Restart the auto-advance dwell so the current scene gets a full interval.
     void reset_scene_dwell();
 
+    // Show the active preset's number fullscreen and restart the dwell.
+    void show_preset_popup();
+
     // esp_event handler (runs in the event-loop task): enqueues events for the
     // main task so all state/scene/panel mutation stays single-threaded.
     static void on_app_event(void *arg, esp_event_base_t base, int32_t id,
@@ -52,12 +55,13 @@ private:
 
     // Automatic scene rotation is driven from update() on the main task (robust,
     // no esp_timer dependency). This marks when the current scene started; when
-    // SCENE_DWELL_MS elapses while in a rotating state, we advance.
+    // the active preset's dwell elapses while in a rotating state, we advance.
     unsigned long last_scene_advance_ms = 0;
-    // Toggled by a double button-press. When false, scenes only change on a
-    // single button press.
-    bool auto_advance_enabled = true;
 
-    // Helpers
-    void draw_icon(const char* name); // Placeholder for drawing status icons
+    // Tracks the popup->normal edge so the scene can be told to repaint.
+    bool popup_was_active = false;
+
+    // True once Wi-Fi has connected at least since boot, so that only a
+    // *regained* connection pops up.
+    bool had_connection = false;
 };

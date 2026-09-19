@@ -61,10 +61,15 @@ extern "C" void app_main() {
   // Register scenes (single place — see scene_registry.hpp)
   register_all_scenes();
 
+  // Resolve the presets against the registered scenes and show preset 0
+  // (single place to edit the rotations — see presets.hpp)
+  scene_switcher_init();
+
   // Init State Machine
   StateMachine::instance().init();
 
   while (true) {
+    wifi_supervisor_tick();
     StateMachine::instance().update();
     vTaskDelay(pdMS_TO_TICKS(100));
   }

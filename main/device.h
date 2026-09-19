@@ -15,6 +15,12 @@ void wifi_init();
 // Check if Wi-Fi is connected
 bool wifi_check();
 
+/**
+ * @brief Debounces disconnects and forces reconnect attempts with a backoff.
+ * Call periodically from the main loop; cheap, and a no-op while connected.
+ */
+void wifi_supervisor_tick();
+
 // Wait for WiFi connection with timeout (in milliseconds)
 // Returns true if connected, false if timeout
 bool wifi_wait_for_connection(uint32_t timeout_ms);

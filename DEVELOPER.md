@@ -90,6 +90,12 @@ void panel_task(void* _) {
 * A *Button Handler Task* reads the queue, debounces, recognizes short/long/double presses and posts higher-level events
   to the app event bus.
 
+**As implemented:** `button.cpp` polls (10 ms) rather than using a GPIO ISR — simpler, and cheap enough at this poll
+rate — but still isolates all debounce/classification logic in its own task, posting exactly the three events the
+spec calls for. In `OPERATIONAL`/`DEGRADED`, `StateMachine` maps them to: short press → `preset_next()`, double press
+→ `preset_prev()` (both followed by `show_preset_popup()`, see "Scene presets" and "Rendering loop" below), long
+press → `wifi_clear_credentials(); esp_restart();` (unconditional factory reset, any state).
+
 ### Wi-Fi Manager & Captive Portal
 
 * Uses `esp_event` to announce `WIFI_CONNECTED`, `WIFI_DISCONNECTED`, `CAPTIVE_PORTAL_STARTED`,
@@ -97,6 +103,20 @@ void panel_task(void* _) {
 * Runs the AP + captive portal when there is no valid configuration.
 * Starts the HTTP server once connected (or when captive portal mode requires it).
 * Recover from disconnections automatically (exponential backoff).
+
+**As implemented:** the vendored `78/esp-wifi-connect` does the reconnecting (5 immediate attempts, then the next AP
+from its scan queue), but it surfaces every failed attempt as another `WIFI_EVENT_STA_DISCONNECTED`. `device.cpp`
+therefore runs a small supervisor — `wifi_supervisor_tick()`, called from the main loop, no extra task or timer:
+
+* a raw disconnect only starts a timer; `APP_EVT_WIFI_DISCONNECTED` is posted once the link has stayed down for
+  `CONFIG_OBG_WIFI_DOWN_GRACE_MS`, which stops the display flapping OPERATIONAL↔DEGRADED during normal reconnects,
+* `APP_EVT_WIFI_CONNECTED` is posted only on a real up-edge, so the two events always pair,
+* while down, `esp_wifi_disconnect()` + `esp_wifi_connect()` are forced on a 30 s → 300 s backoff in case the
+  component's own retries gave up.
+
+Not fixed, because it lives in `managed_components/`: `wifi_station.cc` re-arms its rescan timer with `10 * 1000`
+microseconds (10 ms, almost certainly meant to be 10 s), so a long outage keeps that component scanning in a tight
+loop.
 
 ### HTTP Server (config UI)
 
@@ -195,6 +215,26 @@ measuring `uxTaskGetSystemState()` and CPU usage.
 
 Adjust after profiling.
 
+**As implemented** — every FreeRTOS task that exists once the app is running, with its actual priority
+(`configMAX_PRIORITIES` is 25 on this target, so the valid range is 0–24; ESP-IDF's own scheme is documented in
+`esp_task.h` and `docs/api-guides/performance/speed.rst`):
+
+| Task | Priority | Created by | Touches the panel? |
+|---|---|---|---|
+| `panel_task` | **24** (`configMAX_PRIORITIES - 1`) | `panel_init()` (`ikea-obegransad-panel.c`) | Yes — the only *reader* of `g_framebuffer`. Woken every 2 ms by the refresh-timer ISR; see "Rendering loop" above. Espressif's guidance caps non-networking tasks at 24 for exactly this "very short, restricted" use, so this is the system max, used correctly. |
+| Wi-Fi driver task | 23 (fixed by the Wi-Fi library, not app-configurable) | `esp_wifi_start()` inside `WifiStation::Start()` | No |
+| `esp_timer` service task | 22 (`ESP_TASK_TIMER_PRIO`) | ESP-IDF startup | No — runs any `ESP_TIMER_TASK`-dispatched callback (the managed component's `WifiScanTimer`, and the unused `RenderTimer` helper in `helper.hpp`). The panel refresh timer deliberately uses `ESP_TIMER_ISR` dispatch instead, so it runs in the ISR and never touches this task at all. |
+| `esp_event` default-loop task | 20 (`ESP_TASK_EVENT_PRIO`) | `esp_event_loop_create_default()` in `device_init()` | No — runs every registered `esp_event` handler (`wifi_event_handler` in `device.cpp`, `StateMachine::on_app_event`, `status_led`'s handler). All three only record state or enqueue; none draw. |
+| lwIP TCP/IP task | 18 (`ESP_TASK_TCPIP_PRIO`) | ESP-IDF network init | No — owns the network stack; `weather.cpp`'s HTTP client and SNTP do their I/O through it. |
+| `weather` | 5 (explicit in `weather_client_init()`) | `weather_client.cpp` | No — blocks on `ulTaskNotifyTake` (up to 20 min), fetches, posts `APP_EVT_WEATHER_DATA_READY`. |
+| `button` | 5 (explicit in `button_init()`) | `button.cpp` | No — 10 ms poll loop, posts `APP_EVT_BUTTON_*`. |
+| `main` (`app_main`) | **1** (`ESP_TASK_MAIN_PRIO`, the FreeRTOS floor) | ESP-IDF startup | **Yes — the only writer.** Runs `wifi_supervisor_tick()` and `StateMachine::update()`, i.e. every scene, popup, and overlay draw in the app. See "Concurrency & synchronization" below. |
+| FreeRTOS Timer Service task | 1 (`CONFIG_FREERTOS_TIMER_TASK_PRIORITY`) | FreeRTOS init | No — present but idle; nothing in this project creates a plain `xTimerCreate` software timer (everything uses `esp_timer` instead). |
+
+The main task sitting at priority 1 — the lowest possible — is deliberate on ESP-IDF's part, so app code never
+starves Wi-Fi/lwIP/the event loop above it. The trade-off is the one detailed just below: at priority 24,
+`panel_task` can, and regularly does, preempt the main task mid-frame.
+
 ---
 
 # Practical rules / coding guidelines
@@ -229,6 +269,165 @@ Adjust after profiling.
 * After `scene.update()` completes, the Display Task composes overlays (status icons, battery, debug dot) then commits
   the frame.
 * Overlays are small and fast; implement as a final write to the framebuffer immediately before the SPI/RMT commit.
+
+**As implemented:**
+
+* `main/frame.hpp` — `Frame`, a plain 16×16 off-screen screenbuffer (256 bytes, no allocation). This is the type
+  modules use to hand whole frames to each other; `Frame::present()` pushes it to the panel through `panel_setPixel()`
+  so it renders identically to direct drawing. `drawSprite()` and the sprite/font classes in `main/sprites.hpp` take an
+  optional `Frame *target` and an integer `scale`, so existing art can be composed off-screen and enlarged.
+* `main/popup.{h,cpp}` — a timed fullscreen overlay: `popup_show(frame, duration_ms)`, `popup_is_active()`,
+  `popup_render()`, `popup_dismiss()`. It knows nothing about scenes, presets or Wi-Fi; `StateMachine::update()` decides
+  it wins by skipping scene rendering while one is active, and calls `scene_force_redraw()` on the trailing edge (see
+  "Rendering loop" below for the exact preemption order). Duration for the app's own popups is
+  `CONFIG_OBG_POPUP_MS` (default 2000 ms).
+* `main/overlays.hpp` — the app's popup artwork (`overlay_preset_number()`, `overlay_wifi()`), kept out of the popup
+  module so that stays generic.
+
+---
+
+# Scene presets
+
+Instead of one global rotation over every registered scene, `main/presets.hpp` defines up to ten numbered presets
+(0–9), each an ordered list of scenes plus its own dwell time (`dwell_ms == 0` means "never rotate"). The order in the
+list *is* the rotation, so alternating e.g. clock and weather is just a matter of writing them alternately; empty slots
+are skipped when cycling.
+
+Scenes are referenced by their `get_scene_name()` string and resolved once to registry indices in
+`scene_switcher_init()`; unresolvable names are logged and dropped. A short button press selects the next preset, a
+double press the previous one, and both confirm with a fullscreen number popup. If a preset has no displayable scene
+right now (a weather-only preset while Wi-Fi is down) the switcher falls back to the first scene that does not
+`requires_wifi()` and returns to the preset's rotation once Wi-Fi is back.
+
+---
+
+# Rendering loop (as implemented)
+
+Two independent, differently-clocked loops cooperate through one shared resource: the panel driver's framebuffer
+(`g_framebuffer`, private to `components/ikea-obegransad-panel/ikea-obegransad-panel.c`).
+
+### 1. Hardware refresh loop — 500 Hz, `panel_task`
+
+* An `esp_timer` fires every `FRAME_PERIOD_US` (2000 µs) with `dispatch_method = ESP_TIMER_ISR`; the ISR
+  (`refresh_timer_callback`, `IRAM_ATTR`) does nothing but `vTaskNotifyGiveFromISR(g_panel_task_handle, ...)`.
+* `panel_task_func` (priority `configMAX_PRIORITIES - 1`, pinned to the last core) wakes on that notification. If
+  `g_refresh_needed` is set (i.e. something called `panel_commit()` since the last tick) it rebuilds all four bit
+  planes from `g_framebuffer` in one go (`prepare_bitplane()` × `BIT_DEPTH`); either way it then shifts out the
+  current plane over SPI and pulses `OE` via RMT for that plane's on-time (50/100/200/400 µs for planes 0–3), then
+  advances `g_plane_idx` for the next tick.
+* Effect: a full 4-plane BCM cycle takes 4 ticks = 8 ms (~125 Hz perceived full-brightness refresh), and any pixel
+  write becomes visible within at most one 8 ms cycle of the next `panel_commit()`. This loop never blocks on
+  anything outside the panel component and has no notion of scenes, popups, or app state — it only ever reads
+  whatever `g_framebuffer` currently holds.
+
+### 2. Application loop — 100 ms, `app_main()`
+
+```cpp
+while (true) {
+  wifi_supervisor_tick();
+  StateMachine::instance().update();
+  vTaskDelay(pdMS_TO_TICKS(100));
+}
+```
+
+This is the *only* place that writes into `g_framebuffer` (via `panel_setPixel`/`panel_commit`, whether directly,
+through a scene, or through a `Frame`), so all rendering is single-threaded with respect to itself — the 500 Hz
+loop only ever reads a framebuffer this loop finished writing to. The 100 ms period is also a hard ceiling on scene
+animation rate: `Scene::update()` throttles to `target_fps()`, but no scene can exceed 10 fps in practice because
+nothing calls `tick()` more often than every 100 ms.
+
+`StateMachine::update()` decides **what** gets drawn on a given tick, in strict priority order. Each level below
+*preemptively takes over* from the next — lower levels are not evaluated at all while a higher one is active,
+which is different from compositing (see the DEGRADED dot at the bottom, which *is* a composite):
+
+1. **Popup** (`popup_is_active()`) — highest priority. `process_events()` always runs first, so button and Wi-Fi
+   events keep being queued even during a popup; but if the popup is active, `update()` calls `popup_render()`
+   (which just re-`present()`s the stored `Frame`) and returns immediately — no scene ticks, and the DEGRADED dot
+   is not drawn. On the trailing edge (the first tick where `popup_is_active()` has gone false),
+   `StateMachine` calls `scene_force_redraw()`, which invokes `Scene::request_redraw()` on the active scene. That
+   resets the FPS-throttle's `has_rendered` flag *and* calls the scene's `on_redraw_requested()` hook, then
+   `reset_scene_dwell()` gives the scene a full dwell interval. The hook matters for scenes with their own
+   change-detection cache — `ClockScene`/`ClockSceneWithSecondHand` only redraw when the minute/second changes —
+   without it, such a scene could stay frozen on the popup's leftover pixels for up to a minute.
+2. **`AppState`** — exactly one of `OPERATIONAL`, `DEGRADED`, `SETUP`, `ERROR`, `SLEEPING` is active at a time, each
+   with its own branch in `update()`'s `switch`. `SETUP` (`panel_clear(); wifi_sprite.draw(0,0);`) and `ERROR`
+   (`panel_clear(); font_bold.drawGlyph('!', 4, 4);`) fully replace scene rendering rather than compositing with
+   it — a takeover, not an overlay.
+3. **Scene rotation** — only reached from `OPERATIONAL`/`DEGRADED`. Before drawing, `update()` checks whether the
+   active preset's dwell has elapsed (`preset_dwell_ms()`; 0 means the preset never rotates) and, if so, calls
+   `rotation_advance()`. Then `tick()` renders the current scene: `Scene::update()` → FPS throttle → `render(dt)`
+   → the scene's own `panel_clear()`/draw calls/`panel_commit()`.
+4. **DEGRADED status dot** — the one genuine *overlay* in the pipeline, not a takeover: after `tick()` runs inside
+   the `DEGRADED` branch, `panel_setPixel(15, 0, PANEL_BRIGHTNESS_1); panel_commit();` draws a single pixel
+   (bottom-left) on top of whatever the scene just committed. It is redrawn every DEGRADED tick regardless of
+   whether the scene itself redrew that tick, which is what lets it survive scenes that skip frames under their
+   own FPS throttle.
+
+### Two framebuffers, one pipeline
+
+`g_framebuffer` (panel-private, `uint8_t[16][16]`) and `Frame` (`main/frame.hpp`, the app-level exchangeable
+screenbuffer introduced for popups) are deliberately different types that funnel through the same API:
+`Frame::present()` calls `panel_setPixel()` once per pixel and then `panel_commit()`, so a popup's frame reaches the
+LEDs by exactly the same path a scene's direct drawing does — there is no special-cased "popup mode" in the panel
+driver, and no double-buffering: whichever of the two writers ran most recently on the 100 ms loop is what the
+500 Hz loop displays.
+
+---
+
+# Concurrency & synchronization (as implemented)
+
+### Single-writer model for the panel
+
+Every function that touches the panel — `panel_setPixel`/`panel_fill`/`panel_clear`/`panel_commit` directly, or
+`Frame::present()` — is only ever called from the **main task**. This is true by construction, not convention:
+`scene_switcher.h`, `popup.h` and `state.h` are only `#include`d by `main.cpp`, `state.cpp`, `scene_switcher.cpp`
+and `popup.cpp`, and none of those run on another task. The other three application tasks (`button`, `weather`,
+`panel_task`) never call a `panel_*` function; they only post `esp_event`s or (for `panel_task`) read the
+framebuffer. So there is exactly one writer, drawing synchronously, one call at a time — the classic "many
+writers" hazard doesn't exist today.
+
+### How the popup gets exclusivity — no lock, one dispatcher
+
+There is no mutex, semaphore, or priority mechanism giving the popup "exclusive drawing rights". It works because
+`StateMachine::update()` (main task; walked through step-by-step in "Rendering loop" above) is the **only place**
+that decides what gets rendered on a given 100 ms tick, and it is a plain sequential `if`/`switch`: at most one of
+{`popup_render()`, the active `AppState` branch (which includes `tick()` for scene rendering)} runs per call. A
+scene can never "override" a popup, because nothing ever calls `tick()` while `popup_is_active()` is true — the
+scene switcher has no idea a popup exists, and doesn't need to. If a future module (an HTTP config UI, a second
+data source, …) ever called `panel_setPixel`/`Frame::present()` from **its own** task, this guarantee would break
+immediately: nothing in `components/ikea-obegransad-panel` stops it racing with the main task. Rule of thumb: **any
+code that draws must run on the main task**, i.e. be reached through `StateMachine::update()`.
+
+### A real (if narrow) race: torn frames between the main task and `panel_task`
+
+`g_framebuffer` also has no lock around it, but unlike the single-writer guarantee above, this *is* a genuine
+two-task race, because it is read by a task other than the one that writes it:
+
+* `panel_setPixel()` sets `g_refresh_needed = true` on **every call**, not just when the caller finally calls
+  `panel_commit()`. A scene that draws, say, 20 pixels one at a time gives 20 opportunities for
+  `g_refresh_needed` to already be `true` mid-frame.
+* `panel_task` (priority 24) preempts the main task (priority 1) the instant the refresh-timer ISR notifies it —
+  every 2 ms, unconditionally, regardless of what the main task is doing. On this single-core target, that
+  preemption can land in the middle of a scene's draw sequence.
+* If it does, `prepare_bitplane()` rebuilds all four bit planes from a **partially updated** `g_framebuffer` — a
+  torn frame — and displays it.
+* In practice the window is small (drawing a full 16×16 frame is a few hundred trivial array writes, well under
+  2 ms) and the very next `panel_setPixel` call re-arms `g_refresh_needed`, so any tearing self-corrects within
+  one more 2 ms tick — at worst a single-frame flicker, not a persistent glitch. It has not been observed as
+  visible in practice, but it is a real gap, not a theoretical one.
+* Mitigation, if it's ever worth the complexity: wrap a frame's writes in `taskENTER_CRITICAL`/`taskEXIT_CRITICAL`
+  around `g_framebuffer` (cheap, since draws are fast, but adds jitter right on the 500 Hz path — exactly what
+  "Timing, jitter and Wi-Fi CPU budget" above warns against), or give the panel a second buffer and swap a single
+  pointer in `panel_commit()` instead of mutating the live one in place. Neither is implemented; this is flagged
+  as a known limitation rather than fixed speculatively.
+
+### Cross-task communication stays event/queue-based
+
+Everything that *isn't* the panel already follows the pattern the spec asks for: drivers (`button`, Wi-Fi, SNTP,
+weather) only ever communicate upward by posting `esp_event`s (see "Event-driven state model" above), and
+`StateMachine::on_app_event` immediately re-marshals those onto a queue so `process_events()` runs the actual
+reactions back on the main task — no other task ever calls into `StateMachine`, `scene_switcher`, or `popup`
+directly. The panel is the only place a genuine (if narrow) cross-task hazard exists.
 
 ---
 

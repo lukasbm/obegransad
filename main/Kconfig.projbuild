@@ -44,12 +44,29 @@ config OBG_ANNIVERSARY_MONTH
     default 1
 
 config OBG_SCENE_DWELL_MS
-    int "Auto scene-switch dwell (ms)"
+    int "Default scene dwell (ms)"
     range 1000 600000
     default 10000
     help
-        How long each scene is shown before the automatic rotation advances to
-        the next one (milliseconds). The rotation alternates clock and non-clock
-        scenes, so a clock is visible at least every other dwell interval.
+        Default time each scene is shown before the rotation advances
+        (milliseconds). Presets carry their own dwell; this is the value the
+        "Everything" preset uses. See main/presets.hpp.
+
+config OBG_POPUP_MS
+    int "Popup duration (ms)"
+    range 250 10000
+    default 2000
+    help
+        How long the fullscreen popups (preset number, Wi-Fi lost/regained)
+        stay on screen before the normal rendering resumes.
+
+config OBG_WIFI_DOWN_GRACE_MS
+    int "Wi-Fi disconnect grace period (ms)"
+    range 1000 120000
+    default 10000
+    help
+        How long the Wi-Fi link must stay down before the app reports it as
+        disconnected. This rides out the driver's own reconnect attempts, which
+        would otherwise flap the display between OPERATIONAL and DEGRADED.
 
 endmenu
