@@ -32,12 +32,16 @@ namespace preset_scenes {
 inline constexpr const char *calm[] = {"Digital Clock"};
 inline constexpr const char *time_and_weather[] = {
     "Digital Clock", "Current Weather", "Clock w/ seconds", "Daily Weather"};
-inline constexpr const char *fun[] = {"Game of Life", "Concentric Circles"};
+inline constexpr const char *fun[] = {"Game of Life", "Concentric Circles",
+                                      "Rotating Cube"};
 inline constexpr const char *everything[] = {
     "Digital Clock",   "Current Weather", "Clock w/ seconds",
     "Weather Forecast", "Anniversary",    "Daily Weather",
-    "Game of Life",     "Snake",          "Concentric Circles"};
+    "Game of Life",     "Snake",          "Concentric Circles",
+    "Rotating Cube"};
 inline constexpr const char *seconds[] = {"Clock w/ seconds"};
+inline constexpr const char *game_and_time[] = {"Game of Life",
+                                                "Clock w/ seconds"};
 } // namespace preset_scenes
 
 // Fills in scene_count from the array, so it can never drift out of sync.
@@ -53,7 +57,7 @@ inline constexpr Preset presets[PRESET_COUNT] = {
     OBG_PRESET("Fun",            30000,                     preset_scenes::fun),
     OBG_PRESET("Everything",     CONFIG_OBG_SCENE_DWELL_MS, preset_scenes::everything),
     OBG_PRESET("Seconds",        0,                         preset_scenes::seconds),
-    OBG_PRESET_EMPTY,
+    OBG_PRESET("Game & Time",    10000,                     preset_scenes::game_and_time),
     OBG_PRESET_EMPTY,
     OBG_PRESET_EMPTY,
     OBG_PRESET_EMPTY,

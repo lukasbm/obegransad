@@ -8,6 +8,7 @@
 #include "scenes/scene_clock_second_ring.hpp"
 #include "scenes/scene_concentric_circles.hpp"
 #include "scenes/scene_empty.hpp"
+#include "scenes/scene_rotating_cube.hpp"
 #include "scenes/game_of_life.hpp"
 #include "scenes/scene_snake.hpp"
 #include "scenes/scene_test.hpp"
@@ -30,6 +31,7 @@ inline void register_all_scenes() {
   static GameOfLifeScene game_of_life_scene;
   static SnakeScene snake_scene;
   static ConcentricCircleScene concentric_circles_scene;
+  static RotatingCubeScene rotating_cube_scene;
   static SpriteTestScene test_scene;
   static EmptyScene empty_scene;
 
@@ -42,6 +44,7 @@ inline void register_all_scenes() {
   register_scene(&game_of_life_scene);
   register_scene(&snake_scene);
   register_scene(&concentric_circles_scene);
+  register_scene(&rotating_cube_scene);
   register_scene(&test_scene);
   register_scene(&empty_scene);
 }

@@ -3,5 +3,3 @@ Any functions, ISRs, or libraries that are not absolutely necessary should be av
 power.
 
 Make sure to consult the documentation of ESP-IDF as frequently as possible and adhere to [[DEVELOPER.md]].
-
-
