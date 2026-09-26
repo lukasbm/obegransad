@@ -14,7 +14,8 @@ tools/sim/run-qemu.sh --no-monitor # QEMU in the foreground, no monitor
 ```
 
 Options: `--sim-port N` (default 5566), `--http-port N` (default 8080,
-`0` disables), `--persist`, `--no-renderer`, `--no-monitor`.
+`0` disables), `--persist` (keep NVS), `--fresh` (regenerate
+`build-sim/sdkconfig` from the defaults files), `--no-renderer`, `--no-monitor`.
 
 The script uses `build-sim/` and `build-sim/sdkconfig` and layers
 `sdkconfig.defaults[.local]` + `sdkconfig.defaults.sim`; the hardware build and

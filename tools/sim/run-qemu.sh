@@ -13,6 +13,7 @@
 #   --http-port N    host port forwarded to guest port 80 (default 8080,
 #                    0 disables the forward)
 #   --persist        keep NVS (Wi-Fi/config state) across runs
+#   --fresh          regenerate build-sim/sdkconfig from the sdkconfig.defaults*
 #   --no-renderer    do not start the host renderer
 #   --no-monitor     run QEMU without idf.py monitor
 #   -h, --help
@@ -26,10 +27,11 @@ HTTP_PORT=8080
 PERSIST=0
 RENDERER=1
 MONITOR=1
+FRESH=0
 RENDERER_PYTHON="${RENDERER_PYTHON:-python3}"
 
 usage() {
-  sed -n '3,20p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '3,19p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
   exit "${1:-0}"
 }
 
@@ -38,6 +40,7 @@ while [ $# -gt 0 ]; do
     --sim-port) SIM_PORT="${2:?missing value}"; shift ;;
     --http-port) HTTP_PORT="${2:?missing value}"; shift ;;
     --persist) PERSIST=1 ;;
+    --fresh) FRESH=1 ;;
     --no-renderer) RENDERER=0 ;;
     --no-monitor) MONITOR=0 ;;
     -h|--help) usage 0 ;;
@@ -89,6 +92,20 @@ DEFAULTS="$DEFAULTS;sdkconfig.defaults.sim"
 CMAKE_ARGS=(-B "$BUILD_DIR" "-DSDKCONFIG=$BUILD_DIR/sdkconfig"
             "-DSDKCONFIG_DEFAULTS=$DEFAULTS")
 
+# sdkconfig defaults only apply when the sdkconfig is (re)created; an existing
+# file wins. Warn when the defaults changed, and let --fresh regenerate.
+if [ "$FRESH" = 1 ]; then
+  rm -f "$BUILD_DIR/sdkconfig"
+elif [ -f "$BUILD_DIR/sdkconfig" ]; then
+  for defaults_file in ${DEFAULTS//;/ }; do
+    if [ "$PROJECT_DIR/$defaults_file" -nt "$BUILD_DIR/sdkconfig" ]; then
+      echo "note: $defaults_file is newer than build-sim/sdkconfig; its changes" >&2
+      echo "      are not applied until you run with --fresh." >&2
+      break
+    fi
+  done
+fi
+
 # --- QEMU networking ---------------------------------------------------------
 # Emulated OpenCores Ethernet with slirp user-mode networking (DHCP + NAT).
 # hostfwd makes an app HTTP server on guest port 80 reachable as
@@ -121,6 +138,47 @@ if [ "$PERSIST" = 1 ]; then
   fi
   mv "$BUILD_DIR/qemu_flash_new.bin" "$BUILD_DIR/qemu_flash_persist.bin"
   QEMU_ARGS+=(--flash-file "$BUILD_DIR/qemu_flash_persist.bin")
+fi
+
+# --- preflight: stale instances and busy ports --------------------------------
+# Leftover simulator processes are the usual reason a run fails with
+# "Timed out waiting for port 5555 to be open" (QEMU exits because the host
+# forward or monitor port is taken) or with an "Address already in use" bind
+# error. QEMU/renderer processes started from this project are safe to stop.
+stale="$(pgrep -f "[b]uild-sim/qemu_flash" || true)"
+if [ -n "$stale" ]; then
+  echo "warning: stopping stale simulator QEMU process(es): $stale" >&2
+  # shellcheck disable=SC2086
+  kill $stale 2>/dev/null || true
+  sleep 1
+fi
+if [ "$RENDERER" = 1 ]; then
+  stale="$(pgrep -f "[t]ools/sim/renderer.py" || true)"
+  if [ -n "$stale" ]; then
+    echo "warning: stopping stale simulator renderer process(es): $stale" >&2
+    # shellcheck disable=SC2086
+    kill $stale 2>/dev/null || true
+    sleep 1
+  fi
+fi
+
+port_in_use() {
+  ss -H -ltn 2>/dev/null | awk '{print $4}' | grep -qE "[:.]${1}\$"
+}
+if [ "$RENDERER" = 1 ] && port_in_use "$SIM_PORT"; then
+  echo "error: TCP port $SIM_PORT is already in use (another renderer?);" >&2
+  echo "       use --sim-port N or stop the process holding it." >&2
+  exit 1
+fi
+if [ "$MONITOR" = 1 ] && port_in_use 5555; then
+  echo "error: QEMU monitor port 5555 is already in use (stale QEMU?);" >&2
+  echo "       use --no-monitor or stop the process holding it." >&2
+  exit 1
+fi
+if [ "$HTTP_PORT" != 0 ] && port_in_use "$HTTP_PORT"; then
+  echo "error: host HTTP port $HTTP_PORT is already in use;" >&2
+  echo "       use --http-port N (or 0 to disable the forward)." >&2
+  exit 1
 fi
 
 # --- host renderer -----------------------------------------------------------
