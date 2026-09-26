@@ -1,0 +1,18 @@
+# Simulator (QEMU) build defaults.
+#
+# Used by tools/sim/run-qemu.sh, which layers this file on top of
+# sdkconfig.defaults[.local] into a dedicated build-sim/ tree. sdkconfig.defaults
+# already targets esp32c3; the simulator runs that target under QEMU.
+#
+CONFIG_OBG_SIMULATOR=y
+
+# QEMU only emulates UART0. The default USB-Serial-JTAG console would send all
+# logs (and the bootloader output) to a peripheral QEMU does not implement.
+CONFIG_ESP_CONSOLE_UART_DEFAULT=y
+
+# Networking in QEMU comes from the emulated OpenCores Ethernet MAC (the
+# simulator device backend brings it up instead of esp_wifi).
+CONFIG_ETH_USE_OPENETH=y
+
+# Keep the simulator logs readable.
+CONFIG_LOG_DEFAULT_LEVEL_INFO=y

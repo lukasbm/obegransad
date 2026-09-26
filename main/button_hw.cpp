@@ -1,3 +1,7 @@
+#include "sdkconfig.h"
+
+#if CONFIG_OBG_BUTTON_BACKEND_HW
+
 #include "button.h"
 
 #include "app_events.h"
@@ -111,3 +115,5 @@ esp_err_t button_init() {
     }
     return ESP_OK;
 }
+
+#endif // CONFIG_OBG_BUTTON_BACKEND_HW

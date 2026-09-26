@@ -69,4 +69,46 @@ config OBG_WIFI_DOWN_GRACE_MS
         disconnected. This rides out the driver's own reconnect attempts, which
         would otherwise flap the display between OPERATIONAL and DEGRADED.
 
+config OBG_SIMULATOR
+    bool "Simulator build (QEMU/host, no real hardware)"
+    default n
+    help
+        Selects the simulator backends (display over TCP, emulated Ethernet
+        instead of esp_wifi, renderer-driven button). Used by
+        tools/sim/run-qemu.sh via sdkconfig.defaults.sim; the hardware build
+        must keep this off.
+
+choice OBG_DEVICE_BACKEND
+    prompt "Device/connectivity backend"
+    default OBG_DEVICE_BACKEND_SIM if OBG_SIMULATOR
+    default OBG_DEVICE_BACKEND_HW
+
+    config OBG_DEVICE_BACKEND_HW
+        bool "Hardware (esp-wifi-connect + esp_wifi)"
+
+    config OBG_DEVICE_BACKEND_SIM
+        bool "Simulator (QEMU emulated Ethernet, no esp_wifi)"
+endchoice
+
+choice OBG_BUTTON_BACKEND
+    prompt "Button backend"
+    default OBG_BUTTON_BACKEND_SIM if OBG_SIMULATOR
+    default OBG_BUTTON_BACKEND_HW
+
+    config OBG_BUTTON_BACKEND_HW
+        bool "Hardware (poll GPIO)"
+
+    config OBG_BUTTON_BACKEND_SIM
+        bool "Simulator (commands from the renderer)"
+endchoice
+
+config OBG_SIM_FAKE_NO_CREDS
+    bool "Simulator: pretend no Wi-Fi credentials are configured"
+    depends on OBG_SIMULATOR
+    default n
+    help
+        Makes wifi_has_credentials() return false so the app boots into the
+        SETUP state. The captive portal itself cannot run outside real
+        hardware; only the state/UI path is exercised.
+
 endmenu

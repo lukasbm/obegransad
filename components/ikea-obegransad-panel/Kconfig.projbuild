@@ -1,5 +1,21 @@
 menu "Driver for IKEA Obegransad Panel"
-    
+
+    choice OBG_PANEL_BACKEND
+        prompt "Panel backend"
+        default OBG_PANEL_BACKEND_SIM if OBG_SIMULATOR
+        default OBG_PANEL_BACKEND_HW
+        help
+            Hardware uses SPI + RMT + GPIO shift-register output. The
+            simulator publishes frames to the host renderer and touches no
+            peripherals (for QEMU/host builds).
+
+    config OBG_PANEL_BACKEND_HW
+        bool "Hardware (SPI + RMT + GPIO)"
+
+    config OBG_PANEL_BACKEND_SIM
+        bool "Simulator (framebuffer over TCP)"
+    endchoice
+
     config MY_DISPLAY_OE_PIN
         int "OE Pin"
         default 6

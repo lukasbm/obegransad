@@ -433,6 +433,10 @@ directly. The panel is the only place a genuine (if narrow) cross-task hazard ex
 
 # Debugging, testing & telemetry checklist
 
+* Run the QEMU simulator for scene/state/network work without hardware:
+  `tools/sim/run-qemu.sh` (see `tools/sim/README.md`). It replaces the panel
+  output with a host window and Wi-Fi with QEMU's emulated Ethernet; SPI/RMT
+  timing and real Wi-Fi still need the board.
 * Measure refresh jitter (timestamp before ISR and at commit).
 * Measure worst-case refresh duration and CPU utilization.
 * Ensure Wi-Fi tasks get >=20% CPU during heavy network operations (simulate loads).

@@ -1,0 +1,19 @@
+menu "Simulator link"
+
+    config OBG_SIM_HOST
+        string "Host address of the simulator renderer"
+        default "10.0.2.2" if !IDF_TARGET_LINUX
+        default "127.0.0.1" if IDF_TARGET_LINUX
+        help
+            Address the firmware connects to for the simulator renderer.
+            Under QEMU this must be 10.0.2.2 (slirp's alias for the host);
+            on a host build 127.0.0.1.
+
+    config OBG_SIM_PORT
+        int "TCP port of the simulator renderer"
+        range 1024 65535
+        default 5566
+        help
+            Port the host renderer listens on (tools/sim/renderer.py).
+
+endmenu

@@ -1,7 +1,10 @@
+#include "sdkconfig.h"
+
+#if CONFIG_OBG_DEVICE_BACKEND_HW
+
 #include "device.h"
 
 #include "app_events.h"
-#include "sdkconfig.h"
 
 // ESP-IDF core dependencies
 #include "esp_check.h"
@@ -257,3 +260,5 @@ void enter_light_sleep() {
   // esp_sleep_enable_ext0_wakeup(BUTTON_PIN, 0); // Wake up on button press
   esp_light_sleep_start();
 }
+
+#endif // CONFIG_OBG_DEVICE_BACKEND_HW

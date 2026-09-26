@@ -1,4 +1,11 @@
-#include "ikea-obegransad-panel.h"
+// Hardware backend: shift-register output via SPI + RMT-timed OE (ESP32-C3).
+// Framebuffer/timing/brightness live in panel_core.c.
+
+#include "sdkconfig.h"
+
+#if CONFIG_OBG_PANEL_BACKEND_HW
+
+#include "panel_internal.h"
 
 #include "driver/gpio.h"
 #include "driver/rmt_tx.h"
@@ -6,31 +13,17 @@
 #include "esp_attr.h"
 #include "esp_check.h"
 #include "esp_log.h"
-#include "esp_log_level.h"
-#include "esp_timer.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 #include "soc/gpio_struct.h"
-#include <math.h>
 #include <string.h>
 
-// Timing constants for BCM (Bit Code Modulation)
-#define FRAME_PERIOD_US 2000 // 500Hz refresh rate = 2000µs period total
-//  make sure that the sum of all plane times is less than
-// FRAME_PERIOD_US - (some buffer for spi, scheduler, etc. overhead)
+static const char *TAG = "panel_hw";
 
-// color depth settings
-#define BIT_DEPTH 4 // has to be between 1 and 8
+// BCM plane on-times. Make sure the sum of all plane times is less than the
+// core's FRAME_PERIOD_US (2000us) minus some buffer for SPI/scheduler overhead.
 #define PLANE0_ON_US 50
 #define PLANE1_ON_US 100
 #define PLANE2_ON_US 200
 #define PLANE3_ON_US 400
-
-static const char *TAG = "panel";
-
-const Brightness brightness_levels[] = {PANEL_BRIGHTNESS_OFF,
-                                        PANEL_BRIGHTNESS_1, PANEL_BRIGHTNESS_2,
-                                        PANEL_BRIGHTNESS_3};
 
 // Each bitplane requires 32 bytes (256 LEDs / 8 bits per byte)
 #define BITPLANE_SIZE_BYTES ((PANEL_WIDTH * PANEL_HEIGHT) / 8)
@@ -64,40 +57,27 @@ static const uint8_t lut[16][16] = {
     {232, 233, 234, 235, 236, 237, 238, 239, 248, 249, 250, 251, 252, 253, 254,
      255}};
 
-// Driver state - hardware handles and configuration
-static uint8_t g_brightness_panel = 255;
-static uint8_t g_brightness_user = 255;
+// Hardware state
 static panel_config_t g_config;
 static spi_device_handle_t g_spi;
 static rmt_channel_handle_t g_rmt_oe;
 static rmt_encoder_handle_t g_rmt_encoder;
-static esp_timer_handle_t g_refresh_timer; // ESP Timer for precise 500Hz timing
-static uint8_t g_plane_idx = 0; // Current bit plane index for display
-static TaskHandle_t g_panel_task_handle = NULL; // High priority task for refresh
-
-// Buffers
-static uint8_t g_framebuffer[PANEL_HEIGHT][PANEL_WIDTH];
-static uint8_t g_bitplanes[BIT_DEPTH][BITPLANE_SIZE_BYTES];
-static volatile bool g_refresh_needed = false;
+static uint8_t g_bitplanes[PANEL_BIT_DEPTH][BITPLANE_SIZE_BYTES];
+static uint8_t g_plane_idx = 0; // current bit plane for display
 
 // Timing in microseconds
-static const uint32_t plane_times_us[BIT_DEPTH] = {PLANE0_ON_US, PLANE1_ON_US,
-                                                   PLANE2_ON_US, PLANE3_ON_US};
+static const uint32_t plane_times_us[PANEL_BIT_DEPTH] = {
+    PLANE0_ON_US, PLANE1_ON_US, PLANE2_ON_US, PLANE3_ON_US};
 
 // Forward declarations
-static void refresh_timer_callback(void *arg);
-static void panel_task_func(void *arg);
 static void prepare_bitplane(uint8_t plane);
 static void display_bitplane(uint8_t plane);
 static void print_bitplane(uint8_t plane);
 static void print_framebuffer(void);
 
-// Initialization helper functions for modular setup
+// Initialization helper functions
 static esp_err_t init_gpio_pins(void);
 static esp_err_t init_spi_interface(void);
-static esp_err_t init_refresh_timer(void);
-
-// RMT helper functions for precise OE (Output Enable) timing control
 static esp_err_t rmt_setup_oe_channel(void);
 static void rmt_send_oe_pulse(uint32_t duration_us);
 
@@ -114,181 +94,43 @@ static inline void IRAM_ATTR latch_pulse(void) {
 }
 
 //////////////////////////////////
-// important API functions //
+// Backend interface            //
 //////////////////////////////////
 
-esp_err_t panel_init(panel_config_t config) {
-  ESP_LOGI(TAG, "Initializing IKEA Obegränsad panel driver");
-  g_config = config;
+esp_err_t panel_backend_init(const panel_config_t *config) {
+  g_config = *config;
 
-  // Initialize framebuffer and bitplanes to zero (all LEDs off)
-  memset(g_framebuffer, 0, sizeof(g_framebuffer));
-  memset(g_bitplanes, 0, sizeof(g_bitplanes));
-
-  // Initialize all hardware subsystems in sequence
   ESP_RETURN_ON_ERROR(init_gpio_pins(), TAG, "GPIO initialization failed");
   ESP_RETURN_ON_ERROR(rmt_setup_oe_channel(), TAG, "RMT setup failed");
   ESP_RETURN_ON_ERROR(init_spi_interface(), TAG, "SPI initialization failed");
 
-  // Create high priority task pinned to the last core (app core on dual-core,
-  // core 0 on the single-core ESP32-C3). Pinning to a non-existent core 1
-  // asserts in xTaskCreatePinnedToCore on single-core targets.
-  // Stack size 4096 should be sufficient for SPI/RMT calls
-  xTaskCreatePinnedToCore(panel_task_func, "panel_task", 4096, NULL,
-                          configMAX_PRIORITIES - 1, &g_panel_task_handle,
-                          configNUMBER_OF_CORES - 1);
-
-  ESP_RETURN_ON_ERROR(init_refresh_timer(), TAG, "Timer initialization failed");
-
-  ESP_LOGI(TAG, "Panel driver initialized successfully - ready for refresh");
+  memset(g_bitplanes, 0, sizeof(g_bitplanes));
   return ESP_OK;
 }
 
-/**
- * @brief Start the ESP timer for 500Hz display refresh
- * Must be called after panel_init() to begin automatic display updates
- */
-esp_err_t panel_timer_start(void) {
-  return esp_timer_start_periodic(g_refresh_timer, FRAME_PERIOD_US);
-}
-
-/**
- * @brief Stop the ESP timer to halt display refresh
- * LEDs will remain in their current state until timer is restarted
- */
-esp_err_t panel_timer_stop(void) { return esp_timer_stop(g_refresh_timer); }
-
-///////////////////////////////
-// Framebuffer manipulation API //
-///////////////////////////////
-
-static uint8_t map_value_generic(uint8_t value, uint8_t in_min, uint8_t in_max,
-                                 uint8_t out_min, uint8_t out_max) {
-  return (uint8_t)((value - in_min) * (out_max - out_min) / (in_max - in_min) +
-                   out_min);
-}
-
-/**
- * @brief Maps a full 8 bit value (0-255) to the nearest supported brightness
- * level based on BIT_DEPTH
- */
-static uint8_t map_value(uint8_t value) {
-  if (value == 0) {
-    return 0;
-  } else if (value <= PANEL_BRIGHTNESS_1) {
-    return PANEL_BRIGHTNESS_1;
-  } else if (value <= PANEL_BRIGHTNESS_2) {
-    return PANEL_BRIGHTNESS_2;
-  } else {
-    return PANEL_BRIGHTNESS_3;
+void panel_backend_rebuild(void) {
+  for (int i = 0; i < PANEL_BIT_DEPTH; i++) {
+    prepare_bitplane(i);
   }
 }
 
-/**
- * @brief Set individual pixel brightness using logical coordinates
- * @param row Pixel row (0-15)
- * @param col Pixel column (0-15)
- * @param brightness Brightness level (see Brightness enum)
- */
-void panel_setPixel(uint8_t row, uint8_t col, uint8_t brightness) {
-  if (row >= PANEL_HEIGHT || col >= PANEL_WIDTH)
-    return;
-  g_framebuffer[row][col] = map_value(brightness);
-  g_refresh_needed = true;
+void panel_backend_display(void) {
+  GPIO.out_w1ts.val = (1 << g_config.oe_pin); // LEDs off to avoid flickering
+  display_bitplane(g_plane_idx);
+  g_plane_idx = (g_plane_idx + 1) % PANEL_BIT_DEPTH; // Increment plane index
 }
 
-/**
- * @brief Fill entire panel with uniform brightness
- * @param brightness Brightness level (see Brightness enum)
- */
-void panel_fill(uint8_t brightness) {
-  memset(g_framebuffer, map_value(brightness), sizeof(g_framebuffer));
-  g_refresh_needed = true;
-}
-
-/**
- * @brief Mark framebuffer as needing refresh (call after direct framebuffer
- * changes)
- */
-void panel_commit(void) { g_refresh_needed = true; }
-
-/**
- * @brief Set global brightness scaling factor
- * @param brightness Global brightness (0-255), applied to all pixels
- */
-void panel_set_global_brightness(uint8_t brightness) {
-  g_brightness_user = brightness;
-
-  // Apply gamma correction
-  float brightness_f = (float)brightness / 255.0f;
-  brightness = (uint8_t)(pow(brightness_f, g_config.gamma) * 255.0f +
-                         0.1f); // +0.5f for rounding
-  // Clamp to valid range
-  if (brightness > 255)
-    brightness = 255;
-
-  if (brightness < 0)
-    brightness = 0; // Ensure non-negative
-
-  g_brightness_panel = brightness;
-  g_refresh_needed = true; // Trigger refresh with new brightness
-}
-
-/**
- * @brief Get current global brightness scaling factor
- * @return Current global brightness (0-255)
- */
-uint8_t panel_get_global_brightness(void) { return g_brightness_user; }
-
-//////////////////////////
-// Actual Driver functions //
-//////////////////////////
-
-/**
- * @brief ESP Timer callback - ISR context
- * Triggers the high-priority task to perform the actual refresh
- * @param arg User-defined argument (unused)
- */
-static void IRAM_ATTR refresh_timer_callback(void *arg) {
-  BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-  vTaskNotifyGiveFromISR(g_panel_task_handle, &xHigherPriorityTaskWoken);
-  portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-}
-
-/**
- * @brief Dedicated High Priority Task for Display Refresh
- * waits for notification from ISR timer and executes refresh logic
- */
-static void panel_task_func(void *arg) {
-  while (1) {
-    // Wait for notification from timer ISR
-    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-
-    // Prepare bitplanes from framebuffer if changes were made
-    if (g_refresh_needed) {
-      // print_framebuffer();
-      for (int i = 0; i < BIT_DEPTH; i++) {
-        prepare_bitplane(i);
-        // print_bitplane(i); // Print each prepared bitplane for debugging
-      }
-      g_refresh_needed = false;
-    }
-
-    // Display each bitplane with precise RMT-controlled timing
-    // This implements Bit Code Modulation (BCM) for brightness control
-    GPIO.out_w1ts.val = (1 << g_config.oe_pin); // LEDs off to avoid flickering!)
-    display_bitplane(g_plane_idx);
-    g_plane_idx = (g_plane_idx + 1) % BIT_DEPTH; // Increment plane index
-  }
-}
+//////////////////////////////////
+// Bit plane preparation        //
+//////////////////////////////////
 
 /**
  * @brief Prepare bitplane data from framebuffer using Bit Code Modulation (BCM)
  * BCM allows multiple brightness levels by varying the time each LED is lit
- * @param plane The bit plane to prepare (0 = LSB, 1 = MSB for 2-bit depth)
+ * @param plane The bit plane to prepare (0 = LSB)
  */
 static void prepare_bitplane(uint8_t plane) {
-  if (plane >= BIT_DEPTH) {
+  if (plane >= PANEL_BIT_DEPTH) {
     ESP_LOGE(TAG, "Invalid bit plane %d requested", plane);
     return;
   }
@@ -296,10 +138,13 @@ static void prepare_bitplane(uint8_t plane) {
   // Clear the bitplane buffer
   memset(g_bitplanes[plane], 0, BITPLANE_SIZE_BYTES);
 
+  const uint8_t *framebuffer = panel_core_framebuffer();
+
   // Process each pixel in the framebuffer
   for (int y = 0; y < PANEL_HEIGHT; y++) {
     for (int x = 0; x < PANEL_WIDTH; x++) {
-      uint8_t pixel_brightness = g_framebuffer[y][x]; // 0 to 2^BIT_DEPTH-1
+      uint8_t pixel_brightness =
+          framebuffer[y * PANEL_WIDTH + x]; // logical brightness 0..255
 
       // Check if this bit plane should be lit for this pixel in the plane
       // by thresholding against the current bit value
@@ -314,6 +159,10 @@ static void prepare_bitplane(uint8_t plane) {
     }
   }
 }
+
+//////////////////////////////////
+// Output                       //
+//////////////////////////////////
 
 /**
  * @brief Send precisely timed OE pulse using RMT
@@ -334,14 +183,14 @@ static void rmt_send_oe_pulse(uint32_t duration_us) {
       .flags.eot_level = 1, // End of transmission level (1 = high)
       .flags.queue_nonblocking = 1, // non-blocking mode
   };
-  esp_err_t err = rmt_transmit(g_rmt_oe, g_rmt_encoder, &oe_symbol, sizeof(oe_symbol),
-                               &tx_config);
+  esp_err_t err = rmt_transmit(g_rmt_oe, g_rmt_encoder, &oe_symbol,
+                               sizeof(oe_symbol), &tx_config);
   if (err != ESP_OK) {
     ESP_LOGE(TAG, "RMT transmit failed: %s", esp_err_to_name(err));
     return;
   }
-  // Block until transmission completes; prevents descriptor exhaustion log spam.
-  // Can not turn this on or we get the flickering ....
+  // Block until transmission completes; prevents descriptor exhaustion log
+  // spam. Can not turn this on or we get the flickering ....
   // rmt_tx_wait_all_done(g_rmt_oe, portMAX_DELAY);
 }
 
@@ -349,7 +198,7 @@ static void rmt_send_oe_pulse(uint32_t duration_us) {
  * @brief Display a single bitplane with precise timing
  * This implements one phase of BCM: SPI data transfer -> latch -> timed OE
  * pulse
- * @param plane The bitplane to display (0-1 for 2-bit BCM)
+ * @param plane The bitplane to display
  */
 static void display_bitplane(uint8_t plane) {
   // Step 1: Transfer bitplane data to shift registers via high-speed SPI
@@ -373,12 +222,12 @@ static void display_bitplane(uint8_t plane) {
   // Step 3: Enable LED output for precise duration using RMT
   // Shorter duration for LSB plane (fine brightness), longer for MSB plane
   // (coarse brightness)
-  rmt_send_oe_pulse((plane_times_us[plane] * g_brightness_panel) / 255);
+  rmt_send_oe_pulse((plane_times_us[plane] * panel_core_brightness()) / 255);
 }
 
-/////////////////////////
-// DEBUG functions //
-/////////////////////////
+///////////////////////
+// DEBUG functions     //
+///////////////////////
 
 static void print_bitplane(uint8_t plane) {
   // print the newly prepared bitplane for debugging
@@ -403,14 +252,16 @@ static void print_bitplane(uint8_t plane) {
 static void print_framebuffer(void) {
   ESP_LOGI(TAG, "Current framebuffer state:");
 
+  const uint8_t *framebuffer = panel_core_framebuffer();
+
   for (int i = 0; i < PANEL_HEIGHT; i++) {
     // Build one formatted line per row
     // the 3 is for 3 digits (max 255) + space and a final null terminator
     char line[4 * PANEL_WIDTH + 1] = {0};
     int pos = 0;
     for (int j = 0; j < PANEL_WIDTH; j++) {
-      pos +=
-          snprintf(line + pos, sizeof(line) - pos, "%3d ", g_framebuffer[i][j]);
+      pos += snprintf(line + pos, sizeof(line) - pos, "%3d ",
+                      framebuffer[i * PANEL_WIDTH + j]);
     }
     // Ensure null-termination
     line[sizeof(line) - 1] = '\0'; // Safety null-termination
@@ -539,23 +390,4 @@ static esp_err_t init_spi_interface(void) {
   return ESP_OK;
 }
 
-/**
- * @brief Initialize ESP Timer for precise 500Hz refresh timing
- * Creates and configures timer that will call refresh callback directly
- * @return ESP_OK on success, error code on failure
- */
-static esp_err_t init_refresh_timer(void) {
-  ESP_LOGI(TAG, "Creating ESP timer for 500Hz refresh (%d µs period)",
-           FRAME_PERIOD_US);
-
-  // ESP Timer configuration for ISR callback execution
-  esp_timer_create_args_t timer_args = {
-      .callback = refresh_timer_callback,
-      .name = "panel_refresh",
-      .dispatch_method = ESP_TIMER_ISR, // Run in ISR context for low jitter
-  };
-
-  ESP_RETURN_ON_ERROR(esp_timer_create(&timer_args, &g_refresh_timer), TAG,
-                      "ESP Timer creation failed");
-  return ESP_OK;
-}
+#endif // CONFIG_OBG_PANEL_BACKEND_HW
