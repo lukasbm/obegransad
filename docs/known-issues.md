@@ -98,3 +98,11 @@ Current table: `nvs` 24 KiB, `phy_init` 4 KiB, `otadata` 8 KiB, `ota_0` and
   reset unless `--persist` (NVS only) is used.
 - Renderer keys are `s`/`d`/`l`; everything else goes through the HTTP API on
   port 8080.
+
+## Dependencies
+
+`dependencies.lock` is not tracked. The component manager keeps one lock file
+per project, but the Linux target resolves a different dependency set (no
+`78/esp-wifi-connect`, see the rules in `main/idf_component.yml`), so the file
+would flip-flop between chip and host builds. Versions are pinned in
+`main/idf_component.yml`; `managed_components/` is regenerated on demand.

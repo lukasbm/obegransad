@@ -2,6 +2,7 @@ build/
 build-host/
 build-sim/
 data/
+dependencies.lock
 managed_components/
 __pycache__/
 sdkconfig
