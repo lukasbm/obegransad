@@ -17,13 +17,16 @@ unchanged:
 ```sh
 tools/sim/run-qemu.sh              # renderer window + idf.py monitor
 tools/sim/run-qemu.sh --persist    # keep NVS/config across runs
+tools/sim/run-qemu.sh --persist-flash  # keep the whole flash (incl. OTA slots)
 tools/sim/run-qemu.sh --no-monitor # QEMU in the foreground, no monitor
 tools/sim/ota-test.sh              # push an image and verify the slot switch
 ```
 
 Options: `--sim-port N` (default 5566), `--http-port N` (default 8080,
-`0` disables), `--persist` (keep NVS), `--fresh` (regenerate
-`build-sim/sdkconfig` from the defaults files), `--no-renderer`, `--no-monitor`.
+`0` disables), `--persist` (keep NVS), `--persist-flash` (keep the whole flash
+image; delete `build-sim/qemu_flash_full.bin` to start fresh), `--fresh`
+(regenerate `build-sim/sdkconfig` from the defaults files), `--no-renderer`,
+`--no-monitor`.
 
 The script uses `build-sim/` and `build-sim/sdkconfig` and layers
 `sdkconfig.defaults[.local]` + `sdkconfig.defaults.sim`; the hardware build and

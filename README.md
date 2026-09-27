@@ -37,21 +37,22 @@ The device writes the inactive slot, validates the image, switches the boot
 partition and restarts. Until that point the running image keeps booting, so an
 interrupted upload is harmless. `GET /api/ota` reports the running slot.
 
-One-time migration for a device flashed with the old single-`factory` table:
+One-time migration (and every wired reflash) — use the wrapper, which also
+clears `otadata` so the freshly flashed image boots:
 
 ```sh
-idf.py build
-idf.py -p /dev/ttyACM0 flash
-python -m esptool --chip esp32c3 -p /dev/ttyACM0 erase-region 0x10000 0x2000
+tools/flash.sh --port /dev/ttyACM0
 ```
 
-The last command clears stale bytes in `otadata`; NVS (Wi-Fi credentials,
-config) is kept. Note that a later wired `idf.py flash` always writes `ota_0`,
-but if `otadata` points at `ota_1` the device keeps booting the OTA image —
-erase `otadata` again to boot the freshly flashed one.
+It runs `idf.py flash` (bootloader, partition table, app → `ota_0`) and then
+erases the `otadata` partition; NVS (Wi-Fi credentials, config) is kept.
+`--erase-nvs` additionally wipes NVS. Plain `idf.py flash` writes `ota_0` but
+leaves `otadata` alone, so a device that was last updated via OTA would keep
+booting `ota_1`.
 
-The full API is in [[docs/openapi.yaml]]; to test the whole flow in QEMU run
-`tools/sim/ota-test.sh`.
+For testing the flow in QEMU: `tools/sim/ota-test.sh` (push + slot check), and
+`tools/sim/run-qemu.sh --persist-flash` if the OTA'd slot should survive
+simulator restarts. The full API is in [[docs/openapi.yaml]].
 
 
 

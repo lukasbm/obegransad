@@ -10,9 +10,12 @@
 #
 # Usage: tools/sim/run-qemu.sh [options]
 #   --sim-port N     renderer TCP port (default 5566)
-#   --http-port N    host port forwarded to guest port 80 (default 8080,
+#   --http-port N    host port forwarded to guest port 8080 (default 8080,
 #                    0 disables the forward)
 #   --persist        keep NVS (Wi-Fi/config state) across runs
+#   --persist-flash  keep the whole flash image across runs (NVS, otadata and
+#                    both OTA slots; OTA updates survive a simulator restart).
+#                    Delete build-sim/qemu_flash_full.bin to start fresh.
 #   --fresh          regenerate build-sim/sdkconfig from the sdkconfig.defaults*
 #   --no-renderer    do not start the host renderer
 #   --no-monitor     run QEMU without idf.py monitor
@@ -25,13 +28,14 @@ BUILD_DIR="$PROJECT_DIR/build-sim"
 SIM_PORT=5566
 HTTP_PORT=8080
 PERSIST=0
+PERSIST_FLASH=0
 RENDERER=1
 MONITOR=1
 FRESH=0
 RENDERER_PYTHON="${RENDERER_PYTHON:-python3}"
 
 usage() {
-  sed -n '3,19p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '3,22p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
   exit "${1:-0}"
 }
 
@@ -40,6 +44,7 @@ while [ $# -gt 0 ]; do
     --sim-port) SIM_PORT="${2:?missing value}"; shift ;;
     --http-port) HTTP_PORT="${2:?missing value}"; shift ;;
     --persist) PERSIST=1 ;;
+    --persist-flash) PERSIST_FLASH=1 ;;
     --fresh) FRESH=1 ;;
     --no-renderer) RENDERER=0 ;;
     --no-monitor) MONITOR=0 ;;
@@ -122,10 +127,13 @@ if [ "$HTTP_PORT" != "0" ]; then
 fi
 QEMU_ARGS=(--qemu-extra-args="-nic $NIC")
 
-# --- optional persistent NVS -------------------------------------------------
-# idf.py regenerates qemu_flash.bin on every run, which would wipe NVS. With
-# --persist we merge a fresh image (new code) but copy the NVS partition over
-# from the previous run; the NVS offset/size come from partitions.csv.
+# --- optional persistent flash ----------------------------------------------
+# idf.py regenerates qemu_flash.bin on every run, which would wipe NVS and the
+# OTA slots. Two persistence modes:
+#   --persist        merge a fresh image (new code) but copy the NVS partition
+#                    over from the previous run.
+#   --persist-flash  reuse the *whole* previous flash image (code, NVS,
+#                    otadata, both OTA slots) without regenerating it.
 NVS_OFFSET=0x9000
 NVS_SIZE=0x6000
 merge_flash() {
@@ -134,16 +142,31 @@ merge_flash() {
       --output="$out" --pad-to-size=4MB @flash_args )
 }
 
+if [ "$PERSIST" = 1 ] && [ "$PERSIST_FLASH" = 1 ]; then
+  echo "error: --persist and --persist-flash are mutually exclusive" >&2
+  exit 1
+fi
+
 if [ "$PERSIST" = 1 ]; then
   run_idf "${CMAKE_ARGS[@]}" build
   merge_flash "$BUILD_DIR/qemu_flash_new.bin"
-  if [ -f "$BUILD_DIR/qemu_flash_persist.bin" ]; then
-    dd if="$BUILD_DIR/qemu_flash_persist.bin" of="$BUILD_DIR/qemu_flash_new.bin" \
+  if [ -f "$BUILD_DIR/qemu_flash_nvs.bin" ]; then
+    dd if="$BUILD_DIR/qemu_flash_nvs.bin" of="$BUILD_DIR/qemu_flash_new.bin" \
        bs=1 skip=$((NVS_OFFSET)) seek=$((NVS_OFFSET)) count=$((NVS_SIZE)) \
        conv=notrunc status=none
   fi
-  mv "$BUILD_DIR/qemu_flash_new.bin" "$BUILD_DIR/qemu_flash_persist.bin"
-  QEMU_ARGS+=(--flash-file "$BUILD_DIR/qemu_flash_persist.bin")
+  mv "$BUILD_DIR/qemu_flash_new.bin" "$BUILD_DIR/qemu_flash_nvs.bin"
+  QEMU_ARGS+=(--flash-file "$BUILD_DIR/qemu_flash_nvs.bin")
+fi
+
+if [ "$PERSIST_FLASH" = 1 ]; then
+  # Only generate the image when it does not exist: an existing image may
+  # contain an OTA-updated slot and otadata, which must not be overwritten.
+  if [ ! -f "$BUILD_DIR/qemu_flash_full.bin" ]; then
+    run_idf "${CMAKE_ARGS[@]}" build
+    merge_flash "$BUILD_DIR/qemu_flash_full.bin"
+  fi
+  QEMU_ARGS+=(--flash-file "$BUILD_DIR/qemu_flash_full.bin")
 fi
 
 # --- preflight: stale instances and busy ports --------------------------------
@@ -151,7 +174,14 @@ fi
 # "Timed out waiting for port 5555 to be open" (QEMU exits because the host
 # forward or monitor port is taken) or with an "Address already in use" bind
 # error. QEMU/renderer processes started from this project are safe to stop.
-stale="$(pgrep -f "[b]uild-sim/qemu_flash" || true)"
+# Only QEMU processes whose own command line references this project's flash
+# image: matching shells/editors that merely mention the path cannot be hit.
+stale=""
+for pid in $(pgrep -x qemu-system-ris 2>/dev/null || true); do
+  if tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -q 'build-sim/qemu_flash'; then
+    stale="$stale $pid"
+  fi
+done
 if [ -n "$stale" ]; then
   echo "warning: stopping stale simulator QEMU process(es): $stale" >&2
   # shellcheck disable=SC2086

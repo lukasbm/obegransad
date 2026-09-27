@@ -67,17 +67,35 @@ serial/monitor setup (`mon:stdio`, file, TCP — all reproduce it), not
 unrelated to the old captive portal conflict (that was two servers inside the
 guest).
 
-**Root cause**: not pinned down. The Espressif QEMU build has no slirp
-tracepoints compiled in, and the lwIP debug options did not produce per-packet
-logs, so the guest-side handshake could not be observed. It looks like a
-slirp-side race around the guest connection (plausibly ARP/route resolution for
-the forwarded connection).
+**What was tried (all flaky, no fix found)**
 
-**Workarounds**: retry the run (`tools/sim/ota-test.sh` does this
-automatically). The renderer and button input use an outbound connection and
-are unaffected. To fix it properly: build QEMU from source with slirp debug,
-try another QEMU version, or switch to tap networking (needs root; the guest
-gets a real LAN address and hostfwd is bypassed).
+- `-nic` vs `-netdev`/`-device` style: `-netdev ... -device open_eth` never
+  worked at all (0/5); `-nic user,model=open_eth` is the only usable form.
+- Serial/monitor setup: `mon:stdio`, `-serial file:...`, TCP serial — all
+  reproduce it.
+- `-accel tcg,thread=single`, `ipv6=off`, explicit guest IP in `hostfwd`,
+  CPU warm-up before the run, `--persist-flash` vs plain runs: all stayed
+  flaky (0/5–4/5 depending on the batch).
+- Host libslirp: this QEMU build links the *system* `libslirp.so.0`
+  (4.9.1 on Fedora 44). An interleaved A/B against Fedora 42's 4.8.0 gave
+  4/6 vs 2/6 — suggestive but not conclusive with this much variance.
+
+**Root cause**: not pinned down. The Espressif QEMU build has no slirp
+tracepoints compiled in, so slirp internals cannot be observed without
+rebuilding QEMU. The failure is per QEMU process: a run either works for all
+connections or none.
+
+**Fixes / workarounds**
+
+- Retry the run (`tools/sim/ota-test.sh` does this automatically).
+- Pull-based OTA (device downloads from a URL) instead of push: guest→host
+  traffic is reliable, so it sidesteps the flake entirely — and it is useful on
+  hardware anyway (release URLs). Not implemented yet (phase 2 in
+  ota_plan.md).
+- Tap networking: the guest gets a real LAN address, `hostfwd` is bypassed
+  entirely. Needs root; the deterministic option.
+- Build QEMU from source with a bundled/debug slirp if this ever becomes a
+  real blocker.
 
 ## OTA
 
@@ -93,8 +111,10 @@ interrupted upload or power loss is harmless.
 
 In QEMU the flash file persists across the guest's `esp_restart()`, so a full
 cycle works within one run. `idf.py qemu` regenerates the flash image on the
-next run, which is why an OTA'd slot does not survive a restart of the
-simulator (`--persist` only restores the NVS region).
+next run, which is why an OTA'd slot does not normally survive a simulator
+restart — use `tools/sim/run-qemu.sh --persist-flash` to keep the whole image
+(code, NVS, `otadata`, both slots). Delete `build-sim/qemu_flash_full.bin` to
+start fresh.
 
 - **No authentication**: `POST /api/ota` is remote code execution for anyone on
   the LAN. It is refused unless the station is connected (403), but there is no
@@ -108,15 +128,13 @@ simulator (`--persist` only restores the NVS region).
   health delay would be stricter.
 - **No progress in `GET /api/ota` during an upload**: `esp_http_server` is
   single-task, so the status endpoint cannot be served while receiving.
-- **Host build returns 501** (no flash/partitions). QEMU works within one run,
-  but `--persist` preserves only the NVS region, so an OTA'd slot does not
-  survive a restart of `idf.py qemu`. Cross-run OTA testing would need a
-  "keep the whole flash image" option.
-- **Partition migration is one-time and wired** (see README): flash the new
-  table, then `erase-region 0x10000 0x2000` to clear stale `otadata`. A later
-  wired `idf.py flash` always writes `ota_0`, but if `otadata` still points at
-  `ota_1` the device keeps booting the OTA image; erase `otadata` again to boot
-  the freshly flashed one.
+- **Host build returns 501** (no flash/partitions). In QEMU, `--persist`
+  preserves only the NVS region; use `--persist-flash` to keep the whole image
+  including `otadata` and both slots, so OTA updates survive simulator
+  restarts (verified by booting a patched `otadata` twice).
+- **Wired reflash**: use `tools/flash.sh --port PORT`; it flashes and then
+  erases `otadata` so the freshly flashed `ota_0` boots (plain `idf.py flash`
+  does not touch `otadata`). NVS is kept unless `--erase-nvs` is given.
 
 ## Partition layout
 
@@ -125,7 +143,7 @@ Current table: `nvs` 24 KiB, `phy_init` 4 KiB, `otadata` 8 KiB, `ota_0` and
 
 - **No `factory` partition**: with blank `otadata` the bootloader boots `ota_0`
   ("No factory image, trying OTA 0"). Works, but `idf.py flash` always targets
-  `ota_0`.
+  `ota_0` and leaves `otadata` alone — use `tools/flash.sh` (see README).
 - **Headroom**: the hardware image is ~1.22 MiB, so each slot has ~37 % free.
   Large additions (a second TLS stack, Matter, big assets) can exceed the slot;
   watch the build's "Smallest app partition" line.
