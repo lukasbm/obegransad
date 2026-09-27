@@ -12,6 +12,8 @@
 #   --http-port N   host port forwarded to the guest (default 8080)
 #   --attempts N    whole-run retries (default 3)
 #   --image PATH    image to upload (default build-sim/obegransad.bin)
+#   --token T       OTA token (default: $OBG_OTA_TOKEN, then
+#                   CONFIG_OBG_OTA_TOKEN from sdkconfig.defaults.local/sdkconfig)
 #   -h, --help
 #
 set -euo pipefail
@@ -20,9 +22,10 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 HTTP_PORT=8080
 ATTEMPTS=3
 IMAGE="$PROJECT_DIR/build-sim/obegransad.bin"
+TOKEN="${OBG_OTA_TOKEN:-}"
 
 usage() {
-  sed -n '3,16p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '3,18p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
   exit "${1:-0}"
 }
 
@@ -31,6 +34,7 @@ while [ $# -gt 0 ]; do
     --http-port) HTTP_PORT="${2:?missing value}"; shift ;;
     --attempts) ATTEMPTS="${2:?missing value}"; shift ;;
     --image) IMAGE="${2:?missing value}"; shift ;;
+    --token) TOKEN="${2:?missing value}"; shift ;;
     -h|--help) usage 0 ;;
     *) echo "error: unknown option '$1'" >&2; usage 1 ;;
   esac
@@ -38,6 +42,18 @@ while [ $# -gt 0 ]; do
 done
 
 [ -f "$IMAGE" ] || { echo "error: image '$IMAGE' not found; run tools/sim/run-qemu.sh once" >&2; exit 1; }
+
+# The device requires X-OTA-Token (empty token disables OTA entirely).
+if [ -z "$TOKEN" ]; then
+  TOKEN="$(sed -n 's/^CONFIG_OBG_OTA_TOKEN="\(.*\)"$/\1/p' \
+      "$PROJECT_DIR/sdkconfig.defaults.local" "$PROJECT_DIR/sdkconfig" \
+      2>/dev/null | tail -1)"
+fi
+if [ -z "$TOKEN" ]; then
+  echo "error: no OTA token found. Set CONFIG_OBG_OTA_TOKEN in" >&2
+  echo "       sdkconfig.defaults.local, export OBG_OTA_TOKEN, or pass --token." >&2
+  exit 1
+fi
 
 API="http://127.0.0.1:${HTTP_PORT}/api/ota"
 
@@ -87,6 +103,7 @@ for attempt in $(seq 1 "$ATTEMPTS"); do
   echo "  running $before, uploading $(basename "$IMAGE") ($(stat -c%s "$IMAGE") bytes)"
   response="$(curl -s --max-time 90 -w '\n%{http_code}' \
       -X POST -H 'Content-Type: application/octet-stream' -H 'Expect:' \
+      -H "X-OTA-Token: ${TOKEN}" \
       --data-binary "@$IMAGE" "$API")"
   code="$(printf '%s' "$response" | tail -1)"
   body="$(printf '%s' "$response" | head -1)"
