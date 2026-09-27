@@ -1,0 +1,77 @@
+# Sprite manifest -- the single source of truth for generate.py.
+#
+# One [[sprite]] per sprite. Adding art means adding an entry here and running
+# ./convert_all.sh; the .bwb blob, the C++ wrapper header and the CMake embed
+# list are all generated from this.
+#
+#   name        output stem: data/<name>.bwb, main/sprites/<name>.hpp
+#   source      the LibreSprite file in this directory
+#   kind        single | atlas | font | animation  (picks the base class)
+#   type        name of the generated C++ wrapper struct
+#   instance    optional name of a generated inline const global
+#   cell        optional [w, h] cell size; needed for font sheets, where the
+#               .ase canvas is the whole strip. Defaults to the .ase frame size.
+#   ascii_start first character of a font sheet (kind = "font")
+
+[[sprite]]
+name = "cloud"
+source = "Cloud.ase"
+kind = "single"
+type = "CloudSprite"
+instance = "cloud_sprite"
+
+[[sprite]]
+name = "wifi"
+source = "WiFi.ase"
+kind = "single"
+type = "WifiSprite"
+instance = "wifi_sprite"
+
+[[sprite]]
+name = "moon_small"
+source = "MoonSmall.ase"
+kind = "atlas"
+type = "MoonAtlas"
+instance = "moon_atlas"
+
+[[sprite]]
+name = "bold_glyphs"
+source = "BoldGlyphs6x7.ase"
+kind = "font"
+type = "FontBold"
+instance = "font_bold"
+ascii_start = 32
+cell = [6, 7]
+
+[[sprite]]
+name = "thin_glyphs"
+source = "ThinGlyphs4x6.ase"
+kind = "font"
+type = "ThinFont"
+instance = "font_thin"
+ascii_start = 32
+cell = [4, 6]
+
+[[sprite]]
+name = "sun"
+source = "Sun.ase"
+kind = "animation"
+type = "SunAnimation"
+
+[[sprite]]
+name = "rain"
+source = "Rain.ase"
+kind = "animation"
+type = "RainAnimation"
+
+[[sprite]]
+name = "heart"
+source = "Heart.ase"
+kind = "animation"
+type = "HeartAnimation"
+
+[[sprite]]
+name = "firework"
+source = "Firework.ase"
+kind = "animation"
+type = "FireworkAnimation"

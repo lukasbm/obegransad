@@ -14,12 +14,17 @@ else()
     list(APPEND reqs esp-wifi-connect esp_eth esp_netif lwip esp_driver_gpio)
 endif()
 
+# Sprite blobs and their C++ wrappers are generated from
+# assets/sprites/sprites.toml by assets/sprites/convert_all.sh; the generated
+# file below lists the EMBED_FILES.
+include("${CMAKE_CURRENT_LIST_DIR}/sprites/sprites.cmake")
+
 idf_component_register(
     SRCS ${srcs}
     INCLUDE_DIRS "."
     REQUIRES ${reqs}
     PRIV_REQUIRES esp-tls mbedtls nvs_flash
-    EMBED_FILES "../data/bold_glyphs.bwb" "../data/cloud.bwb" "../data/firework.bwb" "../data/heart.bwb" "../data/moon_small.bwb" "../data/rain.bwb" "../data/sun.bwb" "../data/thin_glyphs.bwb" "../data/wifi.bwb"
+    EMBED_FILES ${OBG_SPRITE_EMBED_FILES}
 )
 
 # Set C++17 for modern features used in weather display
