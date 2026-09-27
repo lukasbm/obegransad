@@ -18,6 +18,7 @@ unchanged:
 tools/sim/run-qemu.sh              # renderer window + idf.py monitor
 tools/sim/run-qemu.sh --persist    # keep NVS/config across runs
 tools/sim/run-qemu.sh --no-monitor # QEMU in the foreground, no monitor
+tools/sim/ota-test.sh              # push an image and verify the slot switch
 ```
 
 Options: `--sim-port N` (default 5566), `--http-port N` (default 8080,
@@ -85,8 +86,17 @@ weather/HTTPS/NTP and any future HTTP/MQTT server work unchanged. The host
 build (`main/device_host.cpp`) announces the same event using the host stack.
 
 * Outbound (weather, NTP, Home Assistant REST/MQTT): works in both.
-* Inbound under QEMU: `http://127.0.0.1:8080/` is forwarded to guest port 80
-  (`--http-port`). On the host build the server binds host ports directly.
+* Inbound under QEMU: `http://127.0.0.1:8080/` is forwarded to guest port 8080
+  (`--http-port`). On the host build the server binds host port 8080 directly.
+* OTA: `POST /api/ota` with a raw `obegransad.bin` writes the inactive slot and
+  restarts. `tools/sim/ota-test.sh` does this end-to-end under QEMU (boot,
+  upload, verify the slot switch). Within one QEMU run the emulated flash and
+  `esp_restart()` are real; the next `idf.py qemu` regenerates the flash image.
+
+**Known QEMU quirk:** user-mode host forwarding is occasionally unable to
+deliver *inbound* connections (the host socket connects, slirp never forwards
+the request). Outbound works, and a run that starts working stays working.
+Retry the run if `curl` hangs; `ota-test.sh` does that automatically.
 
 Wi-Fi credentials from `sdkconfig.defaults.local` are compiled in but ignored.
 To exercise the `SETUP` state, enable `CONFIG_OBG_SIM_FAKE_NO_CREDS`; the

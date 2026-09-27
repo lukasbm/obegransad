@@ -14,6 +14,7 @@
 #include "device.h" // wifi_check()
 #include "helper.hpp" // millis()
 #include "ikea-obegransad-panel.h"
+#include "ota.h"
 #include "presets.hpp"
 #include "scene_switcher.h"
 #include "sdkconfig.h"
@@ -364,6 +365,11 @@ static esp_err_t events_handler(httpd_req_t *req) {
 esp_err_t config_server_start(void) {
   httpd_config_t config = HTTPD_DEFAULT_CONFIG();
   config.server_port = CONFIG_OBG_HTTP_PORT;
+  // The captive portal (78/esp-wifi-connect) runs its own esp_http_server on
+  // port 80 with the default control port 32768; a second server using the
+  // same control port fails to bind. Keep both ports distinct so the config
+  // server and the portal can coexist (see ota_plan.md section 11).
+  config.ctrl_port = ESP_HTTPD_DEF_CTRL_PORT + 1;
   config.max_uri_handlers = 12;
   config.lru_purge_enable = true;
   config.stack_size = 6144;
@@ -387,6 +393,8 @@ esp_err_t config_server_start(void) {
       {"/api/config", HTTP_POST, config_post_handler},
       {"/api/control", HTTP_POST, control_handler},
       {"/api/events", HTTP_GET, events_handler},
+      {"/api/ota", HTTP_GET, ota_handle_get},
+      {"/api/ota", HTTP_POST, ota_handle_post},
   };
   for (const auto &entry : entries) {
     httpd_uri_t uri = {};

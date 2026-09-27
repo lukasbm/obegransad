@@ -108,11 +108,17 @@ fi
 
 # --- QEMU networking ---------------------------------------------------------
 # Emulated OpenCores Ethernet with slirp user-mode networking (DHCP + NAT).
-# hostfwd makes an app HTTP server on guest port 80 reachable as
-# http://127.0.0.1:$HTTP_PORT/ from the host.
+# hostfwd makes the config server reachable as http://127.0.0.1:$HTTP_PORT/.
+# The guest port is read from the build's sdkconfig: an existing sdkconfig wins
+# over the Kconfig default (IDF does not re-apply defaults to an existing file).
+GUEST_HTTP_PORT=8080
+if [ -f "$BUILD_DIR/sdkconfig" ]; then
+  _guest_port="$(sed -n 's/^CONFIG_OBG_HTTP_PORT=//p' "$BUILD_DIR/sdkconfig" | tail -1)"
+  [ -n "$_guest_port" ] && GUEST_HTTP_PORT="$_guest_port"
+fi
 NIC="user,model=open_eth,id=lo0"
 if [ "$HTTP_PORT" != "0" ]; then
-  NIC="$NIC,hostfwd=tcp:127.0.0.1:${HTTP_PORT}-:80"
+  NIC="$NIC,hostfwd=tcp:127.0.0.1:${HTTP_PORT}-:${GUEST_HTTP_PORT}"
 fi
 QEMU_ARGS=(--qemu-extra-args="-nic $NIC")
 

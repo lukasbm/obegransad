@@ -10,14 +10,17 @@ info:
     (homeassistant/custom_components/obegransad) is a client of this API, and
     the simulator renderer uses the same control actions over its own channel.
 
-    - Device / QEMU: `http://<device-ip>/` (QEMU forwards host `:8080` to guest
-      port 80, see tools/sim/run-qemu.sh)
-    - Native host build: `http://127.0.0.1:8080/` (port set by
-      `CONFIG_OBG_HTTP_PORT`)
+    - Device / QEMU: `http://<device-ip>:8080/` (QEMU forwards host `:8080`
+      to guest port 8080, see tools/sim/run-qemu.sh)
+    - Native host build: `http://127.0.0.1:8080/`
+    - Port set by `CONFIG_OBG_HTTP_PORT`; the captive portal keeps port 80 so
+      the two servers can coexist.
 
     There is no authentication: the API is meant for the local network only.
     Control actions are queued and executed on the main task, so responses are
-    `202 Accepted` rather than the resulting state.
+    `202 Accepted` rather than the resulting state. `POST /api/ota` is remote
+    code execution for anyone who can reach the port — never expose it to the
+    internet, and see ota_plan.md section 6.3 for hardening options.
 servers:
   - url: http://{host}:{port}
     description: Device or simulator
@@ -25,13 +28,14 @@ servers:
       host:
         default: obegransad.local
       port:
-        default: "80"
+        default: "8080"
 tags:
   - name: state
   - name: config
   - name: control
   - name: events
   - name: info
+  - name: ota
 
 paths:
   /:
@@ -161,6 +165,63 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Events"
+
+  /api/ota:
+    get:
+      tags: [ota]
+      summary: OTA readiness and running slot
+      responses:
+        "200":
+          description: OTA state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OtaStatus"
+    post:
+      tags: [ota]
+      summary: Upload and apply a firmware image (push OTA)
+      description: |
+        Body is the raw app image (`application/octet-stream`), e.g.
+        `build/obegransad.bin` produced by this repository. The device writes
+        the inactive slot, verifies the image, switches the boot partition and
+        restarts. Until validation and the boot-partition switch succeed, the
+        running image keeps booting, so an interrupted upload is harmless.
+
+        Only accepted while the device is connected as a station (not from the
+        captive portal AP). No authentication: LAN only, see ota_plan.md.
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "202":
+          description: Image accepted; restart imminent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean, example: true}
+                  version: {type: string, example: "1.0.1"}
+                  slot: {type: string, example: ota_1}
+                  restarting: {type: boolean, example: true}
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          description: Not connected as a station (captive portal mode)
+        "409":
+          description: Upload in progress, or running image not confirmed
+        "411":
+          description: Content-Length missing
+        "413":
+          description: Image larger than the target partition
+        "500":
+          description: Flash or OTA setup error
+        "501":
+          description: Build has no OTA partitions (host build)
 
 components:
   responses:
@@ -384,3 +445,30 @@ components:
               uptime_ms:
                 type: integer
                 format: int64
+
+    OtaStatus:
+      type: object
+      properties:
+        state:
+          type: string
+          enum: [idle, receiving, ready, error]
+        supported:
+          type: boolean
+          description: False on the native host build (no partitions/flash)
+        running:
+          nullable: true
+          type: object
+          properties:
+            label: {type: string, example: ota_0}
+            offset: {type: integer, format: int64, example: 131072}
+            version: {type: string, example: "1.0.0"}
+        next:
+          nullable: true
+          type: object
+          properties:
+            label: {type: string, example: ota_1}
+            offset: {type: integer, format: int64, example: 2162688}
+        received: {type: integer, example: 0}
+        total: {type: integer, example: 0}
+        last_error: {type: string, nullable: true}
+        restart_pending: {type: boolean}

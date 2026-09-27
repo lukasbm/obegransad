@@ -119,12 +119,11 @@ config OBG_SIM_FAKE_NO_CREDS
 config OBG_HTTP_PORT
     int "HTTP config server port"
     range 1 65535
-    default 8080 if IDF_TARGET_LINUX
-    default 80
+    default 8080
     help
-        Port the built-in config server (docs/openapi.yaml) listens on. The
-        device and QEMU use 80 (run-qemu.sh forwards host 8080 to guest 80);
-        the native host build defaults to 8080 because binding port 80 needs
-        privileges.
+        Port the built-in config server (docs/openapi.yaml) listens on. It uses
+        8080 on every target so the device, QEMU and native host builds behave
+        the same. The captive portal keeps port 80 for Wi-Fi provisioning; the
+        two servers must not share a port (see ota_plan.md section 11).
 
 endmenu

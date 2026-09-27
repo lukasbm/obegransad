@@ -40,6 +40,15 @@ static const char CONFIG_PAGE_HTML[] = R"HTML(<!doctype html>
   <button type="submit">Save</button>
  </form>
 </section>
+<section>
+ <h2>Firmware update</h2>
+ <p>Upload a <code>build/obegransad.bin</code> produced by this repository.
+    The device writes the inactive slot, verifies the image and restarts.</p>
+ <input type="file" id="fw" accept=".bin,application/octet-stream">
+ <button onclick="uploadFw()">Upload and restart</button>
+ <progress id="fwprogress" value="0" max="100" style="width:100%"></progress>
+ <div id="fwstatus"></div>
+</section>
 <script>
 const $ = s => document.querySelector(s);
 async function control(body){
@@ -58,6 +67,17 @@ async function refresh(){
     const c = await (await fetch('/api/config')).json();
     for(const [k,v] of Object.entries(c)) if($(`[name=${k}]`)) $(`[name=${k}]`).value = v;
   }
+}
+function uploadFw(){
+  const f = $('#fw').files[0];
+  if(!f) return;
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST','/api/ota');
+  xhr.setRequestHeader('Content-Type','application/octet-stream');
+  xhr.upload.onprogress = e => { if(e.lengthComputable) $('#fwprogress').value = 100*e.loaded/e.total; };
+  xhr.onload = () => { $('#fwstatus').textContent = xhr.status + ' ' + xhr.responseText; };
+  xhr.onerror = () => { $('#fwstatus').textContent = 'upload failed'; };
+  xhr.send(f);
 }
 $('#config').addEventListener('submit', async e=>{
   e.preventDefault();

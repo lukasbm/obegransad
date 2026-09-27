@@ -9,6 +9,7 @@
 #include "config_server.h"
 #include "config_store.h"
 #include "device.h"
+#include "ota.h"
 #include "ikea-obegransad-panel.h"
 #include "scene_registry.hpp"
 #include "status_led.hpp"
@@ -77,6 +78,7 @@ extern "C" void app_main() {
   ESP_ERROR_CHECK(config_store_init());
   config_store_apply();
   ESP_ERROR_CHECK(app_control_init());
+  ESP_ERROR_CHECK(ota_init());
 
   // Register scenes (single place — see scene_registry.hpp)
   register_all_scenes();
@@ -93,6 +95,7 @@ extern "C" void app_main() {
 
   while (true) {
     app_control_process();
+    ota_process();
     wifi_supervisor_tick();
     StateMachine::instance().update();
     vTaskDelay(pdMS_TO_TICKS(100));

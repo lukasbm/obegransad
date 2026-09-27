@@ -21,6 +21,36 @@ tools/sim/run-host.sh    # native Linux build (fast iteration, gdb)
 See [[tools/sim/README.md]] for options, the renderer, networking and
 limitations. The host build needs the `libbsd` development headers.
 
+### OTA updates
+
+The device has two OTA slots (`partitions.csv`: `otadata` + `ota_0` + `ota_1`,
+1984 KiB each) and accepts a push update on the config server:
+
+```sh
+curl -X POST -H 'Content-Type: application/octet-stream' -H 'Expect:' \
+     --data-binary @build/obegransad.bin http://<device-ip>:8080/api/ota
+```
+
+The device writes the inactive slot, validates the image, switches the boot
+partition and restarts. Until that point the running image keeps booting, so an
+interrupted upload is harmless. `GET /api/ota` reports the running slot.
+
+One-time migration for a device flashed with the old single-`factory` table:
+
+```sh
+idf.py build
+idf.py -p /dev/ttyACM0 flash
+python -m esptool --chip esp32c3 -p /dev/ttyACM0 erase-region 0x10000 0x2000
+```
+
+The last command clears stale bytes in `otadata`; NVS (Wi-Fi credentials,
+config) is kept. Note that a later wired `idf.py flash` always writes `ota_0`,
+but if `otadata` points at `ota_1` the device keeps booting the OTA image —
+erase `otadata` again to boot the freshly flashed one.
+
+The full API is in [[docs/openapi.yaml]]; to test the whole flow in QEMU run
+`tools/sim/ota-test.sh`.
+
 
 
 ## TIPS

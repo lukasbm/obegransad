@@ -26,3 +26,7 @@ CONFIG_ESPTOOLPY_FLASHSIZE="4MB"
 # Custom partition table
 CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+
+# Allow the bootloader to roll back an OTA image that never confirms itself.
+# ota_init() confirms the running image early (see main/ota.cpp).
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
