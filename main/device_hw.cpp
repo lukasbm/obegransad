@@ -45,7 +45,10 @@ static uint32_t nudge_backoff_ms = 0;
 static int last_disconnect_reason = 0;
 
 static constexpr uint32_t DOWN_GRACE_MS = CONFIG_OBG_WIFI_DOWN_GRACE_MS;
-static constexpr uint32_t NUDGE_FIRST_MS = 30 * 1000;
+// First reconnect attempt after a disconnect, then doubling up to NUDGE_MAX_MS.
+// (The removed esp-wifi-connect component used to do the quick retries; the
+// supervisor owns them now.)
+static constexpr uint32_t NUDGE_FIRST_MS = 2 * 1000;
 static constexpr uint32_t NUDGE_MAX_MS = 300 * 1000;
 
 static inline uint32_t now_ms() {
