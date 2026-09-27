@@ -4,48 +4,97 @@ Living list of caveats around the simulator, OTA and the partition layout.
 See also `tools/sim/README.md` (simulator usage), `docs/openapi.yaml` (API)
 and `ota_plan.md` (the original OTA design document).
 
-## Captive portal removed
+## Captive portal and SETUP state removed
 
-The provisioning AP/web UI from `78/esp-wifi-connect`
-(`WifiConfigurationAp`) was removed. It ran a second `esp_http_server` on port
-80 with control port 32768, which clashed with the config server:
+The provisioning AP/web UI from `78/esp-wifi-connect` (`WifiConfigurationAp`)
+and the `SETUP` state were removed. The portal ran a second `esp_http_server`
+on port 80 with control port 32768, which clashed with the config server:
 
 - the UDP control socket is bound without `SO_REUSEADDR`, so the second
   `httpd_start()` fails (`ESP_FAIL`) and the `ESP_ERROR_CHECK` aborts, and
-- both servers on TCP port 80 make one of the two UIs silently unreachable
-  (`SO_REUSEADDR` lets both binds succeed).
+- both servers on TCP port 80 make one of the two UIs silently unreachable.
 
-The config server is now the only HTTP server (port 8080, control port 32769).
+The config server is now the device's only HTTP server (port 8080, control port
+32769), and the whole `78/esp-wifi-connect` dependency is gone: credentials are
+read from Kconfig and kept in RAM by the small station driver in
+`main/device_hw.cpp`.
 
 **Consequences**
 
 - Wi-Fi credentials come from Kconfig (`CONFIG_OBG_WIFI_SSID`/`_PASSWORD`,
-  normally in the gitignored `sdkconfig.defaults.local`) or from NVS seeded
-  earlier. There is no in-field provisioning path right now.
-- After a factory reset (long press clears credentials and restarts) the device
-  boots into `SETUP` and stays offline until it is reflashed with credentials.
-  This is the main open UX gap of the removal.
-- `78/esp-wifi-connect` is still a dependency (for `SsidManager` and
-  `WifiStation`), so its unused portal assets still take flash space.
+  normally in the gitignored `sdkconfig.defaults.local`). There is no in-field
+  provisioning path right now.
+- With no credentials the device logs an error and stays in `DEGRADED`
+  (offline scenes) instead of entering a provisioning mode.
+- The long-press button action (factory reset) is a **no-op**: it was the only
+  path that cleared credentials, and without a provisioning mode it would have
+  left the device offline until reflashed. The button still emits
+  `APP_EVT_BUTTON_LONG` (visible via `/api/events`), nothing acts on it.
 
 **Possible follow-ups**: expose Wi-Fi settings on the config server (only
-reachable while connected), add BLE/AP provisioning later, or make the long
-press not clear credentials.
+reachable while connected) or add BLE/AP provisioning later.
 
 ## QEMU user-mode networking: flaky inbound host forwarding
 
-Host→guest connections through `-nic user,...,hostfwd=...` fail in roughly
-30–40 % of QEMU runs: QEMU accepts the host connection, the request stays
-unread in its socket queue, and slirp never forwards it to the guest. Outbound
-traffic (guest→internet, guest→host renderer) keeps working, and a run that
-starts working stays working. Reproduced with the Espressif QEMU 9.2.2 fork on
-Fedora 44; independent of the serial/monitor setup and of `-nic`/`-netdev`
-style.
+Host→guest connections through `-nic user,...,hostfwd=...` fail in a random
+fraction of QEMU runs (observed anywhere from 0/3 to 4/4 in batches): QEMU
+accepts the host connection, the request stays unread in its socket queue, and
+slirp never forwards it to the guest. Outbound traffic (guest→internet,
+guest→host renderer) keeps working, and a run that starts working stays
+working.
 
-**Workarounds**: retry the whole run (`tools/sim/ota-test.sh` does this); the
-renderer and button input use an outbound connection and are unaffected.
+**What happens, step by step**
+
+1. `hostfwd` makes QEMU's user-mode network (slirp) listen on the host port and
+   accept a connection there. That part always works — the host sees
+   `ESTABLISHED` against the QEMU process.
+2. Slirp is then supposed to open a matching TCP connection *inside* the
+   virtual network, i.e. send a SYN to the guest IP (`10.0.2.15:8080`).
+3. In failing runs that SYN never reaches the guest (or its reply never comes
+   back), so the connection stalls. The request bytes are visible as unread
+   data in QEMU's receive queue:
+
+   ```
+   ESTAB 85 0 127.0.0.1:8080 127.0.0.1:49960 users:(("qemu-system-ris",fd=10))
+   ```
+
+4. Retrying the whole QEMU process fixes it; retrying the *connection* inside
+   the same run does not, so the failure is per-run state, not per-connection.
+
+**What it is not**: not the guest HTTP server (only one runs now), not the
+serial/monitor setup (`mon:stdio`, file, TCP — all reproduce it), not
+`-nic`/`-netdev` style or port numbers, and not host CPU load. It is also
+unrelated to the old captive portal conflict (that was two servers inside the
+guest).
+
+**Root cause**: not pinned down. The Espressif QEMU build has no slirp
+tracepoints compiled in, and the lwIP debug options did not produce per-packet
+logs, so the guest-side handshake could not be observed. It looks like a
+slirp-side race around the guest connection (plausibly ARP/route resolution for
+the forwarded connection).
+
+**Workarounds**: retry the run (`tools/sim/ota-test.sh` does this
+automatically). The renderer and button input use an outbound connection and
+are unaffected. To fix it properly: build QEMU from source with slirp debug,
+try another QEMU version, or switch to tap networking (needs root; the guest
+gets a real LAN address and hostfwd is bypassed).
 
 ## OTA
+
+**How it works (one breath)**: the device has two app slots; `otadata` tells
+the bootloader which one to run. `POST /api/ota` writes the uploaded image into
+the *inactive* slot in 4 KiB chunks while the current image keeps running,
+`esp_ota_end()` verifies the image structure, and
+`esp_ota_set_boot_partition()` writes `otadata` to point at the new slot; the
+device then restarts into it. With rollback enabled the new image starts as
+`PENDING_VERIFY` and `ota_init()` confirms it early, so a reset before
+confirmation rolls back. Because `otadata` is only touched at the very end, an
+interrupted upload or power loss is harmless.
+
+In QEMU the flash file persists across the guest's `esp_restart()`, so a full
+cycle works within one run. `idf.py qemu` regenerates the flash image on the
+next run, which is why an OTA'd slot does not survive a restart of the
+simulator (`--persist` only restores the NVS region).
 
 - **No authentication**: `POST /api/ota` is remote code execution for anyone on
   the LAN. It is refused unless the station is connected (403), but there is no
@@ -102,7 +151,7 @@ Current table: `nvs` 24 KiB, `phy_init` 4 KiB, `otadata` 8 KiB, `ota_0` and
 ## Dependencies
 
 `dependencies.lock` is not tracked. The component manager keeps one lock file
-per project, but the Linux target resolves a different dependency set (no
-`78/esp-wifi-connect`, see the rules in `main/idf_component.yml`), so the file
-would flip-flop between chip and host builds. Versions are pinned in
-`main/idf_component.yml`; `managed_components/` is regenerated on demand.
+per project, but the Linux target resolves a different dependency set (the
+manifest rules in `main/idf_component.yml` can exclude components per target),
+so the file would flip-flop between chip and host builds. Versions are pinned
+in `main/idf_component.yml`; `managed_components/` is regenerated on demand.

@@ -7,7 +7,6 @@
 
 enum class AppState {
     SLEEPING,   // Display Off, Chip Sleeping, Wi-Fi Off
-    SETUP,      // Display On, Chip On, no Wi-Fi credentials configured
     OPERATIONAL,// Display On, Chip On, Wi-Fi Connected
     ERROR,      // Display On, Chip On, Wi-Fi Off/Error
     DEGRADED    // Display On, Chip On, Wi-Fi Disconnected (Temporary)
@@ -46,13 +45,10 @@ private:
     void on_wifi_connected();
     void on_wifi_disconnected();
     void on_button_short_press();
-    void on_button_long_press();
     void on_button_double_press();
 
     // State handlers
     void enter_state(AppState state);
-    void exit_state(AppState state);
-    void update_state(AppState state);
 
     QueueHandle_t event_queue = nullptr;
     AppState current_state = AppState::SLEEPING; // Default, will change in init

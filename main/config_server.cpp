@@ -81,8 +81,6 @@ static const char *state_name(AppState state) {
   switch (state) {
   case AppState::SLEEPING:
     return "SLEEPING";
-  case AppState::SETUP:
-    return "SETUP";
   case AppState::OPERATIONAL:
     return "OPERATIONAL";
   case AppState::ERROR:

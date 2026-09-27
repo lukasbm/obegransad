@@ -108,15 +108,6 @@ choice OBG_BUTTON_BACKEND
         bool "Simulator (commands from the renderer)"
 endchoice
 
-config OBG_SIM_FAKE_NO_CREDS
-    bool "Simulator: pretend no Wi-Fi credentials are configured"
-    depends on OBG_SIMULATOR
-    default n
-    help
-        Makes wifi_has_credentials() return false so the app boots into the
-        SETUP state. Only the state/UI path is exercised; there is no
-        provisioning portal (it was removed, see docs/known-issues.md).
-
 config OBG_HTTP_PORT
     int "HTTP config server port"
     range 1 65535

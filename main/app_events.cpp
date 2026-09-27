@@ -55,8 +55,6 @@ const char *app_event_name(int32_t id) {
     return "APP_EVT_WIFI_CONNECTED";
   case APP_EVT_WIFI_DISCONNECTED:
     return "APP_EVT_WIFI_DISCONNECTED";
-  case APP_EVT_CAPTIVE_PORTAL_ACTIVE:
-    return "APP_EVT_CAPTIVE_PORTAL_ACTIVE";
   case APP_EVT_BUTTON_SHORT:
     return "APP_EVT_BUTTON_SHORT";
   case APP_EVT_BUTTON_LONG:

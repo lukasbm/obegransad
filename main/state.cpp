@@ -11,11 +11,9 @@
 #include "ikea-obegransad-panel.h"
 
 // Sprites
-#include "sprites/wifi.hpp"
 #include "sprites/bold_glyphs.hpp"
 
 #include <esp_log.h>
-#include <esp_system.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <sdkconfig.h>
@@ -61,19 +59,10 @@ void StateMachine::init() {
     ESP_ERROR_CHECK(esp_event_handler_register(
         APP_EVENTS, ESP_EVENT_ANY_ID, &StateMachine::on_app_event, nullptr));
 
-    // Determine initial state based on WiFi/Credentials. Subsequent changes
-    // arrive as events; we only poll once here to pick the starting state.
-    if (wifi_has_credentials()) {
-        if (wifi_check()) {
-            set_state(AppState::OPERATIONAL);
-        } else {
-            // Try to connect, if we are not connected yet but have creds
-            // We start in DEGRADED and hope to connect
-            set_state(AppState::DEGRADED);
-        }
-    } else {
-        set_state(AppState::SETUP);
-    }
+    // Determine the initial state by polling once; subsequent changes arrive
+    // as events. With no credentials configured the device simply stays in
+    // DEGRADED (there is no provisioning mode anymore).
+    set_state(wifi_check() ? AppState::OPERATIONAL : AppState::DEGRADED);
 }
 
 void StateMachine::update() {
@@ -118,17 +107,6 @@ void StateMachine::update() {
             panel_commit(); // Commit overlay
             break;
 
-        case AppState::SETUP:
-            // In SETUP, we show the WiFi icon
-            panel_clear();
-            wifi_sprite.draw(0, 0); 
-            panel_commit();
-            
-            if (wifi_has_credentials()) {
-                 // If creds appeared, maybe user saved them. 
-            }
-            break;
-
         case AppState::ERROR:
             panel_clear();
             // Draw '!'
@@ -165,14 +143,14 @@ void StateMachine::process_events() {
                 on_button_short_press();
                 break;
             case APP_EVT_BUTTON_LONG:
-                ESP_LOGI(TAG, "button: long press");
-                on_button_long_press();
+                // Long press is intentionally a no-op (the factory reset was
+                // removed together with the captive portal).
+                ESP_LOGI(TAG, "button: long press (ignored)");
                 break;
             case APP_EVT_BUTTON_DOUBLE:
                 ESP_LOGI(TAG, "button: double press");
                 on_button_double_press();
                 break;
-            case APP_EVT_CAPTIVE_PORTAL_ACTIVE: /* informational */      break;
             case APP_EVT_TIME_SYNCED:
                 ESP_LOGI(TAG, "Time synced");
                 // Timestamps are meaningful now; refresh weather.
@@ -210,7 +188,6 @@ void StateMachine::on_wifi_connected() {
 
     switch (current_state) {
         case AppState::DEGRADED:
-        case AppState::SETUP:
             ESP_LOGI(TAG, "WiFi connected, entering OPERATIONAL state");
             set_state(AppState::OPERATIONAL);
             break;
@@ -239,7 +216,6 @@ void StateMachine::set_state(AppState new_state) {
     const bool was_rotating = is_rotating_state(current_state);
     const bool will_rotate = is_rotating_state(new_state);
 
-    exit_state(current_state);
     current_state = new_state;
     enter_state(current_state);
 
@@ -260,19 +236,11 @@ void StateMachine::enter_state(AppState state) {
         case AppState::DEGRADED:
             scene_switcher_set_wifi_available(false);
             break;
-            
-        case AppState::SETUP:
-            scene_switcher_set_wifi_available(false);
-            // No credentials: the captive portal was removed, so the device
-            // stays offline until reflashed with a configured SSID
-            // (docs/known-issues.md). The SETUP screen just indicates that.
-            break;
-            
+
         case AppState::ERROR:
             scene_switcher_set_wifi_available(false);
-            wifi_clear_credentials(); // Maybe? Or just stop trying.
             break;
-            
+
         case AppState::SLEEPING:
             scene_switcher_set_wifi_available(false);
             panel_clear();
@@ -282,18 +250,6 @@ void StateMachine::enter_state(AppState state) {
             set_state(AppState::DEGRADED); // Safe default?
             break;
     }
-}
-
-void StateMachine::exit_state(AppState state) {
-    switch (state) {
-        case AppState::SETUP:
-            // Nothing to tear down (no captive portal).
-            break;
-        default:
-            break;
-    }
-    // Note: the scene dwell timer is managed in set_state() across the
-    // OPERATIONAL/DEGRADED super-state, not started/stopped here.
 }
 
 void StateMachine::on_button_short_press() {
@@ -310,20 +266,13 @@ void StateMachine::on_button_short_press() {
             break;
 
         case AppState::ERROR:
-            set_state(AppState::SETUP);
+            // Retry connectivity (short press used to leave ERROR into SETUP).
+            set_state(AppState::DEGRADED);
             break;
             
         default:
             break;
     }
-}
-
-void StateMachine::on_button_long_press() {
-    // In all states, long press -> Reset
-    // Except maybe SLEEPING?
-    ESP_LOGI(TAG, "Long press - Resetting");
-    wifi_clear_credentials();
-    esp_restart();
 }
 
 void StateMachine::on_button_double_press() {

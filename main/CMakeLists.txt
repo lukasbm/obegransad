@@ -11,8 +11,7 @@ if(obg_target STREQUAL "linux")
     # Host build: the host network stack is used; there is no Wi-Fi, Ethernet
     # or GPIO driver to link against.
 else()
-    list(APPEND reqs esp-wifi-connect esp_eth esp_netif lwip esp_driver_gpio
-                     app_update)
+    list(APPEND reqs esp_wifi esp_eth esp_netif lwip esp_driver_gpio app_update)
 endif()
 
 # Sprite blobs and their C++ wrappers are generated from

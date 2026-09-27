@@ -105,18 +105,6 @@ void wifi_supervisor_tick() {
   // The emulated Ethernet link either has an IP or does not; nothing to nurse.
 }
 
-bool wifi_has_credentials() {
-#if CONFIG_OBG_SIM_FAKE_NO_CREDS
-  return false;
-#else
-  return true; // credentials are irrelevant for the emulated Ethernet link
-#endif
-}
-
-void wifi_clear_credentials() {
-  ESP_LOGI(TAG, "Simulator: wifi_clear_credentials() is a no-op");
-}
-
 bool wifi_wait_for_connection(uint32_t timeout_ms) {
   ESP_LOGI(TAG, "Waiting for emulated Ethernet (timeout: %lu ms)...",
            timeout_ms);

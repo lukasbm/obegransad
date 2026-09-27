@@ -64,12 +64,6 @@ void wifi_supervisor_tick() {
 
 bool wifi_check() { return true; }
 
-bool wifi_has_credentials() { return true; }
-
-void wifi_clear_credentials() {
-  ESP_LOGI(TAG, "Host build: wifi_clear_credentials() is a no-op");
-}
-
 bool wifi_wait_for_connection(uint32_t timeout_ms) {
   (void)timeout_ms;
   return true;

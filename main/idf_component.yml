@@ -1,8 +1,2 @@
 dependencies:
   espressif/cjson: ^1.7.19
-  78/esp-wifi-connect:
-    version: "^2.4.3"
-    rules:
-      # The Linux/POSIX host target has no esp_wifi; the host device backend
-      # uses the host network stack instead.
-      - if: "target != linux"

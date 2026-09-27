@@ -98,9 +98,9 @@ deliver *inbound* connections (the host socket connects, slirp never forwards
 the request). Outbound works, and a run that starts working stays working.
 Retry the run if `curl` hangs; `ota-test.sh` does that automatically.
 
-Wi-Fi credentials from `sdkconfig.defaults.local` are compiled in but ignored.
-To exercise the `SETUP` state, enable `CONFIG_OBG_SIM_FAKE_NO_CREDS`; there is
-no provisioning portal (removed, see `docs/known-issues.md`).
+Wi-Fi credentials from `sdkconfig.defaults.local` are compiled in but ignored
+by the simulator backends. There is no provisioning portal and no SETUP state
+(both removed, see `docs/known-issues.md`).
 
 ## Limitations
 

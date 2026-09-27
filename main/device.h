@@ -31,8 +31,4 @@ void wifi_supervisor_tick();
 // Returns true if connected, false if timeout
 bool wifi_wait_for_connection(uint32_t timeout_ms);
 
-void wifi_clear_credentials();
-
-bool wifi_has_credentials();
-
 void enter_light_sleep();

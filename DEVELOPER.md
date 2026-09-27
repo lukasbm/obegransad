@@ -94,8 +94,9 @@ void panel_task(void* _) {
 **As implemented:** `button.cpp` polls (10 ms) rather than using a GPIO ISR — simpler, and cheap enough at this poll
 rate — but still isolates all debounce/classification logic in its own task, posting exactly the three events the
 spec calls for. In `OPERATIONAL`/`DEGRADED`, `StateMachine` maps them to: short press → `preset_next()`, double press
-→ `preset_prev()` (both followed by `show_preset_popup()`, see "Scene presets" and "Rendering loop" below), long
-press → `wifi_clear_credentials(); esp_restart();` (unconditional factory reset, any state).
+→ `preset_prev()` (both followed by `show_preset_popup()`, see "Scene presets" and "Rendering loop" below). Long
+press is a no-op (it used to be the factory reset; see docs/known-issues.md); the event is still posted so external
+clients can observe it.
 
 ### Wi-Fi Manager
 
@@ -171,7 +172,7 @@ Use `esp_event` (ESP-IDF event loop) or a small internal event bus. Post named e
 **State examples** (application-level):
 
 * `SLEEPING`
-* `SETUP` (no credentials)
+* `SETUP` was removed together with the captive portal; the states are `OPERATIONAL`, `DEGRADED`, `ERROR`, `SLEEPING`.
 * `OPERATIONAL`
 * `DEGRADED`
 * `ERROR`
@@ -264,8 +265,9 @@ via `CONFIG_OBG_WIFI_SSID`/`_PASSWORD` in the gitignored
 in-field provisioning path right now. Runtime settings live on the config
 server (port 8080, docs/openapi.yaml).
 
-1. Boot -> Wi-Fi Manager seeds the configured SSID and connects. With no SSID
-   the device enters `SETUP` and stays offline until reflashed.
+1. Boot -> Wi-Fi Manager reads the configured SSID and connects. With no SSID
+   the device logs an error and stays in `DEGRADED` until reflashed (there is
+   no provisioning mode, see docs/known-issues.md).
 2. On successful connection -> `EVT_WIFI_CONNECTED` -> NTP sync, weather fetch,
    scene switcher.
 3. On Wi-Fi loss -> `EVT_WIFI_DISCONNECTED` -> move to `DEGRADED`: the scene
@@ -361,8 +363,8 @@ which is different from compositing (see the DEGRADED dot at the bottom, which *
    `reset_scene_dwell()` gives the scene a full dwell interval. The hook matters for scenes with their own
    change-detection cache — `ClockScene`/`ClockSceneWithSecondHand` only redraw when the minute/second changes —
    without it, such a scene could stay frozen on the popup's leftover pixels for up to a minute.
-2. **`AppState`** — exactly one of `OPERATIONAL`, `DEGRADED`, `SETUP`, `ERROR`, `SLEEPING` is active at a time, each
-   with its own branch in `update()`'s `switch`. `SETUP` (`panel_clear(); wifi_sprite.draw(0,0);`) and `ERROR`
+2. **`AppState`** — exactly one of `OPERATIONAL`, `DEGRADED`, `ERROR`, `SLEEPING` is active at a time, each
+   with its own branch in `update()`'s `switch`. `ERROR`
    (`panel_clear(); font_bold.drawGlyph('!', 4, 4);`) fully replace scene rendering rather than compositing with
    it — a takeover, not an overlay.
 3. **Scene rotation** — only reached from `OPERATIONAL`/`DEGRADED`. Before drawing, `update()` checks whether the
@@ -453,7 +455,7 @@ directly. The panel is the only place a genuine (if narrow) cross-task hazard ex
 * Measure worst-case refresh duration and CPU utilization.
 * Ensure Wi-Fi tasks get >=20% CPU during heavy network operations (simulate loads).
 * Test button debouncing and long/short/double detection under load.
-* Validate boot with no credentials (SETUP screen, device offline).
+* Validate boot with no credentials (device offline in DEGRADED).
 * Use heap and stack monitoring (heap_caps_get_free_size, `uxTaskGetStackHighWaterMark`).
 
 ---
@@ -474,8 +476,8 @@ directly. The panel is the only place a genuine (if narrow) cross-task hazard ex
 7. **Refactor Scenes** to be pure drawing functions and ensure `requires_wifi()` is honored by the
    app_task/scene_switcher.
 8. **Profile** and tune priorities/stack sizes.
-9. **Edge cases**: implement fallback degraded mode, and a global long-press handler (ISR -> event) that always triggers
-   reset behavior.
+9. **Edge cases**: implement fallback degraded mode (the old global long-press
+   factory reset was removed with the captive portal; see docs/known-issues.md).
 
 ---
 

@@ -17,29 +17,27 @@
 #include <esp_system.h>
 #include <esp_timer.h>
 #include <esp_wifi.h>
+#include <string.h>
 
-// esp-wifi-connect headers
-#include "ssid_manager.h"          // SsidManager::GetInstance()
-#include "wifi_station.h"          // WifiStation::GetInstance()
-
+// Minimal in-house Wi-Fi station driver.
+//
+// Replaces the esp-wifi-connect component: credentials come from Kconfig (see
+// main/Kconfig.projbuild) and are kept in RAM only, so no NVS churn and no
+// stale credentials. The supervisor below handles reconnect backoff; the
+// captive portal was removed (see docs/known-issues.md).
 static const char *TAG = "device";
 
 // state variables
 static bool wifi_station_started = false;
+static bool wifi_connected = false;
 
 // --- Wi-Fi supervisor -------------------------------------------------------
 //
-// The vendored esp-wifi-connect component already retries (5 immediate
-// esp_wifi_connect() attempts, then the next AP from its scan queue), but every
-// failed attempt surfaces as another WIFI_EVENT_STA_DISCONNECTED. Posting those
-// straight onto the app bus made the app flap OPERATIONAL<->DEGRADED during
-// perfectly normal reconnects. So we debounce here: the link counts as down
-// only after it has stayed down for a grace period, and while it is down we
-// nudge the driver on a backoff schedule in case its own retries gave up.
-//
-// Known wart we do not own: wifi_station.cc re-arms its rescan timer with
-// `10 * 1000` microseconds — 10 ms, almost certainly meant to be 10 s — so a
-// long outage also has that component scanning in a tight loop.
+// Every failed connection attempt surfaces as a WIFI_EVENT_STA_DISCONNECTED.
+// Posting those straight onto the app bus would flap OPERATIONAL<->DEGRADED
+// during perfectly normal reconnects, so the link counts as down only after it
+// has stayed down for a grace period; while down, the driver is nudged back
+// into a connect cycle on a backoff schedule.
 static bool link_announced_up = false; // last state posted to the app bus
 static uint32_t link_down_since_ms = 0;
 static uint32_t next_nudge_ms = 0;   // when to force the next reconnect attempt
@@ -58,7 +56,11 @@ static inline uint32_t now_ms() {
 // rest of the system can subscribe to connectivity changes without polling.
 static void wifi_event_handler(void * /*arg*/, esp_event_base_t event_base,
                                int32_t event_id, void *event_data) {
-  if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+  if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
+    esp_wifi_connect();
+  } else if (event_base == WIFI_EVENT &&
+             event_id == WIFI_EVENT_STA_DISCONNECTED) {
+    wifi_connected = false;
     if (event_data != nullptr) {
       const auto *d =
           static_cast<wifi_event_sta_disconnected_t *>(event_data);
@@ -76,6 +78,7 @@ static void wifi_event_handler(void * /*arg*/, esp_event_base_t event_base,
     // The app event is posted by wifi_supervisor_tick() once the link has been
     // down long enough to be worth reporting.
   } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
+    wifi_connected = true;
     link_down_since_ms = 0;
     if (!link_announced_up) {
       link_announced_up = true;
@@ -123,7 +126,7 @@ esp_err_t device_init() {
 
   // Bridge driver events onto the application event bus.
   ESP_RETURN_ON_ERROR(
-      esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED,
+      esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID,
                                  &wifi_event_handler, nullptr),
       TAG, "Failed to register WiFi event handler");
   ESP_RETURN_ON_ERROR(
@@ -131,7 +134,7 @@ esp_err_t device_init() {
                                  &wifi_event_handler, nullptr),
       TAG, "Failed to register IP event handler");
 
-  // Initialize NVS flash (e.g. to store wifi creds and config)
+  // Initialize NVS flash (app config lives there; see config_store.cpp)
   esp_err_t ret = nvs_flash_init();
   if (ret == ESP_ERR_NVS_NO_FREE_PAGES ||
       ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -145,72 +148,72 @@ esp_err_t device_init() {
   return ESP_OK;
 }
 
-void wifi_clear_credentials() {
-  ESP_LOGI(TAG, "Clearing WiFi credentials from NVS");
-
-  // Clear stored Wi-Fi credentials
-  SsidManager::GetInstance().Clear();
-
-  // Only stop station if it was started
-  if (wifi_station_started) {
-    ESP_LOGI(TAG, "Stopping WifiStation");
-    WifiStation::GetInstance().Stop();
-    wifi_station_started = false;
-  }
-}
-
-bool wifi_has_credentials() {
-  return !SsidManager::GetInstance().GetSsidList().empty();
-}
-
 void wifi_init() {
-  // Credentials come from Kconfig. Seed the SsidManager so WifiStation connects
-  // to exactly the configured network.
+  // Credentials come from Kconfig (normally sdkconfig.defaults.local).
   if (CONFIG_OBG_WIFI_SSID[0] == '\0') {
-    // The captive portal was removed (it clashed with the config server, see
-    // docs/known-issues.md): with no credentials the device has no network
-    // until it is reflashed with CONFIG_OBG_WIFI_SSID set.
     ESP_LOGE(TAG, "No WiFi SSID configured (CONFIG_OBG_WIFI_SSID); set it in "
-                  "sdkconfig.defaults.local and reflash");
+                  "sdkconfig.defaults.local and reflash (there is no captive "
+                  "portal, see docs/known-issues.md)");
     return;
   }
 
-  auto &mgr = SsidManager::GetInstance();
-  mgr.Clear();
-  mgr.AddSsid(CONFIG_OBG_WIFI_SSID, CONFIG_OBG_WIFI_PASSWORD);
+  if (esp_netif_create_default_wifi_sta() == nullptr) {
+    ESP_LOGE(TAG, "Failed to create station netif");
+    return;
+  }
+
+  wifi_init_config_t init_config = WIFI_INIT_CONFIG_DEFAULT();
+  ESP_RETURN_VOID_ON_ERROR(esp_wifi_init(&init_config), TAG,
+                           "Failed to initialize WiFi");
+  // Credentials come from Kconfig on every boot: keep them in RAM only.
+  ESP_RETURN_VOID_ON_ERROR(esp_wifi_set_storage(WIFI_STORAGE_RAM), TAG,
+                           "Failed to set WiFi storage");
+
+  wifi_config_t wifi_config = {};
+  strlcpy((char *)wifi_config.sta.ssid, CONFIG_OBG_WIFI_SSID,
+          sizeof(wifi_config.sta.ssid));
+  strlcpy((char *)wifi_config.sta.password, CONFIG_OBG_WIFI_PASSWORD,
+          sizeof(wifi_config.sta.password));
+  // Accept any auth mode up to WPA3 (WIFI_AUTH_OPEN is the lowest threshold).
+  wifi_config.sta.threshold.authmode = WIFI_AUTH_OPEN;
 
   ESP_LOGI(TAG, "Connecting to configured WiFi SSID: %s", CONFIG_OBG_WIFI_SSID);
+  ESP_RETURN_VOID_ON_ERROR(esp_wifi_set_mode(WIFI_MODE_STA), TAG,
+                           "Failed to set WiFi mode");
+  ESP_RETURN_VOID_ON_ERROR(esp_wifi_set_config(WIFI_IF_STA, &wifi_config), TAG,
+                           "Failed to set WiFi config");
+  ESP_RETURN_VOID_ON_ERROR(esp_wifi_start(), TAG, "Failed to start WiFi");
+
   link_down_since_ms = now_ms();
   next_nudge_ms = link_down_since_ms + NUDGE_FIRST_MS;
   nudge_backoff_ms = NUDGE_FIRST_MS;
-  WifiStation::GetInstance().Start();
   wifi_station_started = true;
 }
 
-bool wifi_check() { return WifiStation::GetInstance().IsConnected(); }
+bool wifi_check() { return wifi_connected; }
 
 bool wifi_wait_for_connection(uint32_t timeout_ms) {
   ESP_LOGI(TAG, "Waiting for WiFi connection (timeout: %lu ms)...", timeout_ms);
-  
+
   const uint32_t check_interval_ms = 500;
   uint32_t elapsed_ms = 0;
-  
+
   while (elapsed_ms < timeout_ms) {
     if (wifi_check()) {
       ESP_LOGI(TAG, "WiFi connected after %lu ms", elapsed_ms);
       return true;
     }
-    
+
     vTaskDelay(pdMS_TO_TICKS(check_interval_ms));
     elapsed_ms += check_interval_ms;
-    
+
     // Log progress every 10 seconds
     if (elapsed_ms % 10000 == 0) {
-      ESP_LOGI(TAG, "Still waiting for connection... (%lu/%lu ms)", 
+      ESP_LOGI(TAG, "Still waiting for connection... (%lu/%lu ms)",
                elapsed_ms, timeout_ms);
     }
   }
-  
+
   ESP_LOGW(TAG, "WiFi connection timeout after %lu ms", timeout_ms);
   return false;
 }

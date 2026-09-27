@@ -42,7 +42,6 @@ void on_app_event(void * /*arg*/, esp_event_base_t /*base*/, int32_t id,
     set_led(true);
     break;
   case APP_EVT_WIFI_DISCONNECTED:
-  case APP_EVT_CAPTIVE_PORTAL_ACTIVE:
     set_led(false);
     break;
   default:
