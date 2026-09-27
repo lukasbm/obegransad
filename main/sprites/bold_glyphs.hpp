@@ -10,4 +10,4 @@ struct FontBold : FontSheet {
 };
 
 // global instance as there is no instance state
-const FontBold font_bold;
+inline const FontBold font_bold;

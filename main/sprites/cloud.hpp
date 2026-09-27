@@ -11,4 +11,4 @@ struct CloudSprite : SingleSprite {
 };
 
 // global instance as there is no instance state
-const CloudSprite cloud_sprite;
+inline const CloudSprite cloud_sprite;

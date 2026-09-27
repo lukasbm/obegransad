@@ -11,4 +11,4 @@ struct MoonAtlas : TextureAtlas {
 };
 
 // global instance as there is no instance state
-const MoonAtlas moon_atlas;
+inline const MoonAtlas moon_atlas;

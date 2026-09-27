@@ -11,4 +11,4 @@ struct ThinFont : FontSheet {
 };
 
 // global instance as there is no instance state
-const ThinFont font_thin;
+inline const ThinFont font_thin;

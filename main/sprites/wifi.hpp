@@ -10,4 +10,4 @@ struct WifiSprite : SingleSprite {
 };
 
 // global instance as there is no instance state
-const WifiSprite wifi_sprite;
+inline const WifiSprite wifi_sprite;

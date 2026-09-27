@@ -28,8 +28,8 @@ inline Frame overlay_preset_number(uint8_t number) {
  * the two states are unmistakable at a glance.
  */
 inline Frame overlay_wifi(bool connected) {
-  constexpr uint8_t SPRITE_X = (PANEL_WIDTH - 10) / 2;
-  constexpr uint8_t SPRITE_Y = (PANEL_HEIGHT - 8) / 2;
+  const uint8_t SPRITE_X = (PANEL_WIDTH - wifi_sprite.width()) / 2;
+  const uint8_t SPRITE_Y = (PANEL_HEIGHT - wifi_sprite.height()) / 2;
 
   Frame frame;
   frame.clear();

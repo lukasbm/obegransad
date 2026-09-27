@@ -94,6 +94,11 @@ public:
       : data_start(start + sizeof(bwb_header_t)), data_end(end),
         bytes(end - start - sizeof(bwb_header_t)),
         header(bwb_read_header(start)) {}
+
+  /** @brief Width of one sprite cell in pixels, from the .bwb header. */
+  uint8_t width() const { return header.w; }
+  /** @brief Height of one sprite cell in pixels, from the .bwb header. */
+  uint8_t height() const { return header.h; }
 };
 
 // for a single sprite (image)
@@ -104,7 +109,7 @@ struct SingleSprite : Sprite {
   /**
    * @brief Draws the sprite at the specified top-left corner (tlX, tlY)
    */
-  void draw(const uint8_t tlX, const uint8_t tlY, Frame *target = nullptr,
+  void draw(const int8_t tlX, const int8_t tlY, Frame *target = nullptr,
             uint8_t scale = 1) const {
     drawSprite(tlX, tlY, data_start, header.w, header.h, target, scale);
   }
@@ -117,7 +122,9 @@ struct TextureAtlas : Sprite {
 
   TextureAtlas(const uint8_t *start, const uint8_t *end)
       : Sprite(start, end), sprite_size(header.h * header.w),
-        sprite_count(bytes / sprite_size) {}
+        // Guard a malformed/empty blob (header w or h == 0) against division
+        // by zero; with no cell size there is simply nothing to draw.
+        sprite_count(sprite_size ? bytes / sprite_size : 0) {}
 
   /**
    * @brief get the sprite data by index
@@ -132,8 +139,8 @@ struct TextureAtlas : Sprite {
   /**
    * @brief directly draw the sprite by index at the specified top-left corner
    */
-  void drawByIndex(const unsigned short index, const uint8_t tlX,
-                   const uint8_t tlY, Frame *target = nullptr,
+  void drawByIndex(const unsigned short index, const int8_t tlX,
+                   const int8_t tlY, Frame *target = nullptr,
                    uint8_t scale = 1) const {
     const uint8_t *spriteData = getByIndex(index);
     if (spriteData) {
@@ -157,7 +164,7 @@ struct FontSheet : TextureAtlas {
     return getByIndex(index);
   }
 
-  void drawGlyph(const char c, const uint8_t tlX, const uint8_t tlY,
+  void drawGlyph(const char c, const int8_t tlX, const int8_t tlY,
                  Frame *target = nullptr, uint8_t scale = 1) const {
     const uint8_t *glyphData = getGlyph(c);
     if (glyphData) {
@@ -168,22 +175,26 @@ struct FontSheet : TextureAtlas {
 
 // for animations
 struct AnimationSheet : TextureAtlas {
+  // Per-instance playhead. It used to be a function-local `static`, which
+  // meant every AnimationSheet shared one counter; two animations on screen
+  // would advance each other's frames.
+  mutable unsigned short curr_frame = 0;
+
   AnimationSheet(const uint8_t *start, const uint8_t *end)
       : TextureAtlas(start, end) {}
 
   const uint8_t *nextFrame() const {
-    static unsigned short currFrame = 0;
-
-    if (currFrame >= sprite_count) {
-      currFrame = 0;
+    if (curr_frame >= sprite_count) {
+      curr_frame = 0;
     }
-    return getByIndex(currFrame++);
+    return getByIndex(curr_frame++);
   }
 
-  void drawNextFrame(const uint8_t tlX, const uint8_t tlY) const {
+  void drawNextFrame(const int8_t tlX, const int8_t tlY,
+                     Frame *target = nullptr, uint8_t scale = 1) const {
     const uint8_t *frameData = nextFrame();
     if (frameData) {
-      drawSprite(tlX, tlY, frameData, header.w, header.h);
+      drawSprite(tlX, tlY, frameData, header.w, header.h, target, scale);
     }
   }
 };
