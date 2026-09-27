@@ -80,6 +80,43 @@ Headless text mode (SSH, scripts):
 python3 tools/sim/renderer.py --ascii
 ```
 
+## Stopping
+
+- **QEMU, default (with monitor):** press `Ctrl-]` in the terminal. The monitor
+  exits and `idf.py` then terminates QEMU.
+- **QEMU `--no-monitor`:** press `Ctrl-a` then `x` (QEMU's own exit), or
+  `Ctrl-C`.
+- **Native host build:** `Ctrl-C` in the terminal.
+- Closing the renderer window does **not** stop the firmware; stop it from the
+  terminal.
+
+If a terminal is gone or the simulator seems stuck, from another terminal:
+
+```sh
+pkill -f '[q]emu-system-riscv32'    # QEMU
+pkill -f '[t]ools/sim/renderer.py'  # renderer window
+```
+
+(The brackets stop the commands from matching themselves.) Note that after
+boot the logs are quiet and preset 0 "Calm" is a static clock that only
+redraws at minute boundaries — an unchanging picture is expected. Press `s` in
+the renderer window (click it first) or use the preset buttons on
+<http://127.0.0.1:8080/> to rotate scenes.
+
+## Where the scenes and presets live
+
+- `main/presets.hpp` — the ten presets: name, dwell (`0` = never rotate) and
+  the ordered list of scene names. The list order *is* the rotation.
+- `main/scene_registry.hpp` — which scene objects are instantiated and
+  registered.
+- `main/scenes/*.hpp` — the scenes themselves (`render()`, `target_fps()`,
+  `requires_wifi()`, `get_scene_name()`).
+- `main/scene.h` — the `Scene` base class and the authoring contract.
+- Rotation logic: `main/scene_switcher.cpp` and `StateMachine::update()`
+  (`main/state.cpp`).
+- At runtime: `GET /api/info` lists every preset and scene; the settings page
+  on <http://127.0.0.1:8080/> has preset/scene buttons.
+
 ## Networking
 
 QEMU provides emulated OpenCores Ethernet with slirp: DHCP, DNS and NAT to the
