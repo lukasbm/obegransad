@@ -365,10 +365,9 @@ static esp_err_t events_handler(httpd_req_t *req) {
 esp_err_t config_server_start(void) {
   httpd_config_t config = HTTPD_DEFAULT_CONFIG();
   config.server_port = CONFIG_OBG_HTTP_PORT;
-  // The captive portal (78/esp-wifi-connect) runs its own esp_http_server on
-  // port 80 with the default control port 32768; a second server using the
-  // same control port fails to bind. Keep both ports distinct so the config
-  // server and the portal can coexist (see ota_plan.md section 11).
+  // Distinct control port: cheap insurance against another esp_http_server
+  // (the config server is currently the only one; the captive portal was
+  // removed, see docs/known-issues.md).
   config.ctrl_port = ESP_HTTPD_DEF_CTRL_PORT + 1;
   config.max_uri_handlers = 12;
   config.lru_purge_enable = true;

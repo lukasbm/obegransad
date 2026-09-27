@@ -13,7 +13,9 @@ constexpr gpio_num_t STATUS_LED_PIN = GPIO_NUM_10;
 // basic device initialization (NVS, event loop)
 esp_err_t device_init();
 
-// start captive portal if needed, otherwise connect to Wi-Fi
+// Connect to the Wi-Fi network configured in Kconfig. There is no captive
+// portal (removed, see docs/known-issues.md): with an empty SSID the device
+// stays offline until it is reflashed with credentials.
 void wifi_init();
 
 // Check if Wi-Fi is connected
@@ -30,10 +32,6 @@ void wifi_supervisor_tick();
 bool wifi_wait_for_connection(uint32_t timeout_ms);
 
 void wifi_clear_credentials();
-
-void start_captive_portal();
-void stop_captive_portal();
-bool is_captive_portal_active();
 
 bool wifi_has_credentials();
 

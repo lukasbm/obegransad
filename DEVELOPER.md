@@ -5,7 +5,8 @@
 Turn the 16×16 grayscale matrix into a resilient smart display with:
 
 * deterministic 400–500 Hz refresh,
-* Wi-Fi provisioning via captive portal,
+* Wi-Fi credentials from Kconfig (the captive portal was removed, see
+  docs/known-issues.md),
 * an embedded HTTP configuration server,
 * weather fetching when connected, and
 * a single physical button with context-dependent actions.
@@ -96,12 +97,15 @@ spec calls for. In `OPERATIONAL`/`DEGRADED`, `StateMachine` maps them to: short 
 → `preset_prev()` (both followed by `show_preset_popup()`, see "Scene presets" and "Rendering loop" below), long
 press → `wifi_clear_credentials(); esp_restart();` (unconditional factory reset, any state).
 
-### Wi-Fi Manager & Captive Portal
+### Wi-Fi Manager
 
-* Uses `esp_event` to announce `WIFI_CONNECTED`, `WIFI_DISCONNECTED`, `CAPTIVE_PORTAL_STARTED`,
-  `CAPTIVE_PORTAL_STOPPED`.
-* Runs the AP + captive portal when there is no valid configuration.
-* Starts the HTTP server once connected (or when captive portal mode requires it).
+* Uses `esp_event` to announce `WIFI_CONNECTED`, `WIFI_DISCONNECTED`.
+* Credentials come from Kconfig (`CONFIG_OBG_WIFI_SSID`/`_PASSWORD`, normally
+  in the gitignored `sdkconfig.defaults.local`). The captive portal was removed
+  (see docs/known-issues.md): with no credentials the device stays offline
+  until it is reflashed.
+* The config server (port 8080) is started by the app itself; see
+  docs/openapi.yaml.
 * Recover from disconnections automatically (exponential backoff).
 
 **As implemented:** the vendored `78/esp-wifi-connect` does the reconnecting (5 immediate attempts, then the next AP
@@ -167,7 +171,7 @@ Use `esp_event` (ESP-IDF event loop) or a small internal event bus. Post named e
 **State examples** (application-level):
 
 * `SLEEPING`
-* `SETUP` (captive portal)
+* `SETUP` (no credentials)
 * `OPERATIONAL`
 * `DEGRADED`
 * `ERROR`
@@ -252,14 +256,22 @@ starves Wi-Fi/lwIP/the event loop above it. The trade-off is the one detailed ju
 
 ---
 
-# Captive portal + Web UI flow (suggested)
+# Wi-Fi credentials & config flow
 
-1. Boot -> Wi-Fi Manager loads NVS config. If no SSID => start AP + captive portal -> post `EVT_CAPTIVE_PORTAL_ACTIVE`.
-2. Captive portal starts HTTP server. User configures Wi-Fi.
-3. On successful connection -> `EVT_WIFI_CONNECTED` -> NTP sync, start HTTP server for device config, start scene
-   switcher.
-4. On Wi-Fi loss -> `EVT_WIFI_DISCONNECTED` -> move to `DEGRADED`: scene switcher may still run, but cloud-only scenes
-   filtered out.
+The captive portal was removed (see docs/known-issues.md). Credentials are set
+via `CONFIG_OBG_WIFI_SSID`/`_PASSWORD` in the gitignored
+`sdkconfig.defaults.local` and take effect on the next flash; there is no
+in-field provisioning path right now. Runtime settings live on the config
+server (port 8080, docs/openapi.yaml).
+
+1. Boot -> Wi-Fi Manager seeds the configured SSID and connects. With no SSID
+   the device enters `SETUP` and stays offline until reflashed.
+2. On successful connection -> `EVT_WIFI_CONNECTED` -> NTP sync, weather fetch,
+   scene switcher.
+3. On Wi-Fi loss -> `EVT_WIFI_DISCONNECTED` -> move to `DEGRADED`: the scene
+   switcher may still run, but cloud-only scenes are filtered out.
+4. The config server is up in every state; `POST /api/ota` additionally
+   requires a station connection.
 
 ---
 
@@ -441,7 +453,7 @@ directly. The panel is the only place a genuine (if narrow) cross-task hazard ex
 * Measure worst-case refresh duration and CPU utilization.
 * Ensure Wi-Fi tasks get >=20% CPU during heavy network operations (simulate loads).
 * Test button debouncing and long/short/double detection under load.
-* Validate captive portal flow with network off at boot.
+* Validate boot with no credentials (SETUP screen, device offline).
 * Use heap and stack monitoring (heap_caps_get_free_size, `uxTaskGetStackHighWaterMark`).
 
 ---
@@ -458,7 +470,7 @@ directly. The panel is the only place a genuine (if narrow) cross-task hazard ex
 4. **Replace global loop** with an `app_task` that subscribes to `esp_event` events and posts commands to modules (
    start/stop server, switch scene, etc).
 5. **Implement button ISR -> queue -> button task** and publish `EVT_BUTTON_*` events.
-6. **Implement Wi-Fi manager** (AP + captive portal + auto reconnect) that posts events.
+6. **Implement Wi-Fi manager** (auto reconnect) that posts events.
 7. **Refactor Scenes** to be pure drawing functions and ensure `requires_wifi()` is honored by the
    app_task/scene_switcher.
 8. **Profile** and tune priorities/stack sizes.

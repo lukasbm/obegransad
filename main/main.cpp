@@ -37,7 +37,6 @@ extern "C" void app_main() {
   // Reduce WiFi debug spam before initialization
   esp_log_level_set("wifi", ESP_LOG_WARN);
   esp_log_level_set("WifiStation", ESP_LOG_INFO);
-  esp_log_level_set("WifiConfigurationAp", ESP_LOG_INFO);
 
   // nvs, event loop, networking (creates the default event loop the app bus
   // and status LED subscribe to)

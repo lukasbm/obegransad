@@ -181,8 +181,8 @@ esp_err_t ota_handle_get(httpd_req_t *req) {
 }
 
 esp_err_t ota_handle_post(httpd_req_t *req) {
-  // OTA is only offered while connected as a station: not from the captive
-  // portal's AP, where the network is unauthenticated.
+  // OTA is only offered while connected as a station (not while offline or
+  // during any future provisioning mode).
   if (!wifi_check()) {
     return ota_send_error(req, "403 Forbidden",
                           "OTA requires a station connection");

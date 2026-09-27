@@ -99,8 +99,8 @@ the request). Outbound works, and a run that starts working stays working.
 Retry the run if `curl` hangs; `ota-test.sh` does that automatically.
 
 Wi-Fi credentials from `sdkconfig.defaults.local` are compiled in but ignored.
-To exercise the `SETUP` state, enable `CONFIG_OBG_SIM_FAKE_NO_CREDS`; the
-captive portal itself cannot run without real AP hardware.
+To exercise the `SETUP` state, enable `CONFIG_OBG_SIM_FAKE_NO_CREDS`; there is
+no provisioning portal (removed, see `docs/known-issues.md`).
 
 ## Limitations
 
@@ -110,7 +110,7 @@ captive portal itself cannot run without real AP hardware.
 | `esp_timer` | real | shim (tick-granular) |
 | Display | framebuffer to the renderer (no SPI/RMT) | same |
 | Buttons | renderer keys | renderer keys |
-| Wi-Fi / captive portal (AP) | emulated Ethernet instead | host stack |
+| Wi-Fi (driver) | emulated Ethernet instead | host stack |
 | `esp_restart()` on long press | may not reset the emulated chip; restart the script if it hangs | same |
 
 For real SPI/RMT timing, Wi-Fi behaviour and provisioning, test the hardware

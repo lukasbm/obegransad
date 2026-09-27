@@ -7,7 +7,7 @@
 
 enum class AppState {
     SLEEPING,   // Display Off, Chip Sleeping, Wi-Fi Off
-    SETUP,      // Display On, Chip On, Wi-Fi Captive Portal
+    SETUP,      // Display On, Chip On, no Wi-Fi credentials configured
     OPERATIONAL,// Display On, Chip On, Wi-Fi Connected
     ERROR,      // Display On, Chip On, Wi-Fi Off/Error
     DEGRADED    // Display On, Chip On, Wi-Fi Disconnected (Temporary)

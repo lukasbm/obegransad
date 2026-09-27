@@ -3,8 +3,8 @@
 // contract is identical to device_hw.cpp: a working IP link posts
 // APP_EVT_WIFI_CONNECTED, so the state machine, SNTP and weather are unchanged.
 //
-// Wi-Fi credentials are irrelevant here; the captive portal cannot run without
-// AP mode and is reduced to a state flag.
+// Wi-Fi credentials are irrelevant here; the captive portal was removed (see
+// docs/known-issues.md).
 
 #include "sdkconfig.h"
 
@@ -30,7 +30,6 @@ static const char *TAG = "device_sim";
 
 static bool s_got_ip = false;
 static bool s_link_announced_up = false;
-static bool s_captive_portal_active = false;
 static esp_eth_handle_t s_eth = nullptr;
 
 static void eth_event_handler(void * /*arg*/, esp_event_base_t event_base,
@@ -133,20 +132,6 @@ bool wifi_wait_for_connection(uint32_t timeout_ms) {
   ESP_LOGW(TAG, "Ethernet timeout after %lu ms", timeout_ms);
   return false;
 }
-
-void start_captive_portal() {
-  if (s_captive_portal_active) {
-    return;
-  }
-  ESP_LOGW(TAG, "Simulator: captive portal is unavailable (no AP mode); "
-                "SETUP state only");
-  s_captive_portal_active = true;
-  app_post_event(APP_EVT_CAPTIVE_PORTAL_ACTIVE);
-}
-
-void stop_captive_portal() { s_captive_portal_active = false; }
-
-bool is_captive_portal_active() { return s_captive_portal_active; }
 
 void enter_light_sleep() {
   // Light sleep is not worth emulating; SLEEPING would otherwise never wake.

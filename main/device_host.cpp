@@ -4,8 +4,8 @@
 // the first supervisor tick (which runs after the state machine subscribed),
 // so state, clock and weather behave exactly like on the target.
 //
-// Wi-Fi credentials and the captive portal are meaningless here; the portal
-// is reduced to a state flag.
+// Wi-Fi credentials and the captive portal are meaningless here (the portal
+// was removed, see docs/known-issues.md).
 
 #include "sdkconfig.h"
 
@@ -25,7 +25,6 @@
 static const char *TAG = "device_host";
 
 static bool s_link_announced = false;
-static bool s_captive_portal_active = false;
 
 esp_err_t device_init() {
   // mbedTLS's PSA layer is initialized lazily on target, but on the Linux
@@ -75,19 +74,6 @@ bool wifi_wait_for_connection(uint32_t timeout_ms) {
   (void)timeout_ms;
   return true;
 }
-
-void start_captive_portal() {
-  if (s_captive_portal_active) {
-    return;
-  }
-  ESP_LOGW(TAG, "Host build: captive portal is unavailable; SETUP state only");
-  s_captive_portal_active = true;
-  app_post_event(APP_EVT_CAPTIVE_PORTAL_ACTIVE);
-}
-
-void stop_captive_portal() { s_captive_portal_active = false; }
-
-bool is_captive_portal_active() { return s_captive_portal_active; }
 
 void enter_light_sleep() {
   ESP_LOGW(TAG, "Host build: light sleep ignored");

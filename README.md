@@ -19,7 +19,9 @@ tools/sim/run-host.sh    # native Linux build (fast iteration, gdb)
 ```
 
 See [[tools/sim/README.md]] for options, the renderer, networking and
-limitations. The host build needs the `libbsd` development headers.
+limitations, and [[docs/known-issues.md]] for caveats around OTA, QEMU
+networking and the partition layout. The host build needs the `libbsd`
+development headers.
 
 ### OTA updates
 

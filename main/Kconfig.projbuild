@@ -4,8 +4,9 @@ config OBG_WIFI_SSID
     string "WiFi SSID"
     default ""
     help
-        SSID of the WiFi network to connect to. Leave empty to fall back to the
-        captive portal for provisioning.
+        SSID of the WiFi network to connect to. Set it in
+        sdkconfig.defaults.local (gitignored) and reflash; there is no captive
+        portal fallback anymore (see docs/known-issues.md).
 
 config OBG_WIFI_PASSWORD
     string "WiFi password"
@@ -113,8 +114,8 @@ config OBG_SIM_FAKE_NO_CREDS
     default n
     help
         Makes wifi_has_credentials() return false so the app boots into the
-        SETUP state. The captive portal itself cannot run outside real
-        hardware; only the state/UI path is exercised.
+        SETUP state. Only the state/UI path is exercised; there is no
+        provisioning portal (it was removed, see docs/known-issues.md).
 
 config OBG_HTTP_PORT
     int "HTTP config server port"
@@ -123,7 +124,6 @@ config OBG_HTTP_PORT
     help
         Port the built-in config server (docs/openapi.yaml) listens on. It uses
         8080 on every target so the device, QEMU and native host builds behave
-        the same. The captive portal keeps port 80 for Wi-Fi provisioning; the
-        two servers must not share a port (see ota_plan.md section 11).
+        the same.
 
 endmenu

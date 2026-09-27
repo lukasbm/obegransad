@@ -263,7 +263,9 @@ void StateMachine::enter_state(AppState state) {
             
         case AppState::SETUP:
             scene_switcher_set_wifi_available(false);
-            start_captive_portal();
+            // No credentials: the captive portal was removed, so the device
+            // stays offline until reflashed with a configured SSID
+            // (docs/known-issues.md). The SETUP screen just indicates that.
             break;
             
         case AppState::ERROR:
@@ -285,7 +287,7 @@ void StateMachine::enter_state(AppState state) {
 void StateMachine::exit_state(AppState state) {
     switch (state) {
         case AppState::SETUP:
-            stop_captive_portal();
+            // Nothing to tear down (no captive portal).
             break;
         default:
             break;

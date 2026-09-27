@@ -21,7 +21,7 @@ ESP_EVENT_DECLARE_BASE(APP_EVENTS);
 enum app_event_id_t {
   APP_EVT_WIFI_CONNECTED,        // station obtained an IP
   APP_EVT_WIFI_DISCONNECTED,     // station lost connectivity
-  APP_EVT_CAPTIVE_PORTAL_ACTIVE, // provisioning AP started
+  APP_EVT_CAPTIVE_PORTAL_ACTIVE, // reserved: portal removed, never posted
   APP_EVT_BUTTON_SHORT,
   APP_EVT_BUTTON_LONG,
   APP_EVT_BUTTON_DOUBLE,

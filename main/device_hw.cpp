@@ -20,13 +20,11 @@
 
 // esp-wifi-connect headers
 #include "ssid_manager.h"          // SsidManager::GetInstance()
-#include "wifi_configuration_ap.h" // WifiConfigurationAp::GetInstance()
 #include "wifi_station.h"          // WifiStation::GetInstance()
 
 static const char *TAG = "device";
 
 // state variables
-static bool captive_portal_active = false;
 static bool wifi_station_started = false;
 
 // --- Wi-Fi supervisor -------------------------------------------------------
@@ -159,47 +157,7 @@ void wifi_clear_credentials() {
     WifiStation::GetInstance().Stop();
     wifi_station_started = false;
   }
-
-  // Stop captive portal if active
-  stop_captive_portal();
 }
-
-void start_captive_portal() {
-  if (captive_portal_active) {
-    ESP_LOGW(TAG, "Captive portal already active, skipping start");
-    return;
-  }
-
-  // Stop station mode first to prevent APSTA interference
-  // Only stop if it was actually started to avoid ESP_ERR_WIFI_NOT_INIT
-  if (wifi_station_started) {
-    ESP_LOGI(TAG, "Stopping WifiStation before starting captive portal");
-    WifiStation::GetInstance().Stop();
-    wifi_station_started = false;
-  }
-
-  ESP_LOGI(TAG, "Starting captive portal...");
-  auto &ap = WifiConfigurationAp::GetInstance();
-  ap.SetSsidPrefix("Obegransad");
-  ap.Start();
-  captive_portal_active = true;
-  app_post_event(APP_EVT_CAPTIVE_PORTAL_ACTIVE);
-
-  ESP_LOGI(TAG, "Captive portal started - SSID: %s", ap.GetSsid().c_str());
-}
-
-void stop_captive_portal() {
-  if (!captive_portal_active) {
-    ESP_LOGW(TAG, "Captive portal not active, skipping stop");
-    return;
-  }
-
-  WifiConfigurationAp::GetInstance().Stop();
-  captive_portal_active = false;
-  ESP_LOGI(TAG, "Captive portal stopped");
-}
-
-bool is_captive_portal_active() { return captive_portal_active; }
 
 bool wifi_has_credentials() {
   return !SsidManager::GetInstance().GetSsidList().empty();
@@ -207,11 +165,13 @@ bool wifi_has_credentials() {
 
 void wifi_init() {
   // Credentials come from Kconfig. Seed the SsidManager so WifiStation connects
-  // to exactly the configured network (no captive portal when an SSID is set).
+  // to exactly the configured network.
   if (CONFIG_OBG_WIFI_SSID[0] == '\0') {
-    ESP_LOGW(TAG, "No WiFi SSID configured (CONFIG_OBG_WIFI_SSID); "
-                  "starting captive portal");
-    start_captive_portal();
+    // The captive portal was removed (it clashed with the config server, see
+    // docs/known-issues.md): with no credentials the device has no network
+    // until it is reflashed with CONFIG_OBG_WIFI_SSID set.
+    ESP_LOGE(TAG, "No WiFi SSID configured (CONFIG_OBG_WIFI_SSID); set it in "
+                  "sdkconfig.defaults.local and reflash");
     return;
   }
 

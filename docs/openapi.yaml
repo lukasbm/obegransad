@@ -13,8 +13,8 @@ info:
     - Device / QEMU: `http://<device-ip>:8080/` (QEMU forwards host `:8080`
       to guest port 8080, see tools/sim/run-qemu.sh)
     - Native host build: `http://127.0.0.1:8080/`
-    - Port set by `CONFIG_OBG_HTTP_PORT`; the captive portal keeps port 80 so
-      the two servers can coexist.
+    - Port set by `CONFIG_OBG_HTTP_PORT`. This is the device's only HTTP
+      server: the captive portal was removed (see docs/known-issues.md).
 
     There is no authentication: the API is meant for the local network only.
     Control actions are queued and executed on the main task, so responses are
@@ -211,7 +211,7 @@ paths:
         "400":
           $ref: "#/components/responses/BadRequest"
         "403":
-          description: Not connected as a station (captive portal mode)
+          description: Not connected as a station (offline / no credentials)
         "409":
           description: Upload in progress, or running image not confirmed
         "411":
