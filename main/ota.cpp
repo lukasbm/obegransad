@@ -19,6 +19,25 @@ static const char *TAG = "ota";
 static constexpr size_t BUF_SIZE = 4096;
 static constexpr uint32_t RESTART_DELAY_MS = 800;
 
+// Provenance: only images built from this project are accepted.
+static constexpr const char *EXPECTED_PROJECT = "obegransad";
+
+static bool token_configured(void) { return CONFIG_OBG_OTA_TOKEN[0] != '\0'; }
+
+// Constant-time comparison of the request token against the configured one.
+static bool token_matches(const char *candidate) {
+  const char *expected = CONFIG_OBG_OTA_TOKEN;
+  const size_t expected_len = strlen(expected);
+  if (candidate == nullptr || strlen(candidate) != expected_len) {
+    return false;
+  }
+  unsigned char diff = 0;
+  for (size_t i = 0; i < expected_len; i++) {
+    diff |= (unsigned char)(expected[i] ^ candidate[i]);
+  }
+  return diff == 0;
+}
+
 // --- JSON helpers (kept local so ota.cpp does not depend on config_server) ---
 
 static esp_err_t ota_send_json(httpd_req_t *req, cJSON *root) {
@@ -61,6 +80,7 @@ esp_err_t ota_handle_get(httpd_req_t *req) {
   cJSON *root = cJSON_CreateObject();
   cJSON_AddStringToObject(root, "state", "idle");
   cJSON_AddBoolToObject(root, "supported", false);
+  cJSON_AddBoolToObject(root, "auth_required", CONFIG_OBG_OTA_TOKEN[0] != '\0');
   cJSON_AddNullToObject(root, "running");
   cJSON_AddNullToObject(root, "next");
   cJSON_AddNumberToObject(root, "received", 0);
@@ -167,6 +187,7 @@ esp_err_t ota_handle_get(httpd_req_t *req) {
   cJSON *root = cJSON_CreateObject();
   cJSON_AddStringToObject(root, "state", state_name(s_state.load()));
   cJSON_AddBoolToObject(root, "supported", true);
+  cJSON_AddBoolToObject(root, "auth_required", token_configured());
   add_partition_json(root, "running", esp_ota_get_running_partition());
   add_partition_json(root, "next", esp_ota_get_next_update_partition(nullptr));
   cJSON_AddNumberToObject(root, "received", s_received.load());
@@ -186,6 +207,20 @@ esp_err_t ota_handle_post(httpd_req_t *req) {
   if (!wifi_check()) {
     return ota_send_error(req, "403 Forbidden",
                           "OTA requires a station connection");
+  }
+
+  if (!token_configured()) {
+    return ota_send_error(req, "403 Forbidden",
+                          "OTA disabled: set CONFIG_OBG_OTA_TOKEN");
+  }
+  char token[80] = {};
+  if (httpd_req_get_hdr_value_len(req, "X-OTA-Token") == 0 ||
+      httpd_req_get_hdr_value_str(req, "X-OTA-Token", token, sizeof(token)) !=
+          ESP_OK ||
+      !token_matches(token)) {
+    ESP_LOGW(TAG, "rejected OTA upload with invalid or missing token");
+    return ota_send_error(req, "401 Unauthorized",
+                          "invalid or missing X-OTA-Token");
   }
 
   const esp_partition_t *target = esp_ota_get_next_update_partition(nullptr);
@@ -270,6 +305,24 @@ esp_err_t ota_handle_post(httpd_req_t *req) {
     return ota_send_error(req, "400 Bad Request", "image validation failed");
   }
 
+  // Provenance: the image is structurally valid, but is it ours? Refuse to
+  // switch the boot partition for a foreign project's image; the inactive slot
+  // may keep it, otadata is untouched, the running image keeps booting.
+  esp_app_desc_t desc = {};
+  if (esp_ota_get_partition_description(target, &desc) != ESP_OK) {
+    snprintf(s_error, sizeof(s_error), "cannot read image description");
+    reset_transfer();
+    s_state.store(OtaState::ERROR);
+    return ota_send_error(req, "400 Bad Request", "cannot read image description");
+  }
+  if (strcmp(desc.project_name, EXPECTED_PROJECT) != 0) {
+    ESP_LOGW(TAG, "rejecting image for project '%s'", desc.project_name);
+    snprintf(s_error, sizeof(s_error), "not an %s image", EXPECTED_PROJECT);
+    reset_transfer();
+    s_state.store(OtaState::ERROR);
+    return ota_send_error(req, "400 Bad Request", "not an obegransad image");
+  }
+
   err = esp_ota_set_boot_partition(target);
   if (err != ESP_OK) {
     ESP_LOGE(TAG, "set_boot_partition failed: %s", esp_err_to_name(err));
@@ -280,11 +333,7 @@ esp_err_t ota_handle_post(httpd_req_t *req) {
                           "boot partition switch failed");
   }
 
-  esp_app_desc_t desc = {};
-  const char *version = "unknown";
-  if (esp_ota_get_partition_description(target, &desc) == ESP_OK) {
-    version = desc.version;
-  }
+  const char *version = desc.version;
   s_state.store(OtaState::READY);
   s_restart_at_ms.store((uint32_t)millis() + RESTART_DELAY_MS);
   ESP_LOGI(TAG, "image accepted (%s), boot slot %s, restarting", version,

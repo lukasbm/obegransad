@@ -92,9 +92,10 @@ build (`main/device_host.cpp`) announces the same event using the host stack.
 * Inbound under QEMU: `http://127.0.0.1:8080/` is forwarded to guest port 8080
   (`--http-port`). On the host build the server binds host port 8080 directly.
 * OTA: `POST /api/ota` with a raw `obegransad.bin` writes the inactive slot and
-  restarts. `tools/sim/ota-test.sh` does this end-to-end under QEMU (boot,
-  upload, verify the slot switch). Within one QEMU run the emulated flash and
-  `esp_restart()` are real; the next `idf.py qemu` regenerates the flash image.
+  restarts (`X-OTA-Token` header required; `tools/ota-push.sh` reads the token
+  from the sdkconfig). `tools/sim/ota-test.sh` does this end-to-end under QEMU
+  (boot, upload, verify the slot switch). Within one QEMU run the emulated flash
+  and `esp_restart()` are real; `--persist-flash` keeps the result across runs.
 
 **Known QEMU quirk:** user-mode host forwarding is occasionally unable to
 deliver *inbound* connections (the host socket connects, slirp never forwards

@@ -117,4 +117,13 @@ config OBG_HTTP_PORT
         8080 on every target so the device, QEMU and native host builds behave
         the same.
 
+config OBG_OTA_TOKEN
+    string "OTA token"
+    default ""
+    help
+        Shared secret required in the X-OTA-Token header on POST /api/ota.
+        Leave empty to disable OTA entirely (the safer default). Set it in the
+        gitignored sdkconfig.defaults.local; tools/ota-push.sh reads it from
+        there when no --token is given.
+
 endmenu

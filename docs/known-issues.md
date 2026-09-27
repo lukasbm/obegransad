@@ -116,13 +116,17 @@ restart — use `tools/sim/run-qemu.sh --persist-flash` to keep the whole image
 (code, NVS, `otadata`, both slots). Delete `build-sim/qemu_flash_full.bin` to
 start fresh.
 
-- **No authentication**: `POST /api/ota` is remote code execution for anyone on
-  the LAN. It is refused unless the station is connected (403), but there is no
-  token, TLS or physical-presence check.
-- **No image provenance check**: `esp_ota_end()` validates the image structure,
-  not that it belongs to this project. Only upload bins built from this repo.
-- **No version policy**: flashing the same or an older image is allowed. There
-  is no anti-rollback (eFuse-based, irreversible) and no version manifest.
+- **Authentication is a shared token**: `POST /api/ota` requires `X-OTA-Token`
+  to match `CONFIG_OBG_OTA_TOKEN` (empty token disables OTA entirely). It is
+  sent over plain HTTP, so anyone who can sniff the LAN or guess a weak token
+  can still push; physical-presence confirmation or TLS would be stricter.
+- **Image provenance is checked**: the uploaded image must report
+  `project_name == "obegransad"` in its application descriptor, otherwise it is
+  rejected and the boot partition is not switched.
+- **No version policy**: the same or an older image is accepted. A version
+  manifest would prevent downgrades to known-bad builds and document what is
+  deployed; anti-rollback via eFuse is irreversible and not worth it here.
+  With a controlled upload script this is mostly a safety net.
 - **Rollback is confirmed immediately** in `ota_init()`. An image that boots but
   fails later will not roll back; confirming after Wi-Fi connects or after a
   health delay would be stricter.

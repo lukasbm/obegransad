@@ -26,16 +26,19 @@ development headers.
 ### OTA updates
 
 The device has two OTA slots (`partitions.csv`: `otadata` + `ota_0` + `ota_1`,
-1984 KiB each) and accepts a push update on the config server:
+1984 KiB each). Firmware is pushed with the helper script, which sends the
+`X-OTA-Token` header (set `CONFIG_OBG_OTA_TOKEN` in `sdkconfig.defaults.local`;
+an empty token disables OTA):
 
 ```sh
-curl -X POST -H 'Content-Type: application/octet-stream' -H 'Expect:' \
-     --data-binary @build/obegransad.bin http://<device-ip>:8080/api/ota
+tools/ota-push.sh --host 192.168.1.23
 ```
 
-The device writes the inactive slot, validates the image, switches the boot
-partition and restarts. Until that point the running image keeps booting, so an
-interrupted upload is harmless. `GET /api/ota` reports the running slot.
+The device writes the inactive slot, validates the image, checks that it was
+built from this project, switches the boot partition and restarts. Until then
+the running image keeps booting, so an interrupted or foreign upload is
+harmless. `GET /api/ota` reports the running slot and whether a token is
+required.
 
 One-time migration (and every wired reflash) — use the wrapper, which also
 clears `otadata` so the freshly flashed image boots:

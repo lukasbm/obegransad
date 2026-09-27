@@ -30,9 +30,13 @@ CONFIG_COMPILER_DISABLE_DEFAULT_ERRORS=y
 CONFIG_LOG_DEFAULT_LEVEL_INFO=y
 
 # Obegransad app configuration (see main/Kconfig.projbuild).
-# Set your WiFi SSID below (leave empty to use the captive portal instead).
+# Set your WiFi SSID below; with an empty SSID the device stays offline
+# (there is no captive portal anymore, see docs/known-issues.md).
 CONFIG_OBG_WIFI_SSID=""
 CONFIG_OBG_WIFI_PASSWORD=""
+# OTA token for POST /api/ota. Set a real value in sdkconfig.defaults.local;
+# an empty token disables OTA. tools/ota-push.sh reads it from there.
+CONFIG_OBG_OTA_TOKEN=""
 CONFIG_OBG_TIMEZONE="CET-1CEST,M3.5.0,M10.5.0/3"
 CONFIG_OBG_WEATHER_LATITUDE="0.0"
 CONFIG_OBG_WEATHER_LONGITUDE="0.0"

@@ -16,11 +16,13 @@ info:
     - Port set by `CONFIG_OBG_HTTP_PORT`. This is the device's only HTTP
       server: the captive portal was removed (see docs/known-issues.md).
 
-    There is no authentication: the API is meant for the local network only.
-    Control actions are queued and executed on the main task, so responses are
-    `202 Accepted` rather than the resulting state. `POST /api/ota` is remote
-    code execution for anyone who can reach the port — never expose it to the
-    internet, and see ota_plan.md section 6.3 for hardening options.
+    There is no general authentication: the API is meant for the local network
+    only. Control actions are queued and executed on the main task, so responses
+    are `202 Accepted` rather than the resulting state. `POST /api/ota` is the
+    exception: it requires the shared secret from `CONFIG_OBG_OTA_TOKEN` in the
+    `X-OTA-Token` header, and the uploaded image must belong to this project
+    (checked via the application descriptor). Never expose the port to the
+    internet.
 servers:
   - url: http://{host}:{port}
     description: Device or simulator
@@ -180,15 +182,20 @@ paths:
     post:
       tags: [ota]
       summary: Upload and apply a firmware image (push OTA)
+      security:
+        - otaToken: []
       description: |
         Body is the raw app image (`application/octet-stream`), e.g.
         `build/obegransad.bin` produced by this repository. The device writes
-        the inactive slot, verifies the image, switches the boot partition and
-        restarts. Until validation and the boot-partition switch succeed, the
-        running image keeps booting, so an interrupted upload is harmless.
+        the inactive slot, verifies the image, checks that it belongs to this
+        project (application descriptor `project_name == "obegransad"`),
+        switches the boot partition and restarts. Until the boot-partition
+        switch succeeds, the running image keeps booting, so an interrupted or
+        foreign upload is harmless.
 
-        Only accepted while the device is connected as a station (not from the
-        captive portal AP). No authentication: LAN only, see ota_plan.md.
+        Requires the `X-OTA-Token` header to match `CONFIG_OBG_OTA_TOKEN`;
+        empty configuration disables OTA (`403`). Only accepted while the
+        device is connected as a station.
       requestBody:
         required: true
         content:
@@ -210,8 +217,10 @@ paths:
                   restarting: {type: boolean, example: true}
         "400":
           $ref: "#/components/responses/BadRequest"
+        "401":
+          description: Missing or invalid X-OTA-Token
         "403":
-          description: Not connected as a station (offline / no credentials)
+          description: OTA disabled (no token configured) or not connected as a station
         "409":
           description: Upload in progress, or running image not confirmed
         "411":
@@ -224,6 +233,12 @@ paths:
           description: Build has no OTA partitions (host build)
 
 components:
+  securitySchemes:
+    otaToken:
+      type: apiKey
+      in: header
+      name: X-OTA-Token
+      description: Must match `CONFIG_OBG_OTA_TOKEN` on the device.
   responses:
     BadRequest:
       description: Invalid request
@@ -455,6 +470,9 @@ components:
         supported:
           type: boolean
           description: False on the native host build (no partitions/flash)
+        auth_required:
+          type: boolean
+          description: True when CONFIG_OBG_OTA_TOKEN is set (POST needs the header)
         running:
           nullable: true
           type: object
