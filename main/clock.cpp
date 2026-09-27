@@ -42,6 +42,41 @@ constexpr time_t MIN_VALID_TIME = 1577836800; // 2020-01-01 00:00:00 UTC
 static volatile int64_t last_sync_us = 0;
 static bool sntp_initialized = false;
 
+// Simulator time override: seconds added to the real wall clock. Always 0 on
+// hardware builds; set through clock_sim_set_time() in simulator builds.
+static int64_t s_sim_offset_s = 0;
+
+// Current wall clock (real time plus the simulator override).
+static time_t clock_now(void) {
+  time_t now = 0;
+  time(&now);
+  return (time_t)((int64_t)now + s_sim_offset_s);
+}
+
+#if CONFIG_OBG_SIMULATOR
+void clock_sim_set_time(int hour, int minute) {
+  if (hour < 0 || minute < 0) {
+    s_sim_offset_s = 0;
+    ESP_LOGI(TAG, "sim time override cleared");
+    return;
+  }
+  if (hour > 23 || minute > 59) {
+    ESP_LOGW(TAG, "sim time override ignored: %02d:%02d", hour, minute);
+    return;
+  }
+  time_t now = 0;
+  time(&now);
+  struct tm t = {};
+  localtime_r(&now, &t);
+  t.tm_hour = hour;
+  t.tm_min = minute;
+  t.tm_sec = 0;
+  const time_t target = mktime(&t);
+  s_sim_offset_s = (int64_t)target - (int64_t)now;
+  ESP_LOGI(TAG, "sim time override: %02d:%02d", hour, minute);
+}
+#endif
+
 // Runs in the SNTP service task context — keep it minimal: record the sync and
 // announce it on the app event bus. No panel / blocking work here.
 #if !CONFIG_IDF_TARGET_LINUX
@@ -108,7 +143,7 @@ bool is_time_sync_healthy() {
   if (last_sync_us == 0) {
     return false; // never synced
   }
-  if (time(NULL) < MIN_VALID_TIME) {
+  if (clock_now() < MIN_VALID_TIME) {
     return false; // clock not plausibly set
   }
   // Consider sync stale after 24h (lwIP auto-resyncs hourly, so this is slack).
@@ -158,8 +193,7 @@ void clock_force_sync() {
 }
 
 bool get_local_time(struct tm &timeinfo) {
-  time_t now;
-  time(&now);
+  const time_t now = clock_now();
 
   // Check if time is reasonable (after 2020). This is a per-frame query for the
   // clock scenes, so don't log here — the bool return is the signal.
@@ -177,6 +211,7 @@ bool get_time_precise(struct timeval &tv) {
     ESP_LOGE(TAG, "gettimeofday failed");
     return false;
   }
+  tv.tv_sec += (time_t)s_sim_offset_s;
 
   // Check if time is reasonable
   if (tv.tv_sec < MIN_VALID_TIME) {
@@ -187,7 +222,7 @@ bool get_time_precise(struct timeval &tv) {
   return true;
 }
 
-time_t get_unix_timestamp(void) { return time(NULL); }
+time_t get_unix_timestamp(void) { return clock_now(); }
 
 struct tm time_get() {
   struct tm timeinfo = {};

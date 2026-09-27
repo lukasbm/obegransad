@@ -47,6 +47,8 @@ void StateMachine::show_preset_popup() {
     reset_scene_dwell(); // the new preset's first scene gets a full interval
 }
 
+void StateMachine::announce_preset() { show_preset_popup(); }
+
 void StateMachine::init() {
     ESP_LOGI(TAG, "Initializing State Machine");
 

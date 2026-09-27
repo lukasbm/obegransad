@@ -3,8 +3,11 @@
 #include <esp_log.h>
 #include <freertos/projdefs.h>
 
+#include "app_control.h"
 #include "button.h"
 #include "clock.h"
+#include "config_server.h"
+#include "config_store.h"
 #include "device.h"
 #include "ikea-obegransad-panel.h"
 #include "scene_registry.hpp"
@@ -69,6 +72,12 @@ extern "C" void app_main() {
   ESP_ERROR_CHECK(panel_init(panel_config));
   ESP_ERROR_CHECK(panel_timer_start());
 
+  // Runtime configuration from NVS (defaults come from Kconfig) and the
+  // control queue shared by the HTTP API and the simulator.
+  ESP_ERROR_CHECK(config_store_init());
+  config_store_apply();
+  ESP_ERROR_CHECK(app_control_init());
+
   // Register scenes (single place — see scene_registry.hpp)
   register_all_scenes();
 
@@ -79,7 +88,11 @@ extern "C" void app_main() {
   // Init State Machine
   StateMachine::instance().init();
 
+  // HTTP config server (state/config/control/events, see docs/openapi.yaml)
+  ESP_ERROR_CHECK(config_server_start());
+
   while (true) {
+    app_control_process();
     wifi_supervisor_tick();
     StateMachine::instance().update();
     vTaskDelay(pdMS_TO_TICKS(100));

@@ -1,0 +1,386 @@
+openapi: 3.0.3
+info:
+  title: Obegränsad device API
+  version: "0.1.0"
+  description: |
+    HTTP API exposed by the firmware's config server (main/config_server.cpp).
+
+    It is the single control surface of the device: state, settings, control
+    actions and an event log. The Home Assistant custom integration
+    (homeassistant/custom_components/obegransad) is a client of this API, and
+    the simulator renderer uses the same control actions over its own channel.
+
+    - Device / QEMU: `http://<device-ip>/` (QEMU forwards host `:8080` to guest
+      port 80, see tools/sim/run-qemu.sh)
+    - Native host build: `http://127.0.0.1:8080/` (port set by
+      `CONFIG_OBG_HTTP_PORT`)
+
+    There is no authentication: the API is meant for the local network only.
+    Control actions are queued and executed on the main task, so responses are
+    `202 Accepted` rather than the resulting state.
+servers:
+  - url: http://{host}:{port}
+    description: Device or simulator
+    variables:
+      host:
+        default: obegransad.local
+      port:
+        default: "80"
+tags:
+  - name: state
+  - name: config
+  - name: control
+  - name: events
+  - name: info
+
+paths:
+  /:
+    get:
+      tags: [info]
+      summary: Minimal human-readable settings page
+      responses:
+        "200":
+          description: HTML page
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /api/info:
+    get:
+      tags: [info]
+      summary: Static device information, presets and registered scenes
+      responses:
+        "200":
+          description: Device info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Info"
+
+  /api/state:
+    get:
+      tags: [state]
+      summary: Current runtime state
+      responses:
+        "200":
+          description: Runtime state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/State"
+
+  /api/config:
+    get:
+      tags: [config]
+      summary: Current configuration
+      responses:
+        "200":
+          description: Configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Config"
+    post:
+      tags: [config]
+      summary: Update configuration (partial)
+      description: |
+        Every field is optional; provided fields are validated, stored in NVS
+        and applied immediately where possible (timezone, brightness, weather
+        location). The anniversary day/month take effect on the next scene
+        render.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfigUpdate"
+      responses:
+        "200":
+          description: Configuration after applying the update
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Config"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/control:
+    post:
+      tags: [control]
+      summary: Queue a control action
+      description: |
+        Actions are queued and executed on the main task (the only writer to
+        the panel), so the response only confirms the request.
+
+        Simulator-only actions (`fake_weather`, `fake_time`) are accepted when
+        the firmware is built with `CONFIG_OBG_SIMULATOR`; on hardware they
+        return 400.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ControlRequest"
+      responses:
+        "202":
+          description: Action queued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  queued:
+                    type: boolean
+                    example: true
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/events:
+    get:
+      tags: [events]
+      summary: Application event log
+      description: |
+        Returns retained events with `seq > since`, oldest first. The device
+        keeps the last few events only; `latest` is the newest sequence number
+        and can be used as the next `since` value. Button presses appear here,
+        which is how a Home Assistant integration can trigger automations.
+      parameters:
+        - name: since
+          in: query
+          required: false
+          description: Return events newer than this sequence number
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        "200":
+          description: Event batch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Events"
+
+components:
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "invalid brightness"
+
+    Info:
+      type: object
+      properties:
+        app:
+          type: string
+          example: obegransad
+        idf:
+          type: string
+          example: v6.0.1
+        scenes:
+          type: array
+          description: All registered scene names, in registration order
+          items:
+            type: string
+          example: [Digital Clock, Clock w/ seconds, Current Weather]
+        presets:
+          type: array
+          items:
+            $ref: "#/components/schemas/Preset"
+
+    Preset:
+      type: object
+      properties:
+        index:
+          type: integer
+          minimum: 0
+          maximum: 9
+        name:
+          type: string
+          example: Time & Weather
+        dwell_ms:
+          type: integer
+          description: Rotation interval; 0 means the preset never rotates
+          example: 15000
+        scenes:
+          type: array
+          items:
+            type: string
+
+    State:
+      type: object
+      properties:
+        state:
+          type: string
+          enum: [SLEEPING, SETUP, OPERATIONAL, ERROR, DEGRADED]
+        wifi:
+          type: boolean
+        preset:
+          type: integer
+          minimum: 0
+          maximum: 9
+        preset_name:
+          type: string
+        scene:
+          type: string
+          description: Name of the scene currently displayed
+        brightness:
+          type: integer
+          minimum: 0
+          maximum: 255
+        uptime_ms:
+          type: integer
+          format: int64
+        time:
+          type: string
+          nullable: true
+          description: Local time, or null before the clock is valid
+          example: "2026-09-27T14:08:12+0200"
+        weather:
+          $ref: "#/components/schemas/WeatherSnapshot"
+
+    WeatherSnapshot:
+      type: object
+      properties:
+        valid:
+          type: boolean
+          description: False until a successful fetch (or a fake has been set)
+        temperature:
+          type: number
+          format: float
+          nullable: true
+        code:
+          type: integer
+          nullable: true
+          description: open-meteo weather code (see weather.h)
+        is_day:
+          type: boolean
+          nullable: true
+
+    Config:
+      type: object
+      properties:
+        timezone:
+          type: string
+          example: CET-1CEST,M3.5.0,M10.5.0/3
+        latitude:
+          type: number
+          format: double
+          example: 51.3397
+        longitude:
+          type: number
+          format: double
+          example: 12.3731
+        anniversary_day:
+          type: integer
+          minimum: 1
+          maximum: 31
+        anniversary_month:
+          type: integer
+          minimum: 1
+          maximum: 12
+        brightness:
+          type: integer
+          minimum: 0
+          maximum: 255
+
+    ConfigUpdate:
+      type: object
+      description: All fields optional; omitted fields are left unchanged
+      properties:
+        timezone:
+          type: string
+        latitude:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+          description: Must be provided together with longitude
+        longitude:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+          description: Must be provided together with latitude
+        anniversary_day:
+          type: integer
+          minimum: 1
+          maximum: 31
+        anniversary_month:
+          type: integer
+          minimum: 1
+          maximum: 12
+        brightness:
+          type: integer
+          minimum: 0
+          maximum: 255
+
+    ControlRequest:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum:
+            - next_preset
+            - prev_preset
+            - preset
+            - scene
+            - brightness
+            - refresh_weather
+            - redraw
+            - fake_weather
+            - fake_time
+        value:
+          description: |
+            Action argument. `preset`/`brightness` take an integer, `scene`
+            takes a scene name, `fake_weather` one of clear|cloudy|rain|snow|
+            invalid, `fake_time` "HH:MM" (or null to clear the override).
+          nullable: true
+          oneOf:
+            - type: integer
+            - type: string
+      examples:
+        nextPreset:
+          value: {action: next_preset}
+        selectPreset:
+          value: {action: preset, value: 3}
+        selectScene:
+          value: {action: scene, value: Snake}
+        setBrightness:
+          value: {action: brightness, value: 128}
+        fakeWeather:
+          value: {action: fake_weather, value: rain}
+        fakeTime:
+          value: {action: fake_time, value: "23:59"}
+
+    Events:
+      type: object
+      properties:
+        latest:
+          type: integer
+          description: Newest sequence number on the device (use as next `since`)
+        events:
+          type: array
+          items:
+            type: object
+            properties:
+              seq:
+                type: integer
+              id:
+                type: string
+                example: APP_EVT_BUTTON_SHORT
+              uptime_ms:
+                type: integer
+                format: int64

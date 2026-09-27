@@ -1,6 +1,7 @@
 #pragma once
 
 #include "esp_err.h"
+#include "sdkconfig.h"
 #include <time.h>
 
 // TODO: move to kconfig!
@@ -25,6 +26,12 @@ bool is_time_sync_healthy();
 // Convenience accessor for scenes: returns the current local time, or a
 // zero-initialized tm if the clock has not synced yet.
 struct tm time_get();
+
+#if CONFIG_OBG_SIMULATOR
+// Simulator-only: override the wall clock so scenes can be tested at a fixed
+// time. Pass -1 for both to clear the override.
+void clock_sim_set_time(int hour, int minute);
+#endif
 
 // enum MoonPhase : uint8_t {
 //   NEW,

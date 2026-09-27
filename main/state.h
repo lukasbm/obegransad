@@ -22,6 +22,10 @@ public:
 
     AppState get_state() const { return current_state; }
 
+    // Show the active preset's number popup and restart the dwell timer. Used
+    // by the button handlers and by external control (HTTP API, simulator).
+    void announce_preset();
+
 private:
     StateMachine();
     void set_state(AppState new_state);

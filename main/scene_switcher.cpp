@@ -197,3 +197,67 @@ void scene_switcher_set_wifi_available(bool available) {
     rotation_advance();
   }
 }
+
+// --- Introspection and direct selection (HTTP API / HA integration) ---
+
+void preset_select(uint8_t index) {
+  if (index < PRESET_COUNT) {
+    select_preset(index);
+  }
+}
+
+const char *current_scene_name() {
+  if (current_scene_index < 0 || (size_t)current_scene_index >= scenes.size()) {
+    return "-";
+  }
+  return scenes[current_scene_index]->get_scene_name();
+}
+
+bool scene_select_by_name(const char *name) {
+  if (name == nullptr) {
+    return false;
+  }
+  const int idx = scene_index_by_name(name);
+  if (idx < 0) {
+    return false;
+  }
+
+  // Stay inside the preset rotation when the scene belongs to it; otherwise
+  // show it directly until the next rotation (fallback mode).
+  bool in_preset = false;
+  const uint8_t count = resolved_count[current_preset];
+  for (uint8_t pos = 0; pos < count; pos++) {
+    if (resolved[current_preset][pos] == idx) {
+      position_in_preset = pos;
+      in_preset = true;
+      break;
+    }
+  }
+  on_fallback = !in_preset;
+  activate_index(idx);
+  return true;
+}
+
+int scene_count() { return (int)scenes.size(); }
+
+const char *scene_name_at(int index) {
+  if (index < 0 || (size_t)index >= scenes.size()) {
+    return nullptr;
+  }
+  return scenes[index]->get_scene_name();
+}
+
+const char *preset_name_at(uint8_t index) {
+  return index < PRESET_COUNT ? presets[index].name : nullptr;
+}
+
+uint8_t preset_scene_count_at(uint8_t index) {
+  return index < PRESET_COUNT ? resolved_count[index] : 0;
+}
+
+const char *preset_scene_name_at(uint8_t index, uint8_t position) {
+  if (index >= PRESET_COUNT || position >= resolved_count[index]) {
+    return nullptr;
+  }
+  return scene_name_at(resolved[index][position]);
+}
