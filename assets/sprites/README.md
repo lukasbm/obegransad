@@ -38,6 +38,13 @@ sources; use it before committing.
   optional instance/cell.
 * `convert_all.sh` -- thin wrapper: `python3 generate.py "$@"`.
 
+## Requirements
+
+The `.ase` pipeline is pure standard library (Python >= 3.11 for `tomllib`).
+Pillow is only needed for the `.bmp`/`.png` fallback:
+
+    python3 -m pip install -r requirements.txt
+
 ## Fonts
 
 `BoldGlyphs6x7` covers ASCII 32-125 and `ThinGlyphs4x6` covers 32-96 (no
@@ -52,6 +59,6 @@ pixel, with no compression or palette.
 
 ## Unused / legacy
 
-* `unused/` holds sources no scene renders (alternative or demo art).
-* The `.bmp` exports are no longer used by the build; they are kept only as a
-  flattened reference and as input to the fallback converter.
+* `unused/` holds art the build does not use: sources no scene renders and the
+  old `.bmp` exports, kept only as a flattened reference. `img2bwb.py` can still
+  read a `.bmp`/`.png` if you move one back.

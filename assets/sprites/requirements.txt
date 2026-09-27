@@ -1,0 +1,15 @@
+# Python packages for the sprite tools in this directory.
+#
+#   python3 -m pip install -r requirements.txt
+#
+# The preferred .ase pipeline (aseprite.py -> img2bwb.py -> generate.py) is pure
+# standard library, so nothing here is required for the normal workflow. Pillow
+# is only for the optional flattened .bmp / .png fallback in img2bwb.py.
+Pillow>=10.0
+
+# Deliberately not listed:
+#   tomllib  - part of the standard library since Python 3.11 (generate.py
+#              imports it); there is no PyPI package called tomllib, so
+#              `pip install tomllib` fails. The tools need Python >= 3.11.
+#   fire     - replaced by argparse; no longer imported anywhere.
+#   numpy    - replaced by plain bytes; no longer imported anywhere.
