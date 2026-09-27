@@ -2,10 +2,13 @@
 
 #include "app_events.h"
 #include "esp_log.h"
+#include "sdkconfig.h"
+#include <esp_timer.h>
+#if !CONFIG_IDF_TARGET_LINUX
 #include <esp_netif_sntp.h>
 #include <esp_sntp.h>
-#include <esp_timer.h>
 #include <sys/_intsup.h>
+#endif
 #include <sys/select.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -41,11 +44,13 @@ static bool sntp_initialized = false;
 
 // Runs in the SNTP service task context — keep it minimal: record the sync and
 // announce it on the app event bus. No panel / blocking work here.
+#if !CONFIG_IDF_TARGET_LINUX
 static void on_sntp_synced(struct timeval *tv) {
   last_sync_us = esp_timer_get_time();
   ESP_LOGI(TAG, "NTP time synchronized");
   app_post_event(APP_EVT_TIME_SYNCED);
 }
+#endif
 
 esp_err_t clock_init(const char *tz) {
   // for timezones see
@@ -55,6 +60,11 @@ esp_err_t clock_init(const char *tz) {
   // zones.csv in this repo
   clock_apply_timezone(tz);
 
+#if CONFIG_IDF_TARGET_LINUX
+  // The host clock is already valid and there is no lwIP/SNTP stack to start.
+  sntp_initialized = true;
+  return ESP_OK;
+#else
   esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG(NTP_SERVER);
   config.server_from_dhcp = false;
   config.start = true;          // begin background polling immediately
@@ -69,6 +79,7 @@ esp_err_t clock_init(const char *tz) {
   }
   sntp_initialized = true;
   return ESP_OK;
+#endif
 }
 
 void clock_apply_timezone(const char *tz) {
@@ -78,12 +89,19 @@ void clock_apply_timezone(const char *tz) {
 }
 
 void clock_start_sync() {
+#if CONFIG_IDF_TARGET_LINUX
+  // The host clock is already valid: announce a sync so consumers (weather
+  // client) refresh, exactly like a real NTP sync would.
+  last_sync_us = esp_timer_get_time();
+  app_post_event(APP_EVT_TIME_SYNCED);
+#else
   if (!sntp_initialized) {
     return;
   }
   // Force an immediate poll (e.g. right after Wi-Fi connects) instead of
   // waiting for the next scheduled SNTP interval.
   esp_sntp_restart();
+#endif
 }
 
 bool is_time_sync_healthy() {
@@ -116,6 +134,11 @@ bool is_time_sync_healthy() {
 // }
 
 void clock_force_sync() {
+#if CONFIG_IDF_TARGET_LINUX
+  // The host clock is already valid.
+  last_sync_us = esp_timer_get_time();
+  app_post_event(APP_EVT_TIME_SYNCED);
+#else
   static bool time_sync_in_progress = false;
   if (time_sync_in_progress) {
     ESP_LOGD(TAG, "Sync already in progress, skipping");
@@ -131,6 +154,7 @@ void clock_force_sync() {
   }
 
   time_sync_in_progress = false;
+#endif
 }
 
 bool get_local_time(struct tm &timeinfo) {

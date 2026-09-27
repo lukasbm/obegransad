@@ -1,9 +1,17 @@
 #pragma once
 
-#include "soc/gpio_num.h"
-#include <driver/spi_master.h>
+#include "sdkconfig.h"
 #include <esp_err.h>
+#include <soc/gpio_num.h>
 #include <stdint.h>
+
+#if CONFIG_IDF_TARGET_LINUX
+// The SPI driver does not exist on the host target (the hardware backend is
+// not compiled there); panel_config_t only needs the type name.
+typedef int spi_host_device_t;
+#else
+#include <driver/spi_master.h>
+#endif
 
 #ifdef __cplusplus
 extern "C" {

@@ -8,7 +8,7 @@
 
 #include "sdkconfig.h"
 
-#if !CONFIG_OBG_DEVICE_BACKEND_HW
+#if CONFIG_OBG_DEVICE_BACKEND_SIM
 
 #include "device.h"
 
@@ -153,4 +153,4 @@ void enter_light_sleep() {
   ESP_LOGW(TAG, "Simulator: light sleep ignored");
 }
 
-#endif // !CONFIG_OBG_DEVICE_BACKEND_HW
+#endif // CONFIG_OBG_DEVICE_BACKEND_SIM

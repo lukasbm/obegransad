@@ -1,11 +1,18 @@
-# Simulator (QEMU)
+# Simulator
 
-Runs the real firmware on an emulated ESP32-C3 with the display/button replaced
-by simulator backends. FreeRTOS, `esp_timer`, `esp_event`, NVS, lwIP, SNTP and
-the HTTP/TLS stack are real; SPI/RMT/GPIO and the `esp_wifi` driver are not
-(they are not emulated by QEMU — see "Limitations").
+Two ways to run the firmware without the board, both replacing the display
+output, the button and the Wi-Fi stack with simulator backends while the rest
+of the app (state machine, scenes, NVS, `esp_event`, the HTTP/TLS stack) runs
+unchanged:
 
-## Run
+| | `run-qemu.sh` | `run-host.sh` |
+|---|---|---|
+| Execution | real ESP32-C3 image under QEMU | native Linux process (`target linux`) |
+| FreeRTOS/`esp_timer` | real (emulated chip) | POSIX simulator + `esp_timer` shim |
+| Network | emulated Ethernet + slirp NAT | host network stack directly |
+| Best for | firmware-level checks, target behaviour | fast scene/server iteration, debuggers |
+
+## QEMU
 
 ```sh
 tools/sim/run-qemu.sh              # renderer window + idf.py monitor
@@ -21,13 +28,41 @@ The script uses `build-sim/` and `build-sim/sdkconfig` and layers
 `sdkconfig.defaults[.local]` + `sdkconfig.defaults.sim`; the hardware build and
 its `sdkconfig` are untouched.
 
+## Native Linux host
+
+```sh
+tools/sim/run-host.sh              # renderer window, app runs natively
+tools/sim/run-host.sh --fresh      # regenerate build-host/sdkconfig
+```
+
+**Requirement:** the `libbsd` development headers (IDF's linux target includes
+`bsd/sys/cdefs.h`). Fedora: `sudo dnf install libbsd-devel`; Debian/Ubuntu:
+`sudo apt install libbsd-dev`. Without root, extract the package and point
+`OBG_LIBBSD_PREFIX` at the prefix.
+
+The target is a preview/experimental ESP-IDF feature. The runner sets
+`IDF_TARGET=linux` and uses `build-host/`; the root `CMakeLists.txt` restricts
+the build to `main` and its dependencies (required by IDF for this target).
+
+Differences from QEMU worth knowing:
+
+* No emulated hardware at all: no flash image, no real `esp_timer` (a small
+  shim in `components/obegransad-host/` provides it, so sub-tick periods are
+  rounded up to one FreeRTOS tick), no real ISR dispatch.
+* The host network stack is used directly: the app's HTTP server binds host
+  ports (no forwarding), and outbound HA/MQTT/weather use normal sockets/DNS.
+* `psa_crypto_init()` is called at startup; without it the first TLS handshake
+  fails on this target.
+* Ideal for native `gdb`, sanitizers and fast restarts; not a substitute for
+  target timing or RF behaviour.
+
 ## Renderer
 
 `tools/sim/renderer.py` listens on TCP port 5566 (the firmware connects to it,
 so start order does not matter). `run-qemu.sh` binds the renderer to `0.0.0.0`
 because QEMU's slirp connects from the host interface address rather than
-loopback; a host build can use the default `--host 127.0.0.1`. It draws the
-16x16 panel and sends button commands back:
+loopback; the host build uses the default `127.0.0.1`. It draws the 16x16 panel
+and sends button commands back:
 
 | Input | Action |
 |---|---|
@@ -46,11 +81,12 @@ python3 tools/sim/renderer.py --ascii
 QEMU provides emulated OpenCores Ethernet with slirp: DHCP, DNS and NAT to the
 host network. The simulator device backend (`main/device_sim.cpp`) brings it up
 instead of `esp_wifi` and posts the normal `APP_EVT_WIFI_CONNECTED`, so
-weather/HTTPS/NTP and any future HTTP/MQTT server work unchanged.
+weather/HTTPS/NTP and any future HTTP/MQTT server work unchanged. The host
+build (`main/device_host.cpp`) announces the same event using the host stack.
 
-* Outbound (weather, NTP, Home Assistant REST/MQTT): works through the host.
-* Inbound: `http://127.0.0.1:8080/` is forwarded to guest port 80. Change the
-  host port with `--http-port`.
+* Outbound (weather, NTP, Home Assistant REST/MQTT): works in both.
+* Inbound under QEMU: `http://127.0.0.1:8080/` is forwarded to guest port 80
+  (`--http-port`). On the host build the server binds host ports directly.
 
 Wi-Fi credentials from `sdkconfig.defaults.local` are compiled in but ignored.
 To exercise the `SETUP` state, enable `CONFIG_OBG_SIM_FAKE_NO_CREDS`; the
@@ -58,13 +94,14 @@ captive portal itself cannot run without real AP hardware.
 
 ## Limitations
 
-| Feature | QEMU |
-|---|---|
-| FreeRTOS, esp_timer, esp_event, NVS | real |
-| Display | framebuffer sent to the renderer (no SPI/RMT) |
-| Buttons | renderer keys (GPIO input is not emulated) |
-| Wi-Fi / captive portal (AP) | not emulated → emulated Ethernet instead |
-| `esp_restart()` on long press | may not reset the emulated chip; restart the script if it hangs |
+| Feature | QEMU | Host |
+|---|---|---|
+| FreeRTOS, `esp_event`, NVS | real | POSIX simulator |
+| `esp_timer` | real | shim (tick-granular) |
+| Display | framebuffer to the renderer (no SPI/RMT) | same |
+| Buttons | renderer keys | renderer keys |
+| Wi-Fi / captive portal (AP) | emulated Ethernet instead | host stack |
+| `esp_restart()` on long press | may not reset the emulated chip; restart the script if it hangs | same |
 
-For real SPI/RMT timing and Wi-Fi behaviour, test the hardware build; the
-renderer cannot reproduce panel timing artifacts.
+For real SPI/RMT timing, Wi-Fi behaviour and provisioning, test the hardware
+build; the renderer cannot reproduce panel timing artifacts.

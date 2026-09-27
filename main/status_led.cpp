@@ -1,5 +1,14 @@
 #include "status_led.hpp"
 
+#include "sdkconfig.h"
+
+#if CONFIG_IDF_TARGET_LINUX
+
+// The host build has no status LED GPIO.
+esp_err_t status_led_init() { return ESP_OK; }
+
+#else // !CONFIG_IDF_TARGET_LINUX
+
 #include "app_events.h"
 #include "device.h"
 
@@ -59,3 +68,5 @@ esp_err_t status_led_init() {
       TAG, "Failed to register status LED event handler");
   return ESP_OK;
 }
+
+#endif // !CONFIG_IDF_TARGET_LINUX

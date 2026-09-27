@@ -26,6 +26,6 @@ dependencies:
 direct_dependencies:
 - 78/esp-wifi-connect
 - espressif/cjson
-manifest_hash: 1de1f3b252cfbd0ab1d89a93af0f07909dc0a002db2bb1c0a6979fe7bb0e19c4
+manifest_hash: 854487d998709644c7beae19dd6a7eab14ee544a55bc3437bb90ff9aa034d106
 target: esp32c3
 version: 3.0.0

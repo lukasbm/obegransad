@@ -2,6 +2,7 @@ menu "Driver for IKEA Obegransad Panel"
 
     choice OBG_PANEL_BACKEND
         prompt "Panel backend"
+        default OBG_PANEL_BACKEND_SIM if IDF_TARGET_LINUX
         default OBG_PANEL_BACKEND_SIM if OBG_SIMULATOR
         default OBG_PANEL_BACKEND_HW
         help

@@ -1,0 +1,9 @@
+# Native Linux/POSIX host build defaults, used by tools/sim/run-host.sh.
+# The root CMakeLists sets COMPONENTS=main for this target, so only main and
+# its dependencies are built; the sim backends replace the panel output, the
+# button and the Wi-Fi stack, and the host network stack is used directly.
+#
+CONFIG_OBG_SIMULATOR=y
+
+# The host has no flash/partition table; keep the log level explicit.
+CONFIG_LOG_DEFAULT_LEVEL_INFO=y

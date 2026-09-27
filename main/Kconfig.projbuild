@@ -80,6 +80,7 @@ config OBG_SIMULATOR
 
 choice OBG_DEVICE_BACKEND
     prompt "Device/connectivity backend"
+    default OBG_DEVICE_BACKEND_HOST if IDF_TARGET_LINUX
     default OBG_DEVICE_BACKEND_SIM if OBG_SIMULATOR
     default OBG_DEVICE_BACKEND_HW
 
@@ -88,10 +89,14 @@ choice OBG_DEVICE_BACKEND
 
     config OBG_DEVICE_BACKEND_SIM
         bool "Simulator (QEMU emulated Ethernet, no esp_wifi)"
+
+    config OBG_DEVICE_BACKEND_HOST
+        bool "Host (native Linux, host network stack)"
 endchoice
 
 choice OBG_BUTTON_BACKEND
     prompt "Button backend"
+    default OBG_BUTTON_BACKEND_SIM if IDF_TARGET_LINUX
     default OBG_BUTTON_BACKEND_SIM if OBG_SIMULATOR
     default OBG_BUTTON_BACKEND_HW
 

@@ -4,7 +4,7 @@
 
 #include "sdkconfig.h"
 
-#if !CONFIG_OBG_BUTTON_BACKEND_HW
+#if CONFIG_OBG_BUTTON_BACKEND_SIM
 
 #include "button.h"
 
@@ -52,4 +52,4 @@ esp_err_t button_init() {
   return ESP_OK;
 }
 
-#endif // !CONFIG_OBG_BUTTON_BACKEND_HW
+#endif // CONFIG_OBG_BUTTON_BACKEND_SIM

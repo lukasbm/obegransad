@@ -8,17 +8,18 @@ https://www.perplexity.ai/search/how-to-strip-the-c-c-code-by-r-JLu7mmGjRi.iywX2
 
 See [[DEVELOPER.md]]
 
-### Simulator (QEMU)
+### Simulator
 
-Run the firmware on an emulated ESP32-C3 with the display and button replaced
-by simulator backends (QEMU does not emulate SPI/RMT/GPIO or Wi-Fi):
+Run the firmware without the board, with the display and button replaced by
+simulator backends:
 
 ```sh
-tools/sim/run-qemu.sh
+tools/sim/run-qemu.sh    # real firmware on emulated ESP32-C3 (QEMU)
+tools/sim/run-host.sh    # native Linux build (fast iteration, gdb)
 ```
 
-See [[tools/sim/README.md]] for options, the renderer, networking (emulated
-Ethernet + host port forwarding) and limitations.
+See [[tools/sim/README.md]] for options, the renderer, networking and
+limitations. The host build needs the `libbsd` development headers.
 
 
 

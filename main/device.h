@@ -1,10 +1,14 @@
 #pragma once
 
 #include "esp_err.h"
+#include "sdkconfig.h"
+
+#if !CONFIG_IDF_TARGET_LINUX
 #include <driver/gpio.h>
 
 constexpr gpio_num_t BUTTON_PIN = GPIO_NUM_20;
 constexpr gpio_num_t STATUS_LED_PIN = GPIO_NUM_10;
+#endif
 
 // basic device initialization (NVS, event loop)
 esp_err_t device_init();

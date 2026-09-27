@@ -14,6 +14,17 @@
 #include "state.h"
 #include "sdkconfig.h"
 
+#if !CONFIG_IDF_TARGET_LINUX
+#include <driver/spi_master.h>
+#endif
+
+// The simulator panel backend ignores the hardware fields of panel_config_t.
+#if CONFIG_IDF_TARGET_LINUX
+#define OBG_PANEL_SPI_HOST 0
+#else
+#define OBG_PANEL_SPI_HOST SPI2_HOST
+#endif
+
 static const char* TAG = "main";
 
 extern "C" void app_main() {
@@ -50,7 +61,7 @@ extern "C" void app_main() {
       .clk_pin = (gpio_num_t)4,
       .di_pin = (gpio_num_t)5,
       .oe_pin = (gpio_num_t)6,
-      .spi_host = SPI2_HOST, // Use SPI2 for better performance
+      .spi_host = OBG_PANEL_SPI_HOST, // Use SPI2 for better performance
       .spi_clock_speed_hz = 3 * 1000 * 1000, // 1 MHz SPI clock speed
       .gamma = 2.2
   };

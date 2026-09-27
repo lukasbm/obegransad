@@ -90,7 +90,7 @@ fi
 DEFAULTS="$DEFAULTS;sdkconfig.defaults.sim"
 
 CMAKE_ARGS=(-B "$BUILD_DIR" "-DSDKCONFIG=$BUILD_DIR/sdkconfig"
-            "-DSDKCONFIG_DEFAULTS=$DEFAULTS")
+            "-DSDKCONFIG_DEFAULTS=$DEFAULTS" -DIDF_TARGET=esp32c3)
 
 # sdkconfig defaults only apply when the sdkconfig is (re)created; an existing
 # file wins. Warn when the defaults changed, and let --fresh regenerate.

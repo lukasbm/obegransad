@@ -1,5 +1,6 @@
 #include "panel_internal.h"
 
+#include "esp_attr.h"
 #include "esp_check.h"
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -61,11 +62,16 @@ esp_err_t panel_init(panel_config_t config) {
                           configMAX_PRIORITIES - 1, &g_panel_task_handle,
                           configNUMBER_OF_CORES - 1);
 
-  // ESP Timer for ISR-dispatched, low-jitter refresh ticks
+  // ESP Timer for refresh ticks: ISR-dispatched on chip targets for low
+  // jitter; on the host target the shim runs callbacks in task context.
   esp_timer_create_args_t timer_args = {
       .callback = refresh_timer_callback,
       .name = "panel_refresh",
-      .dispatch_method = ESP_TIMER_ISR, // run in ISR context for low jitter
+#if CONFIG_IDF_TARGET_LINUX
+      .dispatch_method = ESP_TIMER_TASK,
+#else
+      .dispatch_method = ESP_TIMER_ISR,
+#endif
   };
   ESP_RETURN_ON_ERROR(esp_timer_create(&timer_args, &g_refresh_timer), TAG,
                       "ESP Timer creation failed");
@@ -168,9 +174,15 @@ uint8_t panel_get_global_brightness(void) { return g_brightness_user; }
  * @param arg User-defined argument (unused)
  */
 static void IRAM_ATTR refresh_timer_callback(void *arg) {
+#if CONFIG_IDF_TARGET_LINUX
+  // The host esp_timer shim runs callbacks in task context, so the ISR-safe
+  // notification must not be used there.
+  xTaskNotifyGive(g_panel_task_handle);
+#else
   BaseType_t xHigherPriorityTaskWoken = pdFALSE;
   vTaskNotifyGiveFromISR(g_panel_task_handle, &xHigherPriorityTaskWoken);
   portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+#endif
 }
 
 /**

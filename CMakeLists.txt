@@ -19,5 +19,26 @@ if(NOT DEFINED SDKCONFIG_DEFAULTS)
     endif()
 endif()
 
+# The Linux/POSIX host target can only build `main` and its dependencies;
+# ESP-IDF requires COMPONENTS to be set before project() (see
+# docs/api-guides/host-apps). Detect the target from the sdkconfig this build
+# uses, so chip builds keep their normal component set.
+if(DEFINED IDF_TARGET AND IDF_TARGET STREQUAL "linux")
+    set(COMPONENTS main)
+else()
+    set(_obg_sdkconfig "${SDKCONFIG}")
+    if(NOT _obg_sdkconfig)
+        set(_obg_sdkconfig "${CMAKE_CURRENT_LIST_DIR}/sdkconfig")
+    endif()
+    if(EXISTS "${_obg_sdkconfig}")
+        file(READ "${_obg_sdkconfig}" _obg_sdkconfig_content)
+        if(_obg_sdkconfig_content MATCHES "CONFIG_IDF_TARGET=\"linux\"")
+            set(COMPONENTS main)
+        endif()
+        unset(_obg_sdkconfig_content)
+    endif()
+    unset(_obg_sdkconfig)
+endif()
+
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(obegransad)

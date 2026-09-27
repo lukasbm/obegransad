@@ -3,7 +3,7 @@
 
 #include "sdkconfig.h"
 
-#if !CONFIG_OBG_PANEL_BACKEND_HW
+#if CONFIG_OBG_PANEL_BACKEND_SIM
 
 #include "panel_internal.h"
 
@@ -34,4 +34,4 @@ void panel_backend_display(void) {
   sim_link_publish_frame(panel_core_framebuffer());
 }
 
-#endif // !CONFIG_OBG_PANEL_BACKEND_HW
+#endif // CONFIG_OBG_PANEL_BACKEND_SIM

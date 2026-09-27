@@ -1,11 +1,22 @@
+idf_build_get_property(obg_target IDF_TARGET)
+
 # Both backends are always registered: the IDF build system evaluates this
 # file before Kconfig, so REQUIRES/SRCS must not depend on CONFIG_*. The
 # backend that is not selected compiles to an empty translation unit (see the
 # #if guards in panel_hw.c / panel_sim.c).
+set(panel_reqs freertos esp_timer obegransad-sim)
+if(obg_target STREQUAL "linux")
+    # Host target: only panel_sim.c compiles; the public header includes
+    # soc/gpio_num.h, which esp_hal_gpio provides for linux.
+    list(APPEND panel_reqs esp_hal_gpio)
+else()
+    list(APPEND panel_reqs esp_driver_spi esp_driver_gpio esp_driver_rmt hal
+                           spi_flash)
+endif()
+
 idf_component_register(
     SRCS "panel_core.c" "panel_hw.c" "panel_sim.c"
     INCLUDE_DIRS "include"
     PRIV_INCLUDE_DIRS "."
-    REQUIRES freertos esp_timer esp_driver_spi esp_driver_gpio esp_driver_rmt
-             hal spi_flash obegransad-sim
+    REQUIRES ${panel_reqs}
 )
